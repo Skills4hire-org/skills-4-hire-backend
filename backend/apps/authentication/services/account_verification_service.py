@@ -7,7 +7,7 @@ from django.db import DatabaseError
 from apps.authentication.otp_models import OTP_Base
 from apps.authentication.exceptions import ServiceAlreadyExpired
 from apps.authentication.services.baase_service import BaseService
-
+from apps.authentication.utils.generate_otp import hash_secret
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -41,8 +41,8 @@ class AccountVerificationService(BaseService):
             if user.is_deleted:
                 raise ValidationError("Account has been deactivated. contact support")
 
-            if user.is_verified or user.is_active:
-                return "Your account is verified, login to your account"
+            #if user.is_verified or user.is_active:
+             #   raise ValidationError("Your account is verified, login to your account")
 
             return user
         except DatabaseError as exc:    
@@ -58,9 +58,10 @@ class AccountVerificationService(BaseService):
             raise ValidationError("Request is misconfigured. Both fields are requried 'user instance', and  'code'.")
 
         try:
-            otp_instance = get_object_or_404(OTP_Base, user=user, code=code)
+            hash_code = hash_secret(code)
+            otp_instance = get_object_or_404(OTP_Base, user=user, code=hash_code)
 
-            if otp_instance.is_expired:
+            if otp_instance.is_expired():
                 logging.info("OTP instance is Expired")
                 raise ServiceAlreadyExpired("otp instance is expired ")
 
@@ -80,12 +81,12 @@ class AccountVerificationService(BaseService):
                 user_instance.save(update_fields=["is_active", "is_verified"])
 
                 otp_instance.save(update_fields=['is_used'])
-                S
+    
         except DatabaseError as exc:
             logger.error("error while verifying user account", exc_info=True)
             raise ValidationError("Error while validating user and otp instances", exc)
 
         except Exception as e:
-            raise ValidationError("Inappropriate error occured", e)
+            raise ValidationError(f"Inappropriate error occured {e}")
 
             

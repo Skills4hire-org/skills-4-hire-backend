@@ -7,7 +7,9 @@ from django.contrib.auth.password_validation import validate_password as _valida
 from .models import CustomUser
 import logging
 from rest_framework.exceptions import ValidationError
-
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
+from django.db.models import Q
+from rest_framework_simplejwt.tokens import RefreshToken, BlacklistedToken
 logging.basicConfig(level=logging.INFO)
 
 
@@ -63,6 +65,15 @@ class RegistrationsSerializer(serializers.Serializer):
         data["phone"] = str(instance.phone) if instance.phone else None
 
         return data
+
+    def validate_phone(self, value):
+        """
+        This method ensures that the provided email address does not already 
+        exist in the database and complies with company domain restrictions.
+        """
+        if User.objects.filter(phone=value).exists():
+            raise serializers.ValidationError("Phone number already exists")
+        return value
     
     def validate_email(self, value:str):
         """
@@ -273,3 +284,70 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         return attrs
 
 
+class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+
+    def user_can_authenticate(self, user):
+
+        return getattr(user, "is_active", True)
+    
+    def validate(self, attrs):
+        
+        login_identifier = attrs.get("email", None)
+        password = attrs.get("password", None).strip()
+        
+        try: 
+            user = User.objects.filter(
+                Q(email__iexact=login_identifier) |
+                Q(phone__iexact=login_identifier)
+            ).first()
+
+        except User.DoesNotExist:
+            user = None
+
+        if not user.is_verified or  not user.is_active:
+            raise serializers.ValidationError("Your account is not verified")
+        if user.is_deleted:
+            raise serializers.ValidationError("Account has been deactivated, contact admin")
+        
+        if hasattr(user, "check_password"):
+            if not user or not user.check_password(password) or not  self.user_can_authenticate(user):
+                raise serializers.ValidationError("Invalid credentials provided")
+
+        self.user = user
+        data = super().validate(attrs)
+
+        data["user_data"] = {
+            "user_id": user.pk,
+            "email": user.email,
+            "full_name": user.full_name
+        }
+
+        return data
+
+
+
+    @classmethod
+    def get_token(self, user):
+        """ 
+        Provide extra claims to token data
+        """
+        token = super().get_token(user)
+
+        token["email"] = getattr(user, "email", None)
+        token["full_name"] = getattr(user, "full_name", None)
+
+        return token
+
+class LogoutSerializer(serializers.Serializer):
+    """ 
+    A simple logout serializer for validating and blacklisting refresh tokens
+    """
+
+    refresh_token = serializers.CharField(write_only=True, required=True)
+
+    def validate(self, attrs: dict) -> str:
+        attrs["refresh_token"].strip()
+
+        return attrs
+
+        

@@ -26,8 +26,8 @@ class OTP_Base(models.Model):
 
     def is_expired(self) -> bool:
         expiry_minute = getattr(settings, "OTP_EXPIRY", 15)   
-        expires_at = self.created_at + timedelta(minutes=expiry_minute)
-        if datetime.now() > expires_at:
+        expires_at = self.created_at + timezone.timedelta(minutes=expiry_minute)
+        if timezone.now() > expires_at:
             return True
         return False
 

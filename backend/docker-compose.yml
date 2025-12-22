@@ -21,6 +21,9 @@ services:
     ports:
       - "5379:5379"
     restart: "unless-stopped"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
 
   adminer:
     image: adminer:standalone
@@ -75,3 +78,4 @@ services:
       
 volumes:
   postgres_data:
+  redis_data:

@@ -9,10 +9,19 @@ from django.db import IntegrityError
 from apps.authentication.services.email_services import EmailService
 from apps.authentication.services.tasks import send_email_notification 
 from apps.authentication.utils.validate import _validate_subject_or_context
+import hashlib
 
 logger = logging.getLogger(__name__)
 
-
+def hash_secret(key: str):
+    if key is None:
+        raise ValidationError("OTP is required to be hashed")
+    print(key)
+    try:
+        hashed_otp = hashlib.sha256(key.encode()).hexdigest()
+        return hashed_otp
+    except Exception as exc:
+        raise ValidationError(f"Error hashing otp codes: {exc}")
 
 def generate_otp():
     max_length = getattr(settings, "MAX_OTP_LENGTH", None)
@@ -53,9 +62,10 @@ def generate_unique_otp(max_attempts=5) -> str:
 def create_otp_for_user(user):
     try:
         code = generate_unique_otp()
-
+        
+        hash = hash_secret(code)
         with transaction.atomic():
-            otp_instance = OTP_Base.objects.create(user=user, code=code)
+            otp_instance = OTP_Base.objects.create(user=user, code=hash)
 
             if not otp_instance.pk:
                 raise ValidationError("Error creating OTP code for user")

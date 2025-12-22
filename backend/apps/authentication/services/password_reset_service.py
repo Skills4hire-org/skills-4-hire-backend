@@ -1,16 +1,17 @@
 from apps.authentication.services.baase_service import BaseService
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core.exceptions import ValidationError
-from django.core.cache import cache
 from django.conf import settings
 from apps.authentication.services.resend_otp_service import ResendOtpService
 from apps.authentication.helpers import send_email_to_user
 from apps.authentication.services.email_services import EmailService
+from apps.authentication.utils.generate_otp import hash_secret
+from django.core.cache import cache
 
 
 import logging
 logger = logging.getLogger(__name__)
-cache_ttl = getattr(settings, "OTP_EXPIRY", 15)
+cache_ttl = getattr(settings, "OTP_EXPIRY", 15) * 60
 
 class PasswordResetService(ResendOtpService):
 
@@ -27,10 +28,10 @@ class PasswordResetService(ResendOtpService):
             return token
         except Exception as exc:
             logger.exception("Exception occurred while generating token for user %", user.pk)
-            raise ValidationError("Validating and returning password reset token failed")
+            raise ValidationError(f"Validating and returning password reset token failed {exc}")
         
     def create_cache_key(self, user_pk):
-        token_cache_key = f"token_{user_pk}_cache"
+        token_cache_key = f"password_reset:{user_pk}"
 
         return token_cache_key
 
@@ -40,7 +41,7 @@ class PasswordResetService(ResendOtpService):
         
         cache_key = self.create_cache_key(user.pk)
 
-        if not cache.has_key(cache_key):
+        if not cache.has_key(cache_key):    
             cache.set(cache_key, token, timeout=cache_ttl)
 
         return cache_key

@@ -3,9 +3,10 @@ from django.core.exceptions import ValidationError
 from apps.authentication.otp_models import OTP_Base
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
-from django.core.cache import cache
 import logging 
-
+from apps.authentication.utils.generate_otp import hash_secret
+from django.core.cache import cache
+from apps.authentication.helpers import blacklist_outstanding_token
 logger = logging.getLogger(__name__)
 
 class PasswordConfirmService(BaseService):
@@ -37,7 +38,8 @@ class PasswordConfirmService(BaseService):
             raise ValidationError("code is required for password reset")
 
         try:
-            code_instance  = get_object_or_404(OTP_Base, code=code)
+            hashed_code = hash_secret(code)
+            code_instance  = get_object_or_404(OTP_Base, code=hashed_code)
             
             if code_instance.is_expired() or code_instance.is_used:
                 raise ValidationError("code is compromised. \n Invalid code provided")
@@ -56,16 +58,21 @@ class PasswordConfirmService(BaseService):
         try:
             token_generator = PasswordResetTokenGenerator()
 
-            check_token = token_generator.check_token(user, token)
-            if not check_token:
-                raise ValidationError("Password reset token mismatch. Error")
-            
-            cache_key = f"token_{user.pk}_cache"
+            if not token_generator.check_token(user, token):
+                raise ValidationError("Token generation check mismatch")
 
-            logger.debug(f"DEBUG CACHED KEYS {cache.keys()}")
-            if not cache.get(cache_key, None):
-                raise ValidationError("Cached token already expired: Timedout")
-            return True 
+            cache_key = f"password_reset:{user.pk}".strip()
+
+            redis_cache_key = cache.get(cache_key)
+            if not redis_cache_key:
+                raise ValidationError("Cached token Not found: Timedout")
+
+            if not token_generator.check_token(user, redis_cache_key):
+                raise ValidationError("Token Mismatch with redis", code=400)
+
+            cache.delete(cache_key)
+            return True
+        
         except Exception as exc:
             raise ValidationError(f"Error: {exc}")
 
@@ -75,16 +82,14 @@ class PasswordConfirmService(BaseService):
         if not (user, code):
             raise ValidationError("Both 'user', and 'code' are required to clean up jobs")
 
-        # Delete otp and redis cache
-        cache_key = f"token_{user.pk}_cache"
-        OTP_Base.objects.get(code=code).delete()
-        cache.delete(cache_key)
+        hashed_code = hash_secret(code)
+        OTP_Base.objects.get(user=user, code=hashed_code).delete()
+
+        # Clean up all outstanding tokens after password change
+
+        blacklist_outstanding_token(user)
+
 
 
         
 
-#{
- #   "code": "0393940S",
-  #  "password": "09876poiu",
-   # "confirm_password": "09876poiu"
-#}

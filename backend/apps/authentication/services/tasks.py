@@ -4,6 +4,9 @@ from django.core.exceptions import ValidationError
 import logging
 from apps.authentication.otp_models import OTP_Base
 from django.db import IntegrityError, transaction
+from rest_framework_simplejwt.tokens import OutstandingToken, BlacklistedToken
+from django.utils import timezone
+
 
 logger = logging.getLogger(__name__)
 
@@ -69,4 +72,23 @@ def auto_delete_otp():
     except ValueError as exc:
         logger.error("Invalid error occurred", exc_info=True)
         raise ValidationError("Error auto deleting OTP code.", exc)
-        
+
+@shared_task    
+def clean_up_expired_jwt():
+    logger.debug("Running Tasks.... Clean up expired jwts refresh tokens")
+
+    try:
+        now = timezone.now()
+
+        expired_outstainding_tokens = OutstandingToken.objects.filter(expires_at__lt=now)
+
+        BlacklistedToken.objects.filter(token__expires_at__lt=now).delete()
+        expired_outstainding_tokens.delete()
+
+        logger.info(f"Automatically deleted Exired outstanding jwt")    
+    except IntegrityError as exc:
+        logger.error("Database error while auto deleting outstanding jwt",  exc_info=True)
+        raise ValidationError("Database error while auto deleting JWT.") 
+    except ValueError as exc:
+        logger.error("Invalid error occurred", exc_info=True)
+        raise ValidationError("Error auto deleting JWT token.", exc)

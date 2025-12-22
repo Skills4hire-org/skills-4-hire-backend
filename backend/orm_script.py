@@ -16,3 +16,10 @@ def ready():
 
 if __name__ == "__main__":
     ready()
+
+
+{
+    "code": "IO5RZ7MJ",
+    "password": "09876poiu",
+    "confirm_password": "09876poiu"
+}

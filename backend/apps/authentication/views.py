@@ -23,13 +23,19 @@ from apps.authentication.serilaizers import (
     RegistrationsSerializer,
     AccountVerificationSerializer,
     ResendOtpSerializer,
-    PasswordResetConfirmSerializer
+    PasswordResetConfirmSerializer,
+    CustomTokenObtainPairSerializer,
+    LogoutSerializer
 )
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status
+from rest_framework import status, permissions
 from apps.authentication.utils.generate_otp import create_otp_for_user, otp_email_for_user
 from django.conf import settings
+from django_redis import get_redis_connection
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework import generics
+from rest_framework_simplejwt.tokens import RefreshToken
 
 BASE_URL = getattr(settings, "BASE_URL")
 
@@ -45,6 +51,8 @@ class RegistrationView(APIView):
     """
 
     http_method_names = ["post"]
+    permission_classes = [permissions.AllowAny]
+
 
     serializer_class = RegistrationsSerializer
 
@@ -87,7 +95,7 @@ class RegistrationView(APIView):
 
 class AccountVerificationView(APIView):
     http_method_names = ["post"]
-
+    permission_classes = [permissions.AllowAny]
     serializer_class = AccountVerificationSerializer
 
     def post(self, request, *args, **kwargs):
@@ -111,7 +119,7 @@ class AccountVerificationView(APIView):
 
 class ResendOtpView(APIView):
     http_method_names = ["post"]
-
+    permission_classes = [permissions.AllowAny]
     serializer_class = ResendOtpSerializer
 
 
@@ -125,7 +133,6 @@ class ResendOtpView(APIView):
 
             email = resend_otp_service._decode_serializer()
             user = resend_otp_service.get_user(email)
-
             code = create_otp_for_user(user)
 
             otp_email_for_user(user, code)
@@ -139,7 +146,7 @@ class ResendOtpView(APIView):
 
 class PasswordResetRequestView(APIView):
     http_method_names = ["post"]
-
+    permission_classes = [permissions.AllowAny]
     serializer_class = ResendOtpSerializer
 
     def post(self, request, *args, **kwargs):
@@ -152,34 +159,36 @@ class PasswordResetRequestView(APIView):
 
             user = password_reset_service.get_user(user_email)
             generate_token = password_reset_service.generate_token_for_user(user)
+            
 
             store_token = password_reset_service.cache_token_in_redis_cache(user, generate_token)
-
             code = create_otp_for_user(user)
 
             password_reset_service.send_reset_email(code, user)
 
             return Response({
                 "success": True,
-                "reset_link": BASE_URL + f"api/v1/auth/account/password/reset/confirm?token={generate_token}"
-            })
+                "reset_link": BASE_URL + f"api/v1/auth/account/password/reset/confirm?token={generate_token}",
+                "cache": store_token,
+            }, status=status.HTTP_200_OK)
         except Exception as e:
             return Response({
             "success": False,
             "error messages": f"Error: {e}"
-            }
+            }, status=status.HTTP_400_BAD_REQUEST
             )
 
 class PasswordResetConfirmView(APIView):
     http_method_names = ["post"]
+    permission_classes = [permissions.AllowAny]
+    serializer_class = PasswordResetConfirmSerializer
 
-    serializer_calss = PasswordResetConfirmSerializer
     def post(self, request, *args, **kwargs):
 
-        serializer = self.serializer_calss(data=request.data)
+        serializer = self.serializer_class(data=request.data)
 
         try:
-            password_reset_token = request.query_params.get("token") or request.GET.get("token")
+            password_reset_token = request.query_params.get("token").strip() or request.GET.get("token").strip()
 
             confirm_service = PasswordConfirmService(serializer)
             confirm_service._validate_serializer()
@@ -193,20 +202,67 @@ class PasswordResetConfirmView(APIView):
                 # set user password 
 
                 user.set_password(password)
-                user.password = password
                 user.save(update_fields=["password"])
             
-            confirm_serivice.clean_up_jobs(code, user)
+            confirm_service.clean_up_jobs(code, user)
 
             return Response({
-                "success": False,
-                "detail": "Password reset successful"
-            })
+                "success": True,
+                "detail": {
+                    "message": "Password Reset successful",
+                    "user_data": {
+                        "email": user.email,
+                        "full_name": user.full_name
+                    }
+                },
+                
+            }, status=status.HTTP_200_OK)
         
         except Exception as exc:
             return Response(
                 {
                     "success": False,
                     "detail": f"Error reseting password: {exc}"
-                }
+                }, status=status.HTTP_400_BAD_REQUEST
             )
+
+class LoginView(TokenObtainPairView):
+    """
+    Takes a set of user credentials and returns an access and refresh JSON web
+    token pair to prove the authentication of those credentials.
+    """
+    serializer_class = CustomTokenObtainPairSerializer
+
+token_obtain_pair = LoginView.as_view()
+
+
+class LogOutView(APIView):
+    serializer_class = LogoutSerializer 
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ["post"]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.serializer_class(data=request.data, context=request)
+        serializer.is_valid(raise_exception=True)
+        try:
+            refresh_token = serializer.validated_data.get("refresh_token", None)
+            refresh = RefreshToken(refresh_token)
+            refresh.blacklist()
+
+            return Response({
+                "detail": {
+                    "message": "Logged out successfully",
+                    "user": request.user.email
+                }
+            }, status= status.HTTP_200_OK)
+
+
+        except Exception  as exc:
+            return Response({
+                "detail": {
+                    "message": "Error occurred while validating log out sessions",
+                    "exceptions": str(exc)
+                }
+            }, status=status.HTTP_400_BAD_REQUEST)
+logout_view = LogOutView.as_view()
+

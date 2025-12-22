@@ -1,6 +1,8 @@
 import os
 from pathlib import Path
 import environ
+from django.utils import timezone
+from celery.schedules import crontab
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -15,7 +17,8 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DEBUG")
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['127.0.0.1', "localhost"]
+
 
 BASE_URL = env("BASE_URL")
 OTP_RETRIES_PER_DAY = env.int("OTP_RETRIES_PER_DAY")
@@ -43,6 +46,7 @@ INSTALLED_APPS = [
     "drf_yasg",
     "rest_framework",
     'django_celery_beat',
+    'rest_framework_simplejwt.token_blacklist',
 
     # local apps
     'apps.authentication.apps.AuthenticationConfig'
@@ -50,15 +54,31 @@ INSTALLED_APPS = [
 ]
 
 REST_FRAMEWORK = {
-    #"DEFAULT_THROTTLE_CLASSES": [
-        #"rest_framework.throttling.UserRateThrottle",
-        #"rest_framework.throttling.AnonRateThrottle",
-    #],
-    #"DEFAULT_THROTTLE_RATES": {
-        #"anon": "5/min",
-        #"user": "10/day"
-    #}
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    ),
+    "DEFAULT_PERMISSION_CLASSES": [
+        "rest_framework.permissions.IsAuthenticated"
+    ]
+
 }
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timezone.timedelta(minutes=OTP_EXPIRY),
+    "REFRESH-TOKEN_LIFETIME": timezone.timedelta(days=3),
+    "UPDATE_LAST_LOGIN": True,
+    "USER_ID_FIELD": "user_id",
+    "USER_ID_CLAIM": "user_id",
+    "ROTATE_REFRESH_TOKEN": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    #"AUTH_HEADER_TYPES": ("Bearer",)
+}
+
+AUTHENTICATION_BACKENDS = [
+    "apps.authentication.backends.EmailPhoneBackend",
+    'django.contrib.auth.backends.ModelBackend'
+]
+
 
 CLOUDINARY_STORAGE = {
         "CLOUD_NAME": env("CLOUD_NAME"),
@@ -190,6 +210,27 @@ timezone = 'Africa/Lagos'
 CELERY_BEAT_SCHEDULE = {
     "delete_otp": {
         "task": "apps.authentication.services.tasks.auto_delete_otp",
-        "schedule": 120
+        "schedule": crontab(hour=10, minute=0)
+    },
+    "auto_delete_exp_outstanding_jwt": {
+        "task": "apps.authentication.services.tasks.clean_up_expired_jwt",
+        "schedule": crontab(hour=0, minute=0)
     }
+}
+
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler"
+        }
+    },
+    "loggers": {
+        "rest_framework": {
+            "handlers": ["console"],
+            "level": "DEBUG"
+        },
+    },
 }
