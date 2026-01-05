@@ -33,7 +33,8 @@ urlpatterns += [
 # App level url config
 
 urlpatterns += [
-    path("api/v1/", include("apps.authentication.urls"))
+    path("api/v1/", include("apps.authentication.urls")),
+    path("api/v1/", include("apps.users.urls"))
 ]
 
 

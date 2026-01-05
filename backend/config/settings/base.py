@@ -49,7 +49,8 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
 
     # local apps
-    'apps.authentication.apps.AuthenticationConfig'
+    'apps.authentication.apps.AuthenticationConfig',
+    "apps.users.apps.UsersConfig"
 
 ]
 
@@ -191,12 +192,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 
 EMAIL_BACKEND = env("EMAIL_BACKEND")
-EMAIL_HOST = env("EMAIL_HOST")
-EMAIL_PORT = env.int("EMAIL_PORT")         
-EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS")   
-EMAIL_HOST_USER = env("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
+
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL")
+SENDGRID_API_KEY = os.getenv("SENDGRID_API_KEY")
 
 
 # Celery config

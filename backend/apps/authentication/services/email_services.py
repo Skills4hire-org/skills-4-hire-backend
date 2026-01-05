@@ -10,7 +10,7 @@ from django.utils import timezone
 
 logging.basicConfig(level=logging.INFO)
 
-email_host = getattr(settings, "EMAIL_HOST_USER")
+email_host = getattr(settings, "DEFAULT_FROM_EMAIL")
 app_name = getattr(settings, "APP_NAME")
 @dataclass
 class Email:
@@ -32,18 +32,20 @@ class EmailService:
         self.template_name = email.template_name
         self.host_user = email.host_user
         self.receipient = email.receipient
-
+        logging.debug(self.subject, self.context, self.receipient)
 
     def _validate_subject(self):
         """ for mat self.subject properly and mark unknow if not provided"""
+        
         if not self.subject or not str(self.subject).strip():
             self.subject = "Unknown"
         else:
             self.subject = str(self.subject).strip()
 
+
     def send_mail(self):
-        if not self._validate_subject():
-            logging.info("Error occurred while checking for message")
+        #if not self._validate_subject():
+         #   logging.info("Error occurred while checking for message")
             
         if not self.receipient:
             logging.info("Receipient list cannot be empty")

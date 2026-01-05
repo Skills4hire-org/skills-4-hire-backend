@@ -49,8 +49,6 @@ class RegistrationsSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=200)
     last_name = serializers.CharField(max_length=200)
     phone = PhoneNumberField(max_length=50)
-
-    role = serializers.ChoiceField(choices= ["CLIENT", "SERVICE_PROVIDER"])
     password = serializers.CharField(write_only=True, max_length=50)
     
     confirm_password = serializers.CharField(max_length=50, write_only=True)
@@ -135,36 +133,6 @@ class RegistrationsSerializer(serializers.Serializer):
 
         return attrs
 
-    def validate_role(self, value):
-        
-        """
-        Validate and normalize the user role.
-
-        Strips leading and trailing whitespace from the provided role value and
-        ensures it is one of the allowed role choices. Raises a validation error
-        if the role is not permitted.
-
-        Args:
-            value (str): The role value provided in the request data.
-
-        Returns:
-            str: The normalized role value.
-
-        Raises:
-            serializers.ValidationError: If the role is not one of the allowed roles.
-        """
-        role = value.strip()
-        allowed_roles = [
-            CustomUser.RoleChoices.SERVICE_PROVIDER,
-            CustomUser.RoleChoices.CLIENT,
-        ]
-
-        if role not in allowed_roles:
-            raise serializers.ValidationError(_(
-                f"Allowed roles: {allowed_roles}"
-            ))
-
-        return role
 
     def _normalize_and_validate_password(self, value):
         

@@ -35,14 +35,14 @@ def blacklist_outstanding_token(user):
         raise ValidationError("User instance is required")
 
     try:
-        outstanding_tokens = OutstandingToken.objects.filter(user=user).first()
+        outstanding_tokens = OutstandingToken.objects.filter(user=user)
 
         if outstanding_tokens is None:
             logger.info("No Outstanding token found for %s",  user)
 
-        for token in outstanding_tokens:
-            # Blacklist tokens
-            BlacklistedToken.objects.get_or_create(token=token)
+        BlacklistedToken.objects.bulk_create([
+            BlacklistedToken(token=token) for token in outstanding_tokens
+            ], ignore_conflicts=True)
         logger.debug(f"Blacklist {outstanding_tokens.count()} token")
 
     except Exception as exc:
