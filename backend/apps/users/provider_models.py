@@ -22,6 +22,13 @@ class ProviderModel(models.Model):
         HYBRID = "HYBRID", "Hybrid"
         CONTRCT = "CONTRCT", "Contract"
         
+    provider_id = models.UUIDField(
+        max_length=20, 
+        primary_key=True, 
+        unique=True,
+        default=uuid.uuid4,
+        db_index=True
+    )
     profile = models.OneToOneField(BaseProfile, on_delete=models.CASCADE, related_name="provider_profile")
     occupation = models.CharField(max_length=250, blank=False, null=False)
     headline = models.CharField(max_length=255)

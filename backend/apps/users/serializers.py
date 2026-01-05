@@ -1,26 +1,7 @@
 from rest_framework import serializers
 from .base_model import BaseProfile
 from .provider_models import ProviderModel
-
-
-class BaseProfileSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = BaseProfile
-        fields = [
-            "gender",
-            "bio",
-            "display_name",
-            "location"
-        ]
-
-        def validate_gender(self, value):
-            allowed_gender = ["MALE", "FEMALE", "OTHER"]
-
-            if value.upper() not in allowed_gender:
-                raise   serializers.ValidationError(f"Only allowed gender is {allowed_gender}")
-
-            return value
+from .client_models import ClientModel
 
 
 class ProviderProfileSerializer(serializers.ModelSerializer):
@@ -42,10 +23,76 @@ class ProviderProfileSerializer(serializers.ModelSerializer):
             "jobs_done",
 
         ]
-        
 
-class ProviderProfileSerializerOut(serializers.ModelSerializer):
-    provider_profile =  ProviderProfileSerializer(read_only=True)
+class ClientProfileSerializer(serializers.ModelSerializer):
+    class Meta: 
+        model = ClientModel
+        fields = [
+            "organisatiokn_name",
+            "organisation_type",
+            "industry",
+            "website",
+            "total_hires",
+        ]
+
+
+    
+class OnboardingSerializer(serializers.Serializer):
+
+    """
+    Handles onboarding user roles 
+    """
+
+    role = serializers.ChoiceField(choices=["SERVICE_PROVIDER", "CLIENT"], required=True)
+
+    def validate_role(self, value):
+        allowed_roles = ["SERVICE_PROVIDER", "CLIENT"]
+
+        if value not in allowed_roles:
+            raise serializers.ValidationError(detail=f"Bad Request: allowed roles: {allowed_roles}", code=400)
+        
+        return value
+
+
+class BaseProfileUpdateSerializer(serializers.Serializer):
+
+    gender = serializers.CharField(max_length=200)
+    bio = serializers.CharField(max_length=1000)
+    location = serializers.CharField(max_length=200)
+
+    provider_profile = ProviderProfileSerializer(required=False)
+    client_profile = ClientProfileSerializer(required=False)
+ 
+    def validate_gender(self, value):
+            allowed_gender = ["MALE", "FEMALE", "OTHER"]
+
+            if value.upper() not in allowed_gender:
+                raise   serializers.ValidationError(f"Only allowed gender is {allowed_gender}")
+
+            return value
+
+    def validate(self, data):
+        
+        request = self.context["request"]
+
+        if "provider_profile" in data and request.user.role != "SERVICE_PROVIDER":
+            raise serializers.ValidationError(
+                "User is not a Provider"
+            )
+
+        if "client_profile" in data and request.user.role != "CLIENT":
+            raise serializers.ValidationError(
+                "User is Not a CLient"
+            )
+
+        return data
+
+    
+
+class BaseProfileReadSerializer(serializers.ModelSerializer):
+
+    provider_profile = ProviderProfileSerializer(read_only=True)
+    client_profile = ClientProfileSerializer(read_only=True)
     class Meta:
         model = BaseProfile
         fields = [
@@ -54,9 +101,8 @@ class ProviderProfileSerializerOut(serializers.ModelSerializer):
             "bio",
             "display_name",
             "location",
-            "provider_profile"
+            "is_verified",
+            "created_at",
+            "provider_profile",
+            "client_profile"
         ]
-    
-
-
-    

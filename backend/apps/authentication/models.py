@@ -100,7 +100,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     last_name = models.CharField(max_length=200)
 
     # user roles in [admin, client, service_provide]
-    role = models.CharField(max_length=30, choices=RoleChoices.choices, default=RoleChoices.SERVICE_PROVIDER)
+    role = models.CharField(max_length=30, choices=RoleChoices.choices, default=None, blank=True, null=True)
 
     # Boolean fields
     is_active = models.BooleanField(default=False, db_index=True)

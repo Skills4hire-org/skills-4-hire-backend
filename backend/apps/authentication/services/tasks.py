@@ -6,6 +6,10 @@ from apps.authentication.otp_models import OTP_Base
 from django.db import IntegrityError, transaction
 from rest_framework_simplejwt.tokens import OutstandingToken, BlacklistedToken
 from django.utils import timezone
+from django.contrib.auth import get_user_model
+
+
+User = get_user_model()
 
 
 logger = logging.getLogger(__name__)
@@ -33,7 +37,11 @@ def send_email_notification(subject, context, template_name, receipient):
         )
 
         service.send_mail()
-        logger.info(f"Notification Email sent Successfully:", receipient)
+        logger.info(
+    "Notification Email sent successfully to %s",
+        receipient
+        )
+
 
     except ValidationError:
         raise
@@ -92,3 +100,10 @@ def clean_up_expired_jwt():
     except ValueError as exc:
         logger.error("Invalid error occurred", exc_info=True)
         raise ValidationError("Error auto deleting JWT token.", exc)
+
+
+@shared_task
+def auto_verify_profile():
+
+    logger.debug("Running Tasks... auto verifying user profiles")
+

@@ -1,16 +1,16 @@
 from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import (
-    base_profile_view,
-    ProviderProfileView
+    onboarding_view,
+    profile_view,
+    ProfileReadView
 )
 
 routers = DefaultRouter()
 
-routers.register(r'profile', ProviderProfileView, basename="profile")
-
-
+routers.register(r"profile", ProfileReadView, basename="profile")
 urlpatterns = [
-    path("users/profile/base/",  base_profile_view, name="base-profile"),
-    path("users/provider/", include(routers.urls))
+    path("", include(routers.urls)),
+    path("profile/onboarding/", onboarding_view, name="onboarding"),
+    path("profile/me/update", profile_view, name="profile-me")
 ]

@@ -89,6 +89,8 @@ def otp_email_for_user(user, code):
         
     try:
 
+        print("DEBUG", subject)
+        print("DEBUG", context)
         send_email_notification.delay(
             subject, 
             context,

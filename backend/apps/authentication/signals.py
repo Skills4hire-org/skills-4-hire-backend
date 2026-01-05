@@ -38,7 +38,8 @@ def post_create_profile(sender, instance, created, **kwrags):
     if BaseProfile.objects.filter(user=instance).exists():
         return 
 
-    profile = BaseProfile(user=instance)
+    profile = BaseProfile(user=instance, display_name=instance.full_name)
+
     profile.save()
 
     
