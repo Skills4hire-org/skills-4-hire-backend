@@ -30,23 +30,23 @@ class ProviderModel(models.Model):
         db_index=True
     )
     profile = models.OneToOneField(BaseProfile, on_delete=models.CASCADE, related_name="provider_profile")
-    occupation = models.CharField(max_length=250, blank=False, null=False)
-    headline = models.CharField(max_length=255)
-    overview = models.TextField()
+    occupation = models.CharField(max_length=250, blank=True, null=True)
+    headline = models.CharField(max_length=255, blank=True)
+    overview = models.TextField(blank=True)
 
     experience_level  = models.CharField(max_length=20, choices=ExperienceChoices.choices, default=ExperienceChoices.JUNIOR)
 
     availability = models.CharField(max_length=20, choices=Availability.choices,default=Availability.FULL_TIME)
 
-    min_charge = models.DecimalField(max_digits=10, decimal_places=2)
-    hourly_pay = models.DecimalField(max_digits=10, decimal_places=2)
+    min_charge = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
+    hourly_pay = models.DecimalField(max_digits=10, decimal_places=2, blank=True , null=True)
 
-    features = models.CharField(max_length=500)
-    description = models.TextField()
+    features = models.CharField(max_length=500, blank=True)
+    description = models.TextField(blank=True)
     jobs_done = models.PositiveIntegerField(default=0)
 
     about = models.TextField()
-    max_charge = models.DecimalField(decimal_places=2, max_digits=10)
+    max_charge = models.DecimalField(decimal_places=2, max_digits=10, blank=True, null=True)
     favourite = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
     is_online = models.BooleanField(default=True)

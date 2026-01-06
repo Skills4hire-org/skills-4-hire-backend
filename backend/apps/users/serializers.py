@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .base_model import BaseProfile
+from .base_model import BaseProfile, Address, Avater
 from .provider_models import ProviderModel
 from .client_models import ClientModel
 
@@ -28,7 +28,7 @@ class ClientProfileSerializer(serializers.ModelSerializer):
     class Meta: 
         model = ClientModel
         fields = [
-            "organisatiokn_name",
+            "organisation_name",
             "organisation_type",
             "industry",
             "website",
@@ -43,12 +43,11 @@ class OnboardingSerializer(serializers.Serializer):
     Handles onboarding user roles 
     """
 
-    role = serializers.ChoiceField(choices=["SERVICE_PROVIDER", "CLIENT"], required=True)
+    role = serializers.ChoiceField(choices=["SERVICE_PROVIDER", "CLIENT", "BOTH"], required=True)
 
-    def validate_role(self, value):
-        allowed_roles = ["SERVICE_PROVIDER", "CLIENT"]
-
-        if value not in allowed_roles:
+    def validate_role(self, value:str):
+        allowed_roles = ["SERVICE_PROVIDER", "CLIENT", "BOTH"]
+        if value.upper() not in allowed_roles:
             raise serializers.ValidationError(detail=f"Bad Request: allowed roles: {allowed_roles}", code=400)
         
         return value
@@ -89,10 +88,35 @@ class BaseProfileUpdateSerializer(serializers.Serializer):
 
     
 
+
+class AddresSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Address
+        fields = [
+            "line1",
+            "line2",
+            "city",
+            "state",
+            "postal_code",
+            "country"
+        ]
+
+
+class AvaterSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Avater
+        fields = [
+            "avater",
+            "description"
+        ]
+
 class BaseProfileReadSerializer(serializers.ModelSerializer):
 
     provider_profile = ProviderProfileSerializer(read_only=True)
     client_profile = ClientProfileSerializer(read_only=True)
+    address = AddresSerializer(read_only=True)
+    avater = AvaterSerializer(read_only=True)
+    
     class Meta:
         model = BaseProfile
         fields = [
@@ -104,5 +128,7 @@ class BaseProfileReadSerializer(serializers.ModelSerializer):
             "is_verified",
             "created_at",
             "provider_profile",
-            "client_profile"
+            "client_profile",
+            "address",
+            "avater"
         ]

@@ -1,7 +1,12 @@
 from rest_framework import status, permissions, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from .serializers import ProviderProfileSerializer, OnboardingSerializer, BaseProfileUpdateSerializer, BaseProfileReadSerializer
+from .serializers import (
+    ProviderProfileSerializer, 
+    OnboardingSerializer, 
+    BaseProfileUpdateSerializer, 
+    BaseProfileReadSerializer
+)
 from .base_model import BaseProfile
 from django.shortcuts import get_object_or_404
 from .provider_models import ProviderModel
@@ -18,9 +23,9 @@ User = settings.AUTH_USER_MODEL
 class OnboardingView(APIView):
     http_method_names = ["post"]
     serializer_class = OnboardingSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.AllowAny]
 
-    def post(self, request, *args, **kwargs):
+    def post(self, request):
 
         serializer = self.serializer_class(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -32,6 +37,7 @@ class OnboardingView(APIView):
                 "detail": "Invalid request: Role cannot be None"
             },status=400)
 
+
         if request.user.role:
             return Response(data={
                 "detailt": "Role already selected!"
@@ -39,26 +45,60 @@ class OnboardingView(APIView):
 
 
         base_profile = request.user.profile
+        match role.upper():
+            case "SERVICE_PROVIDER": 
+                provider_profile = ProviderModel(profile=base_profile)
+                request.user.is_provider = True
+                provider_profile.save()
 
-        if role == User.RoleChoices.SERVICE_PROVIDER: 
-            provider_profile = ProviderModel(profile=base_profile)
-            provider_profile.save()
+            case "CLIENT":
+                client_profile = ClientModel(profile=base_profile)
+                request.user.is_client = True
+                client_profile.save()
 
-        elif role == User.RoleChoices.CLIENT:
-            client_profile = ClientModel(profile=base_profile)
-            client_profile.save()
+            case "BOTH":
+                provider_profile = ProviderModel(profile=base_profile)
+                request.user.is_provider = True
+                request.user.is_client = True
 
-        request.user.role = role
-        request.user.save()
+                provider_profile.save()
+
+
+            case _:
+                return Response(data={
+                    "detail": "Invalid role provided"
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+
+        if role.upper() == "BOTH":
+            role = "SERVICE_PROVIDER"
+
+        request.user.active_role = role
+        request.user.save(update_fields=["active_role"])
 
         return Response(data={
-            "detail": "Onboarding Complete"
+            "detail": "Onboarding Complete",
+            "active role": request.user.active_role
         }, status=status.HTTP_200_OK)
 
 
-onboarding_view = OnboardingView.as_view()
+class SwitchRoleView(APIView):
+    http_method_names = ["post"]
 
+    def post(self, request, *args, **kwargs):
 
+        role = request.data.get("role").lower()
+        allowed_roles = ("service_provider", "client")
+
+        if role not in allowed_roles:
+            return Response(data={
+                "detail": "Specifield role is not inthe allowed role "
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        request.user.active_role = role.upper()
+        request.user.save(update_fields=["active_role"])
+
+switch_role_view = SwitchRoleView.as_view()
 
 class ProfileView(APIView):
     http_method_names = ["patch"]
@@ -68,7 +108,7 @@ class ProfileView(APIView):
     def patch(self, request):
         serializer = self.serializer_class(data=request.data, context={
             "request": request
-        })
+        }, partial=True)
 
         serializer.is_valid(raise_exception=True)
 
@@ -83,17 +123,19 @@ class ProfileView(APIView):
                     setattr(base_profile, fields, data[fields])
 
             base_profile.save()
-
-
+            
         # update role profiles
-        if request.user.role == User.RoleChoices.SERVICE_PROVIDER and "provider_profile" in data:
+        if request.user.active_role == "SERVICE_PROVIDER" and "provider_profile" in data:
             provider_profile = base_profile.provider_profile
             with transaction.atomic():
                 for fields, value in data["provider_profile"].items():
                     setattr(provider_profile, fields, value)
 
                 provider_profile.save()
-        if request.user.role == User.RoleChoices.CLIENT and "clent_profile" in data:
+            
+    
+        if request.user.active_role == "CLIENT" and "client_profile" in data:
+    
             client_profile = base_profile.client_profile
 
             with transaction.atomic():
@@ -122,7 +164,7 @@ class ProfileReadView(viewsets.ModelViewSet):
             BaseProfile.objects.select_related(
                 "provider_profile", "client_profile"
                 ).prefetch_related(
-                    "address", "avater"
+                    "address", "avaters"
                 )
     
         )
@@ -139,7 +181,7 @@ class ProfileReadView(viewsets.ModelViewSet):
             user=request.user
         )
 
-        serializer = self.get_serializer(user_profile, many=True)
+        serializer = self.get_serializer(user_profile)
 
         return Response(data={
             "status": "successful",
@@ -149,7 +191,7 @@ class ProfileReadView(viewsets.ModelViewSet):
     
 
     @method_decorator(cache_page(60 * 15)) # cache view for 15 minutes
-    @action(methods=["get"], detail=False)
+    @action(methods=["get"], detail=True)
     def public(self, request, pk=None):
 
         profile = get_object_or_404(
@@ -157,26 +199,12 @@ class ProfileReadView(viewsets.ModelViewSet):
             pk=pk
         )
 
-        serializer = self.get_serializer(profile, many=True)
+        serializer = self.get_serializer(profile)
         return Response(data={
             "status": "successful",
             "data": serializer.data
         }, status=status.HTTP_200_OK)
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+class AddressViewSet(viewsets.ModelViewSet):
+    pass

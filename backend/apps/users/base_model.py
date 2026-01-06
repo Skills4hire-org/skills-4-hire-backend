@@ -32,6 +32,10 @@ class BaseProfile(models.Model):
     is_verified = models.BooleanField(default=False)
 
 
+    def __str__(self):
+        return f"BaseProfile({self.display_name} {self.profile_id})"
+
+
 
 class Address(models.Model):
     address_id = models.UUIDField(

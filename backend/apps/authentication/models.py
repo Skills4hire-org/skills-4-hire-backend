@@ -100,9 +100,12 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     last_name = models.CharField(max_length=200)
 
     # user roles in [admin, client, service_provide]
-    role = models.CharField(max_length=30, choices=RoleChoices.choices, default=None, blank=True, null=True)
+    active_role = models.CharField(max_length=30, choices=RoleChoices.choices, default=None, blank=True, null=True)
 
-    # Boolean fields
+     # Boolean fields
+    is_provider = models.BooleanField(default=False)
+    is_client = models.BooleanField(default=False)
+   
     is_active = models.BooleanField(default=False, db_index=True)
     is_verified = models.BooleanField(default=False, db_index=True)
     is_staff = models.BooleanField(default=False, db_index=True)
@@ -120,20 +123,10 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
 
     @property
-    def is_service_provider(self):
-        """ Check and return True is the user instance.role == service_provider"""
-        return self.role == RoleChoices.SERVICE_PROVIDER
-
-    @property
-    def is_client(self):
-        """ Check and return True if the user instance.role == client"""
-        return self.role == RoleChoices.CLIENT
-
-    @property
     def is_admin(self):
         " Check and return True is the user instance.role == Admin"
         return (
-            self.role == RoleChoices.ADMIN,
+            self.role == self.RoleChoices.ADMIN,
             self.is_superuser,
             self.is_staff
         )
@@ -155,8 +148,10 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         indexes = [
             models.Index(fields=["email"], name="email_idx"),
             models.Index(fields=["phone"], name="phone_idx"),
-            models.Index(fields=["role"], name="role_idx"),
+            models.Index(fields=["role"], name="active_role_idx"),
             models.Index(fields=["first_name", "last_name"], name="first_last_name_idx"),
+            models.Index(fields=["is_provider"], name="provider_idx"),
+            models.Index(fields=["is_client"], name="client_idx")
 
         ]
 
