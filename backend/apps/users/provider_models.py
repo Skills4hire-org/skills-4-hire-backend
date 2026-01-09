@@ -84,6 +84,8 @@ class ProviderSkills(models.Model):
 
     level_of_experience = models.PositiveIntegerField(default=0)
 
+    work_refrences = models.TextField(blank=True, null=True)
+    
     class Meta:
         verbose_name = "provider_skills"
         constraints = [

@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from .base_model import BaseProfile, Address, Avater
-from .provider_models import ProviderModel
+from .base_model import BaseProfile, Address, Avater, SkillCategory
+from .provider_models import ProviderModel, ProviderSkills
 from .client_models import ClientModel
 
 
@@ -142,4 +142,68 @@ class BaseProfileReadSerializer(serializers.ModelSerializer):
         ]
 
     def get_active_role(self, obj):
+        if not hasattr(obj, "user"):
+            raise serializers.ValidationError("This user has no user object")
+
         return obj.user.active_role
+    
+class ProviderSkillSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProviderSkills
+        fields = [
+            "skill_id",
+            "efficiency",
+            "level_of_experience",
+            "work_reference",
+            "created_at"
+        ]
+
+    def validate_level_of_experience(self, value):
+        if not value.isdigit():
+            raise serializers.ValidationError("Level of experience must be a number")
+        if int(value) < 0:
+            raise serializers.ValidationError("Level of experience must be a positive number")
+        return value
+    
+
+    def validate_efficiency(self, value):
+        allowed_efficiency = ["BEGINEER", "INTERMIDIATE", "EXPERT"]
+
+        if value.upper() not in allowed_efficiency:
+            raise serializers.ValidationError(f"Only allowed efficiency are {allowed_efficiency}")
+
+        return value
+
+    def create(self, validated_data):
+        """
+        Create a new skill for the provider \n
+        Raise ValidationError if skill does not exist or user is not a provider \n
+        return the created skill
+        """
+        request = self.context["request"]
+        skill_name = self.context["skill_name"]
+
+        if not SkillCategory.objects.filter(name=skill_name).exists():
+            raise serializers.ValidationError("Skill does not exist")
+        profile = request.user.profile
+
+
+        if not hasattr(profile, "provider_profile"):
+            raise serializers.ValidationError("User is not a provider")
+
+        provider_profile = profile.provider_profile
+
+        skill, created = ProviderSkills.objects.get_or_create(
+            profile=provider_profile,
+            skill=skill_name,
+            defaults={
+                "efficiency": validated_data.get("efficiency"),
+                "level_of_experience": validated_data.get("level_of_experience"),
+                "work_reference": validated_data.get("work_reference"),
+            }
+        )
+
+        if not created:
+            raise serializers.ValidationError("Skill already exists for this provider")
+
+        return skill
