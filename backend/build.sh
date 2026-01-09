@@ -21,7 +21,7 @@ echo Starting celery worker...
 celery -A config worker --loglevel=info &
 
 echo Starting Celery Beat....
-celery -A config beat --logleve=info &
+celery -A config beat --loglevel=info &
 # 3. Start the server
 # Using exec ensures the Django process receives OS signals (like SIGTERM) directly
 echo "--> Starting development server on port 8000..."
