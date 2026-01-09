@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Verify Your Account</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7f6;
+            font-family: Arial, Helvetica, sans-serif;
+            color: #333333;
+        }
+
+        .email-wrapper {
+            width: 100%;
+            padding: 20px 0;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .header {
+            background-color: #1f9d55;
+            padding: 22px;
+            text-align: center;
+            color: #ffffff;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 22px;
+        }
+
+        .content {
+            padding: 30px;
+            line-height: 1.6;
+        }
+
+        .content p {
+            margin: 0 0 16px;
+            font-size: 15px;
+        }
+
+        .otp-box {
+            margin: 25px 0;
+            padding: 16px;
+            background-color: #e6f4ea;
+            border: 1px dashed #1f9d55;
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+            letter-spacing: 2px;
+            color: #1f9d55;
+            border-radius: 4px;
+        }
+
+        .note {
+            font-size: 14px;
+            color: #555555;
+        }
+
+        .footer {
+            background-color: #f0f3f2;
+            padding: 15px 30px;
+            text-align: center;
+            font-size: 13px;
+            color: #777777;
+        }
+
+        .footer span {
+            color: #1f9d55;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+
+            <!-- Header -->
+            <div class="header">
+                <h1>Account Verification</h1>
+            </div>
+
+            <!-- Content -->
+            <div class="content">
+                <p>Hello <strong>{{ name }}</strong>,</p>
+
+                <p>
+                    Thank you for creating an account on <strong>{{ app_name }}</strong>.
+                    To complete your registration, please use the verification code below.
+                </p>
+
+                <div class="otp-box">
+                    {{ code }}
+                </div>
+
+                <p>
+                    Enter this code on the verification screen to activate your account.
+                    This code is valid for a limited time.
+                </p>
+
+                <p class="note">
+                    For your security, do not share this code with anyone.
+                    If you did not request this verification, please ignore this email.
+                </p>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+                © {{ year }} <span>{{ app_name }}</span> — All rights reserved.
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>
