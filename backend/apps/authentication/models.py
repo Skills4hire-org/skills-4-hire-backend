@@ -118,7 +118,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     updated_at = models.DateTimeField(auto_now=True)
 
     USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ["first_name", "last_name", "phone", "role"]
+    REQUIRED_FIELDS = ["first_name", "last_name", "phone"]
     objects = CustomBaseUserManager()
 
 
@@ -126,7 +126,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     def is_admin(self):
         " Check and return True is the user instance.role == Admin"
         return (
-            self.role == self.RoleChoices.ADMIN,
+            self.active_role == self.RoleChoices.ADMIN,
             self.is_superuser,
             self.is_staff
         )
@@ -139,7 +139,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         " string rep. of user instances"
-        return f"CustomUser({self.email}, {self.phone}, {self.full_name}, {self.role})"
+        return f"CustomUser({self.email}, {self.phone}, {self.full_name}, {self.active_role})"
 
 
     class Meta:
@@ -148,7 +148,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         indexes = [
             models.Index(fields=["email"], name="email_idx"),
             models.Index(fields=["phone"], name="phone_idx"),
-            models.Index(fields=["role"], name="active_role_idx"),
+            models.Index(fields=["active_role"], name="active_role_idx"),
             models.Index(fields=["first_name", "last_name"], name="first_last_name_idx"),
             models.Index(fields=["is_provider"], name="provider_idx"),
             models.Index(fields=["is_client"], name="client_idx")

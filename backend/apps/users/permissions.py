@@ -9,6 +9,6 @@ class IsProvider(BasePermission):
     """
 
     def has_permission(self, request, *args, **kwargs):
-        return request.user.role == CustomUser.RoleChoices.SERVICE_PROVIDER
+        return request.user.active_role == CustomUser.RoleChoices.SERVICE_PROVIDER
 
     

@@ -65,14 +65,14 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timezone.timedelta(minutes=OTP_EXPIRY),
+    "ACCESS_TOKEN_LIFETIME": timezone.timedelta(days=2),
     "REFRESH-TOKEN_LIFETIME": timezone.timedelta(days=3),
     "UPDATE_LAST_LOGIN": True,
     "USER_ID_FIELD": "user_id",
     "USER_ID_CLAIM": "user_id",
     "ROTATE_REFRESH_TOKEN": True,
     "BLACKLIST_AFTER_ROTATION": True,
-    #"AUTH_HEADER_TYPES": ("Bearer",)
+    "AUTH_HEADER_TYPES": ("Bearer",)
 }
 
 AUTHENTICATION_BACKENDS = [
@@ -81,10 +81,14 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 
-CLOUDINARY_STORAGE = {
+CLOUDINARY = {
         "CLOUD_NAME": env("CLOUD_NAME"),
         "API_KEY": env("CLOUD_API_KEY"),
-        "API_SECRET": env("CLOUD_API_SECRET_KEY")
+        "API_SECRET": env("CLOUD_API_SECRET_KEY"),
+
+        'BASE_URL': f"https://res.cloudinary.com/{env("CLOUD_NAME")}/",
+        "AVATER_FOLDER": env("CLOUDINARY_PROFILE_FOLDERS"),
+        "SECURE": True
     }
 
 DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
@@ -214,6 +218,10 @@ CELERY_BEAT_SCHEDULE = {
     "auto_delete_exp_outstanding_jwt": {
         "task": "apps.authentication.services.tasks.clean_up_expired_jwt",
         "schedule": crontab(hour=0, minute=0)
+    },
+    "auto_update_roles": {
+        "task": "apps.users.tasks.auto_update_role",
+        "schedule": crontab(minute=1)
     }
 }
 

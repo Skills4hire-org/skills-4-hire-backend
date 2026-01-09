@@ -101,9 +101,3 @@ def clean_up_expired_jwt():
         logger.error("Invalid error occurred", exc_info=True)
         raise ValidationError("Error auto deleting JWT token.", exc)
 
-
-@shared_task
-def auto_verify_profile():
-
-    logger.debug("Running Tasks... auto verifying user profiles")
-

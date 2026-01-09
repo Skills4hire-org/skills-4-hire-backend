@@ -74,12 +74,12 @@ class BaseProfileUpdateSerializer(serializers.Serializer):
         
         request = self.context["request"]
 
-        if "provider_profile" in data and request.user.role != "SERVICE_PROVIDER":
+        if "provider_profile" in data and request.user.active_role != "SERVICE_PROVIDER":
             raise serializers.ValidationError(
                 "User is not a Provider"
             )
 
-        if "client_profile" in data and request.user.role != "CLIENT":
+        if "client_profile" in data and request.user.active_role != "CLIENT":
             raise serializers.ValidationError(
                 "User is Not a CLient"
             )
@@ -93,12 +93,14 @@ class AddresSerializer(serializers.ModelSerializer):
     class Meta:
         model = Address
         fields = [
+            "address_id",
             "line1",
             "line2",
             "city",
             "state",
             "postal_code",
-            "country"
+            "country",
+            "created_at"
         ]
 
 
@@ -106,16 +108,20 @@ class AvaterSerializer(serializers.ModelSerializer):
     class Meta:
         model = Avater
         fields = [
+            "avater_id",
             "avater",
-            "description"
+            "description",
+            "avater_public_id",
+            "created_at"
         ]
 
 class BaseProfileReadSerializer(serializers.ModelSerializer):
 
     provider_profile = ProviderProfileSerializer(read_only=True)
     client_profile = ClientProfileSerializer(read_only=True)
-    address = AddresSerializer(read_only=True)
-    avater = AvaterSerializer(read_only=True)
+    address = AddresSerializer(many=True, read_only=True)
+    avaters = AvaterSerializer()
+    active_role = serializers.SerializerMethodField()
     
     class Meta:
         model = BaseProfile
@@ -124,11 +130,15 @@ class BaseProfileReadSerializer(serializers.ModelSerializer):
             "gender",
             "bio",
             "display_name",
+            "active_role",
             "location",
             "is_verified",
             "created_at",
             "provider_profile",
             "client_profile",
             "address",
-            "avater"
+            "avaters"
         ]
+
+    def get_active_role(self, obj):
+        return obj.user.active_role

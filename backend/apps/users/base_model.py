@@ -70,8 +70,17 @@ class Avater(models.Model):
     )
 
     profile = models.OneToOneField(BaseProfile, on_delete=models.CASCADE, related_name="avaters")
-    avater = models.ImageField(upload_to="avaters/", blank=True)
-    description = models.TextField()
+    avater = models.URLField(
+        blank=True,
+        null=True,
+        max_length=200
+        )
+    avater_public_id = models.CharField(
+        max_length=200,
+        null=True, 
+        blank=True
+    )
+    description = models.TextField(blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

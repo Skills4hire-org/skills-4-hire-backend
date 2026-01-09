@@ -5,9 +5,11 @@ from .serializers import (
     ProviderProfileSerializer, 
     OnboardingSerializer, 
     BaseProfileUpdateSerializer, 
-    BaseProfileReadSerializer
+    BaseProfileReadSerializer,
+    AddresSerializer,
+    AvaterSerializer
 )
-from .base_model import BaseProfile
+from .base_model import BaseProfile, Address, Avater
 from django.shortcuts import get_object_or_404
 from .provider_models import ProviderModel
 from .client_models import ClientModel
@@ -23,7 +25,7 @@ User = settings.AUTH_USER_MODEL
 class OnboardingView(APIView):
     http_method_names = ["post"]
     serializer_class = OnboardingSerializer
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
 
@@ -38,7 +40,7 @@ class OnboardingView(APIView):
             },status=400)
 
 
-        if request.user.role:
+        if request.user.active_role:
             return Response(data={
                 "detailt": "Role already selected!"
             }, status=status.HTTP_400_BAD_REQUEST)
@@ -87,16 +89,31 @@ class SwitchRoleView(APIView):
 
     def post(self, request, *args, **kwargs):
 
-        role = request.data.get("role").lower()
+        role = request.data.get("role")
+
+        if role is None:
+            return Response(data={
+                "detail": "role cannot be None"
+            }, status=status.HTTP_400_BAD_REQUEST)
         allowed_roles = ("service_provider", "client")
 
-        if role not in allowed_roles:
+        if  request.user.active_role == role.upper():
             return Response(data={
-                "detail": "Specifield role is not inthe allowed role "
+                "detail": f"you are already  in the {role} view"
+            }, status=200)
+        
+        if role.lower() not in allowed_roles:
+            return Response(data={
+                "detail": "Specifield role is not included in the allowed roles"
             }, status=status.HTTP_400_BAD_REQUEST)
 
         request.user.active_role = role.upper()
         request.user.save(update_fields=["active_role"])
+
+        return Response(data={
+            "detail":  "Role updated",
+            "active_role": request.user.active_role
+        }, status=status.HTTP_200_OK)
 
 switch_role_view = SwitchRoleView.as_view()
 
@@ -155,7 +172,7 @@ profile_view = ProfileView.as_view()
 
 
 class ProfileReadView(viewsets.ModelViewSet):
-    http_method_names = ["get"]
+    http_method_names = ["get", "post", "delete"]
 
     
     def get_queryset(self):
@@ -205,6 +222,66 @@ class ProfileReadView(viewsets.ModelViewSet):
             "data": serializer.data
         }, status=status.HTTP_200_OK)
 
+    @action(methods=["post"], detail=False, url_path="avater/upload")
+    def upload_avater(self, request, *args, **kwargs):
+        serializer = AvaterSerializer(
+            request.user.profile.avaters if request.user.profile.avater else None,
+            data=request.data,
+            partial=True
+        )   
+        
+
+        serializer.is_valid(raise_exception=True)
+
+        serializer.save(profile=request.user.profile)
+        return Response({
+            "detail": "Profile photo saved",
+            "status": "success"
+        }, status=status.HTTP_201_CREATED)
+
+
+    @action(methods=["delete"], detail=False, url_path="avater")
+    def delete_avater(self, request, *args, **kwargs):
+        profile = request.user.profile
+
+        profile.avaters.avater = None
+        profile.avaters.avater_public_id = None
+        profile.avaters.description = None
+
+        profile.avaters.save(update_fields=["avater", "avater_public_id", "description"])
+        return Response(data={
+            "detail": "photo deleted",
+            "status": "deleted"
+        }, status=status.HTTP_204_NO_CONTENT)
+    
 
 class AddressViewSet(viewsets.ModelViewSet):
-    pass
+    serializer_class = AddresSerializer
+    permission_classes = [permissions.AllowAny]
+    
+    def perform_create(self, serializer):
+        serializer.save(profile=self.user.profile)
+
+    def create(self, request, *args, **kwargs):
+
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        self.perform_create(serializer)
+
+        return Response(data={
+            "detail": "Address uploaded",
+            "status": "succcess"
+        }, status=status.HTTP_201_CREATED)
+
+
+    def get_queryset(self):
+        address = Address.objects.select_related(
+            "profile"
+            ).filter(
+                profile=self.request.user.profile
+                )
+        return address
+
+
+        
