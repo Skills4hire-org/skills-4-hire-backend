@@ -25,7 +25,7 @@ celery -A config beat --logleve=info &
 # 3. Start the server
 # Using exec ensures the Django process receives OS signals (like SIGTERM) directly
 echo "--> Starting development server on port 8000..."
-exec gunicorn config.wsgi:application --bind 0.0.0.0:$PORT --worker 2
+exec gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
 
 
 
