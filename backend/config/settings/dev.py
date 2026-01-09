@@ -1,25 +1,17 @@
 from config.settings.base import * 
 
-# include debug toolbar in list of added apps
-INSTALLED_APPS += [
-    "debug_toolbar"
-]
+DEBUG = True
 
-CORS_ALLOW_ALL_ORIGINS = True 
-
-
-# internal ip address to enable django debug toolbar
-INTERNAL_IPS = [
-    "127.0.0.1"
-]
-
-# include debug toolbar middle ware
-MIDDLEWARE += [
-    "debug_toolbar.middleware.DebugToolbarMiddleware",
-]
-
-# Overide the email backend and use the console backend for easy debugging in development
-
-#EMAIL_BACKEND="django.core.mail.backends.console.EmailBackend"
+CACHES = {
+    "default": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION":"redis://localhost:6379/1",
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient"
+        }
+    }
+}
 
 
+CELERY_BROKER_URL = "redis://localhost:6379/0"
+CELERY_RESULT_BACKEND = "redis://localhost:6379/0"
