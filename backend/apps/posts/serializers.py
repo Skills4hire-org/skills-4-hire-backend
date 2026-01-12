@@ -1,5 +1,7 @@
 from rest_framework import serializers
-from .models import Post, PostMedia, ServiceTag, SkillCategory
+
+from .models import Post, PostMedia, ServiceTag, SkillCategory, Comment
+
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 
@@ -164,4 +166,45 @@ class PostDetailSerializer(serializers.ModelSerializer):
             "post_media",
             "post_tag"
         ]
+
+
+class CommentSerializer(serializers.ModelSerializer):
+    post_media = PostMediaSerializer(required=False)
+    class Meta:
+        model = Comment
+        fields = [
+            "message",
+            "post_media"
+        ]
+
+
+    def validate_message(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError({"message": "Comment message cannot be empty."})
+        return value
+    
+    def create(self, validated_data):
+        post_media = validated_data.pop("post_media", None)
+        request = self.context.get("request", None)
+
+        user = getattr(request, "user")
+
+        if not user.is_authenticated:
+            raise serializers.ValidationError("Authentication credentials were not provided")
+        
+        comment_instance = Comment.objects.create(user=user, **validated_data)
+
+        if post_media:
+            photos = [PostMedia(comment=comment_instance, **data) for data in post_media]
+            PostMedia.objects.bulk_create(photos)
+
+        return comment_instance
+
+    def update(self, instance, validated_data):
+        
+        instance.message = validated_data.get("message", instance.message)
+
+        instance.save()
+        return instance
 

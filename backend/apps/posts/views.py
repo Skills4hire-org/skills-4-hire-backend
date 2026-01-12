@@ -11,8 +11,8 @@ from rest_framework.decorators import action
 
 from django_filters.rest_framework import DjangoFilterBackend
 
-from .models import Post
-from .serializers import PostCreateSerializer, PostDetailSerializer
+from .models import Post, Comment
+from .serializers import PostCreateSerializer, PostDetailSerializer, CommentSerializer
 from .paginations import CustomPostPagination
 from .permission import IsOwnerOrReadOnly
 
@@ -97,3 +97,74 @@ class PostViewSet(viewsets.ModelViewSet):
         return Response(serializer.data)
 
 
+
+class CommentViewSet(viewsets.ModelViewSet):
+    serializer_class = CommentSerializer
+
+    queryset = Comment.objects.filter(
+        is_active=True, is_deleted=False
+    ).select_related("users").prefetch_related("post_media")
+
+
+    def get_queryset(self):
+        return self.queryset.all()
+
+    @transaction.atomic
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+
+        post_pk = self.kwargs.get("post_pk")
+        
+        if post_pk is None:
+            logger.error("Post PK not found in URL kwargs for comment creation.")
+            return Response(
+                {"detail": "Post ID is required to create a comment."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        post_instance = get_object_or_404(Post, pk=post_pk, is_active=True, is_deleted=False)
+        try:
+            with transaction.atomic():
+                comment_instance = serializer.save(post=post_instance, user=request.user)
+        except Exception:
+            logger.exception("Failed to create Comment")
+            raise
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+    
+        
+    @action(methods=["post"], detail=True, url_path="replies")
+    def replies(self, request):
+        serializer = self.get_serializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+
+        post_pk = self.kwargs.get("post_pk")
+        if post_pk is None:
+            logger.error("Post PK not found in URL kwargs for reply creation.")
+            return Response(
+                {"detail": "Post ID is required to create a reply."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        post_instance = get_object_or_404(Post, pk=post_pk, is_active=True, is_deleted=False)
+
+        comment_pk = self.kwargs.get("comment_id")
+        if comment_pk is None:
+            logger.error("Comment PK not found in URL kwargs for reply creation.")
+            return Response(
+                {"detail": "Comment ID is required to create a reply."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        parent_comment = get_object_or_404(Comment, pk=comment_pk, is_active=True, is_deleted=False)
+
+        try:
+            with transaction.atomic():
+                reply_instance = serializer.save(
+                    post=post_instance,
+                    parent=parent_comment,
+                    user=request.user
+                )
+        except Exception:
+            logger.exception("Failed to create Reply")
+            raise
+        headers = self.get_success_headers(serializer.data)
+        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers) 

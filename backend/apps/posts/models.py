@@ -1,8 +1,15 @@
+import logging
+
 from django.db import models
 from django.conf import settings
-import uuid
-from apps.users.base_model import SkillCategory
 from django.contrib.auth import get_user_model
+from django.utils import timezone
+
+import uuid
+
+from apps.users.base_model import SkillCategory
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -86,36 +93,6 @@ class Post(models.Model):
     def __str__(self):
         return f"Posts('{self.user.full_name}', {self.is_active})"
     
-
-class PostMedia(models.Model):
-    class PostMediaTypes(models.TextChoices):
-        VIDEO = "VIDEO", "Video"
-        PHOTO = "PHOTO", "Photo"
-        FILE = "FILE", "File"
-
-
-    postmedia_id = models.UUIDField(
-        max_length=20,
-        unique=True,
-        primary_key=True,
-        default=uuid.uuid4,
-        db_index=True
-    )
-
-    post_media_type = models.CharField(max_length=200, choices=PostMediaTypes, default=None, null=True, blank=True)
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="post_media")
-
-    post_media_uri = models.URLField(max_length=200, null=True, blank=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"PostMedia({self.post.pk}, )"
-    
-    class Meta:
-        ordering = ['-created_at']
-    
     
 class ServiceTag(models.Model):
     service_tag_id = models.UUIDField(
@@ -146,3 +123,93 @@ class ServiceTag(models.Model):
         ]
 
 
+
+class Comment(models.Model):
+    comment_id = models.UUIDField(max_length=20, unique=True, primary_key=True, default=uuid.uuid4, db_index=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="comments")
+
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="comments")
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.CASCADE,
+        blank=True,
+        null=True,
+        related_name="replies"
+    )
+
+    # content
+    message = models.TextField(max_length=5000)
+
+    # booleanFIelds
+    is_active = models.BooleanField(default=True)
+    is_deleted = models.BooleanField(default=False)
+    is_edited = models.BooleanField(default=False)  
+
+
+    # timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    deleted_at = models.DateTimeField(blank=True, null=True)
+
+
+    class Meta:
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=["parent"], name="parent_idx"),
+            models.Index(fields=["created_at"], name="time_idx"),
+            models.Index(fields=["is_active"], name="is_actice_idx")
+        ]
+
+    def __str__(self):
+        return f"{self.__class__}({self.message}, {self.user.full_name if self.user.full_name else "Anonymous"})"
+    
+    def soft_delete(self):
+        if not hasattr(self, "is_deleteed") and not hasattr(self, "is_active"):
+            logger.error("required attributes are empty, 'is_active', 'is_deleted'")
+            raise ValueError(f"{self.__class__} must have both 'is_deleted' and 'is_actve' attribute")
+
+        self.is_active = False
+        self.is_deleted = True
+        self.deleted_at = timezone.now()
+        self.save(update_fields=["is_active", "is_deleted", "deleted_at"])
+
+
+    def can_edit(self, user) -> bool:
+        if user == self.user:
+            return True
+        if user.is_staff or user.is_admin:
+            return True
+        return False
+    
+
+class PostMedia(models.Model):
+    class PostMediaTypes(models.TextChoices):
+        VIDEO = "VIDEO", "Video"
+        PHOTO = "PHOTO", "Photo"
+        FILE = "FILE", "File"
+
+
+    postmedia_id = models.UUIDField(
+        max_length=20,
+        unique=True,
+        primary_key=True,
+        default=uuid.uuid4,
+        db_index=True
+    )
+
+    post_media_type = models.CharField(max_length=200, choices=PostMediaTypes, default=None, null=True, blank=True)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="post_media", blank=True, null=True)
+    comment = models.ForeignKey(Comment, related_name="post_media", blank=True, null=True, on_delete=models.CASCADE)
+    post_media_uri = models.URLField(max_length=200, null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"PostMedia({self.post.pk}, )"
+    
+    class Meta:
+        ordering = ['-created_at']
+    
+
+        
