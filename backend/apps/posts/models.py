@@ -76,7 +76,8 @@ class Post(models.Model):
             models.Index(fields=["post_id"], name="post_id_idx"),
             models.Index(fields=["is_active"], name="active_idx"),
             models.Index(fields=["is_deleted"], name="deleted_idx"),
-            models.Index(fields=["created_at"], name="date_idx")
+            models.Index(fields=["created_at"], name="date_idx"),
+            models.Index(fields=["is_active", "is_deleted"], name="is_deleted_active_idx")
         ]
 
     def soft_delete(self):
@@ -212,4 +213,47 @@ class PostMedia(models.Model):
         ordering = ['-created_at']
     
 
+class PostLike(models.Model):
+    postlike_id = models.UUIDField(
+        max_length=20,
+        unique=True,
+        primary_key=True,
+        default=uuid.uuid4,
+        db_index=True
+    )
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="post_likes")
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="post_likes")
+
+    is_active = models.BooleanField(default=False)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "post"], name="unique_user_post_like"
+            )
+        ]
+        indexes = [
+            models.Index(fields=["postlike_id"], name="postlike_id_idx"),
+            models.Index(fields=["post"], name="post_like_idx")
+        ]
+    
+    def __str__(self):
+        return f"PostLike({self.user.full_name}, {self.post.pk})"
+
+    
+    # def can_edit_like(self, user):
+    #     if not hasattr(self, "user"): 
+    #         return False
+    #     return self.user == user
+    
+    def soft_delete(self):
+        if not hasattr(self, "is_active"):
+            raise ValueError("is_active field is required")
+        
+        self.is_active = False
+        self.save()
         

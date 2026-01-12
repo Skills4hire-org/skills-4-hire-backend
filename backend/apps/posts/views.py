@@ -11,7 +11,7 @@ from rest_framework.decorators import action
 
 from django_filters.rest_framework import DjangoFilterBackend
 
-from .models import Post, Comment
+from .models import Post, Comment, PostLike
 from .serializers import PostCreateSerializer, PostDetailSerializer, CommentSerializer
 from .paginations import CustomPostPagination
 from .permission import IsOwnerOrReadOnly
@@ -96,6 +96,60 @@ class PostViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(qs, many=True)
         return Response(serializer.data)
 
+    @action(methods=["post"], detail=True, url_path="like")
+    def like_post(self, request, *args, **kwargs):
+        """
+        Like a post.
+        post_pk is expected in the URL kwargs.
+        """ 
+        post_pk = self.kwargs.get("post_id")
+        if post_pk is None:
+            logger.error("Post PK not found in URL kwargs for liking.")
+            return Response(
+                {"detail": "Post ID is required to like a post."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        post_instance = get_object_or_404(Post, pk=post_pk.strip(), is_active=True, is_delete=False)
+
+        try:
+            with transaction.atomic():
+                like = PostLike.objects.create(user=request.user, post=post_instance, is_active=True)
+        
+        except Exception as exc:
+            logger.error(f"Failed to create a like for post {post_pk}: {exc}")
+            raise
+        
+        return Response(f"Post {post_pk} liked successfully.", status=status.HTTP_201_CREATED)
+
+    @action(methods=["delete"], detail=True, url_path="unlike")
+    def unlike_post(self, request, *args, **kwargs):
+        """
+        Unlike a post.
+        post_pk is expected in the URL kwargs.
+        """
+        post_pk = self.kwargs.get("post_id")
+        if post_pk is None:
+            logger.error("Post PK not found in URL kwargs for unliking.")
+            return Response(
+                {"detail": "Post ID is required to unlike a post."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        post_instance = get_object_or_404(Post, pk=post_pk.strip(), is_active=True, is_delete=False)
+        try:
+            with transaction.atomic():
+                like_instance = get_object_or_404(
+                    PostLike,
+                    user=request.user,
+                    post=post_instance,
+                    is_active=True
+                )
+                like_instance.soft_delete()
+        except Exception as exc:
+            logger.error(f"Failed to unlike post {post_pk}: {exc}")
+            raise
+        return Response(f"Post {post_pk} unliked successfully.", status=status.HTTP_200_OK)
+
 
 
 class CommentViewSet(viewsets.ModelViewSet):
@@ -105,6 +159,8 @@ class CommentViewSet(viewsets.ModelViewSet):
         is_active=True, is_deleted=False
     ).select_related("users").prefetch_related("post_media")
 
+
+    permission_classes = [IsOwnerOrReadOnly]
 
     def get_queryset(self):
         return self.queryset.all()
@@ -132,7 +188,33 @@ class CommentViewSet(viewsets.ModelViewSet):
         headers = self.get_success_headers(serializer.data)
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
     
-        
+    @transaction.atomic
+    def update(self, request, *args, **kwargs):
+        return super().update(request, *args, **kwargs)
+    
+    def perform_update(self, serializer):
+        obj = self.get_object()
+        if not obj.can_edit(self.request.user):
+            logger.warning(f"User {self.request.user} attempted to edit Comment {obj.pk} without permission.")
+            raise PermissionError("You do not have permission to edit this comment.")
+        serializer.save()
+
+    @transaction.atomic
+    def partial_update(self, request, *args, **kwargs):
+        return super().partial_update(request, *args, **kwargs)
+    
+    def perform_destroy(self, instance):
+        if not instance.can_edit(self.request.user):
+            logger.warning(f"User {self.request.user} attempted to delete Comment {instance.pk} without permission.")
+            raise PermissionError("You do not have permission to delete this comment.")
+        instance.soft_delete()
+
+    @method_decorator(cache_page(60 * 15))
+    def list(self, request, *args, **kwargs):
+        """List comments (cached for a short period)."""
+        return super().list(request, *args, **kwargs)
+
+
     @action(methods=["post"], detail=True, url_path="replies")
     def replies(self, request):
         serializer = self.get_serializer(data=request.data, context={"request": request})
