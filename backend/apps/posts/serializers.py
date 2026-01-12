@@ -132,10 +132,11 @@ class PostCreateSerializer(serializers.ModelSerializer):
         """Update Post instance. Nested PostMedia and ServiceTag are not updated here."""
         instance.post_content = validated_data.get("post_content", instance.post_content)
         instance.post_type = validated_data.get("post_type", instance.post_type)
-        instance.amount = validated_data.get("amount", instance.amount)
+        instance.amount = validated_data.get("amount", instance.amount) if validated_data.get("amount") else  None
 
         duration = validated_data.get("duration", None)
         if duration:
+            instance.start_date - timezone.now()
             instance.end_date = instance.start_date + timezone.timedelta(days=duration)
 
         instance.save()

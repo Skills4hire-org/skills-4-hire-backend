@@ -154,7 +154,7 @@ class ProviderSkillSerializer(serializers.ModelSerializer):
             "skill_id",
             "efficiency",
             "level_of_experience",
-            "work_reference",
+            "work_refrences",
             "created_at"
         ]
 

@@ -288,8 +288,14 @@ class AddressViewSet(viewsets.ModelViewSet):
 
 class ProviderSkillViewSet(viewsets.ModelViewSet):
     serializer_class = ProviderSkillSerializer
-
+    permission_classes= [permissions.IsAuthenticated]
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return ProviderSkills.objects.none()
+        
+        if not self.request.user.is_authenticated:
+            return ProviderSkills.objects.none()
+        
         skills = ProviderSkills.objects.select_related(
             "profile", "skill"
         ).filter(

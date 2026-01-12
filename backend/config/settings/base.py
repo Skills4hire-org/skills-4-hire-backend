@@ -47,13 +47,19 @@ INSTALLED_APPS = [
     "rest_framework",
     'django_celery_beat',
     'rest_framework_simplejwt.token_blacklist',
+    'django_filters',
 
     # local apps
     'apps.authentication.apps.AuthenticationConfig',
     "apps.users.apps.UsersConfig",
-    "apps.posts.apps.PostsConfig",
+    "apps.posts.apps.PostsConfig"
 
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.CursorPagination',
+    'PAGE_SIZE': 100
+}
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
