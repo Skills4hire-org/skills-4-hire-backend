@@ -7,11 +7,12 @@ from .serializers import (
     BaseProfileUpdateSerializer, 
     BaseProfileReadSerializer,
     AddresSerializer,
-    AvaterSerializer
+    AvaterSerializer,
+    ProviderSkillSerializer
 )
 from .base_model import BaseProfile, Address, Avater
 from django.shortcuts import get_object_or_404
-from .provider_models import ProviderModel
+from .provider_models import ProviderModel, ProviderSkills
 from .client_models import ClientModel
 from django.conf import settings
 from .services.provider_service import ProviderService
@@ -19,6 +20,7 @@ from django.db import transaction
 from rest_framework.decorators import action
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
+from .permissions import IsProvider, IsSkillOwner
 
 User = settings.AUTH_USER_MODEL
 
@@ -283,5 +285,57 @@ class AddressViewSet(viewsets.ModelViewSet):
                 )
         return address
 
+
+class ProviderSkillViewSet(viewsets.ModelViewSet):
+    serializer_class = ProviderSkillSerializer
+    permission_classes= [permissions.IsAuthenticated]
+    def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return ProviderSkills.objects.none()
+        
+        if not self.request.user.is_authenticated:
+            return ProviderSkills.objects.none()
+        
+        skills = ProviderSkills.objects.select_related(
+            "profile", "skill"
+        ).filter(
+            profile=self.request.user.profile.provider_profile if hasattr(
+                self.request.user.profile, "provider_profile"
+            ) else None
+        )
+        return skills
+    
+    def get_permissions(self):
+        if self.methods in ("put", "patch", "delete"):
+            permission_classes = [permissions.IsAuthenticated, IsProvider, IsSkillOwner]
+        if self.methods in ("post"):
+            permission_classes = [permissions.IsAuthenticated, IsProvider]
+
+        else:
+            permission_classes = [permissions.IsAuthenticated]
+
+        return [perm() for perm in permission_classes]
+    
+    
+    def create(self, request, *args, **kwargs):
+        """
+        Create a new provider skill associated with the authenticated user's provider profile.
+        """
+
+        skill_name = request.query_params.get("skill_name")
+
+        serializer = self.get_serializer(data=request.data, context={
+            "request": request,
+            "skill_name": skill_name
+        })
+
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response(data={
+            "detail": "Skill added successfully",
+            "status": "success"
+        }, status=status.HTTP_201_CREATED)
+    
 
         

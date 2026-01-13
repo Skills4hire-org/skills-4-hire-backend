@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from datetime import datetime
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework import permissions
+
 @api_view(http_method_names=["GET"])
 @permission_classes(permission_classes=[permissions.AllowAny])
 def test_email_service(request):

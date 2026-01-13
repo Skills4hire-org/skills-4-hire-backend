@@ -34,13 +34,14 @@ urlpatterns += [
 
 urlpatterns += [
     path("api/v1/", include("apps.authentication.urls")),
-    path("api/v1/", include("apps.users.urls"))
+    path("api/v1/", include("apps.users.urls")),
+    path("api/v1/", include("apps.posts.urls"))
 ]
 
 
-debug  = getattr(settings, "DEBUG")
+# debug  = getattr(settings, "DEBUG")
 
 
-#if debug:
+# if debug:
 #    from debug_toolbar.toolbar import  debug_toolbar_urls
- #   urlpatterns += debug_toolbar_urls()
+#    urlpatterns += debug_toolbar_urls()

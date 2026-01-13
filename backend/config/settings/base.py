@@ -17,7 +17,7 @@ SECRET_KEY = env("SECRET_KEY")
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env.bool("DEBUG")
 
-ALLOWED_HOSTS = ['127.0.0.1', "localhost"]
+ALLOWED_HOSTS = ['127.0.0.1', "localhost", "skills-4-hire-backend.onrender.com"]
 
 
 BASE_URL = env("BASE_URL")
@@ -47,12 +47,19 @@ INSTALLED_APPS = [
     "rest_framework",
     'django_celery_beat',
     'rest_framework_simplejwt.token_blacklist',
+    'django_filters',
 
     # local apps
     'apps.authentication.apps.AuthenticationConfig',
-    "apps.users.apps.UsersConfig"
+    "apps.users.apps.UsersConfig",
+    "apps.posts.apps.PostsConfig"
 
 ]
+
+REST_FRAMEWORK = {
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.CursorPagination',
+    'PAGE_SIZE': 100
+}
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
@@ -140,16 +147,24 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': env("POSTGRES_ENGINE"),
-        'NAME': env("POSTGRES_NAME"),
-        "USER": env("POSTGRES_USER"),
-        "PASSWORD": env("POSTGRES_PASSWORD"),
-        "PORT": env("POSTGRES_PORT"),
-        "HOST": env("POSTGRES_HOST")
+if DEBUG: 
+    DATABASES = {
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "db.sqlite3",
     }
 }
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': env("POSTGRES_ENGINE"),
+            'NAME': env("POSTGRES_NAME"),
+            "USER": env("POSTGRES_USER"),
+            "PASSWORD": env("POSTGRES_PASSWORD"),
+            "PORT": env("POSTGRES_PORT"),
+            "HOST": env("POSTGRES_HOST")
+        }
+    }
 
 
 
@@ -203,8 +218,8 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL")
 
 # Celery config
-CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:6379/1")
+CELERY_BROKER_URL = env("redis://redis:6379/0", default="redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = env("redis://redis:6379/0", default="redis://localhost:6379/1")
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"

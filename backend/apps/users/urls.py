@@ -5,13 +5,15 @@ from .views import (
     profile_view,
     ProfileReadView,
     switch_role_view,
-    AddressViewSet
+    AddressViewSet,
+    ProviderSkillViewSet
 )
 
 routers = DefaultRouter()
 
 routers.register(r"", ProfileReadView, basename="profile")
 routers.register(r"address", AddressViewSet, basename="address")
+routers.register(r"skills", ProviderSkillViewSet, basename="skills")
 
 
 urlpatterns = [

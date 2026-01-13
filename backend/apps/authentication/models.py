@@ -44,21 +44,15 @@ class CustomBaseUserManager(BaseUserManager):
 
     def create_superuser(self, email, password, **extra_fields):
         """ Create and save a super user instane """
-        if not extra_fields.get("is_superuser"):
-            raise ValueError("super user field must be created ")
-        if not extra_fields.get("is_staff"):
-            raise ValueError("is_staff must be provided")
+        # if not extra_fields.get("is_superuser"):
+        #     raise ValueError("super user field must be created ")
+        # if not extra_fields.get("is_staff"):
+        #     raise ValueError("is_staff must be provided")
         
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_staff", True)
 
-        return self.create_user(email=email, pasword=password, **extra_fields)
-
-
-    def create_superuser(self, email, password, **extra_fields):
-        """  
-            A method for handling admin user account registrations 
-        """
+        return self.create_user(email=email, password=password, **extra_fields)
 
 class CustomUser(AbstractBaseUser, PermissionsMixin):
     """
@@ -95,7 +89,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         blank=False, 
         max_length=100
     )
-    phone = PhoneNumberField(max_length=50, unique=True, blank=False)
+    phone = PhoneNumberField(max_length=50, blank=True, null=True)
     first_name = models.CharField(max_length=200)
     last_name = models.CharField(max_length=200)
 
@@ -109,6 +103,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     is_active = models.BooleanField(default=False, db_index=True)
     is_verified = models.BooleanField(default=False, db_index=True)
     is_staff = models.BooleanField(default=False, db_index=True)
+    is_superuser = models.BooleanField(default=False, db_index=True)
 
     # soft delete user account
     is_deleted = models.BooleanField(default=False, editable=True)
@@ -118,7 +113,6 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     updated_at = models.DateTimeField(auto_now=True)
 
     USERNAME_FIELD = "email"
-    REQUIRED_FIELDS = ["first_name", "last_name", "phone"]
     objects = CustomBaseUserManager()
 
 

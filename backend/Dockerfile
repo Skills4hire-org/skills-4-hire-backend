@@ -35,6 +35,7 @@ RUN chmod +x build.sh
 EXPOSE 8000
 
 # entry point
+CMD ["python3", "manage.py", "migrate"]
 CMD ["sh", "./build.sh"]
 
 
