@@ -8,6 +8,7 @@ from django.views.decorators.cache import cache_page
 from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action
+from rest_framework.exceptions import NotFound
 
 from django_filters.rest_framework import DjangoFilterBackend
 
@@ -71,7 +72,7 @@ class PostViewSet(viewsets.ModelViewSet):
         return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
 
     def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
+        serializer.save()
 
     @transaction.atomic
     def update(self, request, *args, **kwargs):
@@ -82,6 +83,7 @@ class PostViewSet(viewsets.ModelViewSet):
         # Use soft delete to preserve data and indexes
         instance.soft_delete()
 
+    @method_decorator(cache_page(60 * 15))
     @action(detail=False, methods=['get'], url_path='mine')
     def mine(self, request):
         """Return the authenticated user's posts with normal pagination and filtering."""
@@ -147,29 +149,45 @@ class PostViewSet(viewsets.ModelViewSet):
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
 
+    pagination_class = CustomPostPagination
+
     queryset = (Comment.objects.filter(
             is_active=True, is_deleted=False
-        ).select_related("users").prefetch_related("post_media")
+        ).select_related("user", "post", "parent").prefetch_related("post_media")
     )
 
     permission_classes = [IsOwnerOrReadOnly]
 
     def get_queryset(self):
-        return self.queryset.all()
+        """ Filter comment for post in URL kwargs"""
+        post_pk = self.kwargs.get("posts_pk")
+        qs = self.queryset.all()
+        if post_pk:
+            post_instance = get_post_by_id(post_pk.strip())
+            if not post_instance.get("success"):
+                raise NotFound(detail=post_instance.get("msg") or "POST_NOT_FOUND")
+            qs = qs.filter(post=post_instance.get("post"))
+            return qs.order_by("-created_at")
+        else:
+            qs = qs.none()
+            return qs
 
+        
+                        
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
-        post_pk = self.kwargs.get("post_pk")
+        print(self.kwargs)
+        post_pk = kwargs.get("posts_pk")
         post = get_post_by_id(post_pk.strip())
         if not post.get("success"):
             return Response(status=status.HTTP_404_NOT_FOUND, data={"detail":f"{post.get('msg')}"})
         post_instance = post["post"]
         try:
             with transaction.atomic():
-                comment_instance = serializer.save(post=post_instance, user=request.user)
+                comment_instance = serializer.save(post=post_instance)
         except Exception:
             logger.exception("Failed to create Comment")
             raise

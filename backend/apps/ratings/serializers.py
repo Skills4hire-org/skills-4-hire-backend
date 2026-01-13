@@ -58,7 +58,7 @@ class RatingSerializer(serializers.ModelSerializer):
         except ValidationError as e:
             logger.error("Validation Errors:")
             for field, errors in e.message_dict.items():
-                print(f"- {field}: {', '.join(errors)}")          
+                raise serializers.ValidationError(f"- {field}: {', '.join(errors)}")          
         else:
             rating.save()
             logger.info("Rating instance saved successfully")
