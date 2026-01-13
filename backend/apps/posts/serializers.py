@@ -43,7 +43,7 @@ class ServiceTagSerializer(serializers.ModelSerializer):
 class PostCreateSerializer(serializers.ModelSerializer):
     post_media = PostMediaSerializer(many=True, required=False)
     post_tag = ServiceTagSerializer(many=True, required=False)
-    duration = serializers.IntegerField(min_value=1)
+    duration = serializers.IntegerField(min_value=1, required=False)
 
     class Meta:
         model = Post
@@ -69,6 +69,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
         # Validate post_type if model exposes allowed values
         valid_post_types = getattr(Post.PostType, "values", None)
+
         if valid_post_types is not None and post_type not in valid_post_types:
             raise serializers.ValidationError({"post_type": "Invalid post type."})
 
@@ -108,14 +109,17 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
         duration = validated_data.pop("duration", None)
 
-        start_date = timezone.now()
-        end_date = start_date + timezone.timedelta(days=duration) if duration else None
-
         request = self.context.get("request")
         user = getattr(request, "user", None)
 
-        # Create and save the Post instance first so related FKs can reference it
-        post_instance = Post.objects.create(user=user, start_date=start_date, end_date=end_date, **validated_data)
+        if duration:
+            start_date = timezone.now()
+            end_date = start_date + timezone.timedelta(days=duration) if duration else None
+            post_instance = Post.objects.create(user=user, start_date=start_date, end_date=end_date, **validated_data)
+       
+        else:
+            # Create and save the Post instance first so related FKs can reference it
+            post_instance = Post.objects.create(user=user, **validated_data)
 
         # Create related PostMedia records (if any)
         if post_media:

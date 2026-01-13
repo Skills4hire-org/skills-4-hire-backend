@@ -41,7 +41,7 @@ services:
       - db
     build: .
     command: >
-      sh -c "chmod +x ./build.sh && ./build.sh"
+      sh -c "chmod +x ./build.sh && python3 manage.py migrate && ./build.sh"
     env_file:
       - .env
     volumes:

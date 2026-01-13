@@ -25,8 +25,8 @@ set -e
 # # 3. Start the server
 # # Using exec ensures the Django process receives OS signals (like SIGTERM) directly
 echo "--> Starting server..."
-
-exec gunicorn config.wsgi:application --workers 1 --threads 1 --timeout 120
+exec python3 manage.py runserver 0.0.0.0:8000
+#exec gunicorn config.wsgi:application --workers 1 --threads 1 --timeout 120
 
 
 

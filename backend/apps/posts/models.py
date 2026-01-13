@@ -164,7 +164,7 @@ class Comment(models.Model):
         ]
 
     def __str__(self):
-        return f"{self.__class__}({self.message}, {self.user.full_name if self.user.full_name else "Anonymous"})"
+        return f"{self.__class__}({self.message}, {self.user.full_name if self.user.full_name else 'Anonymous'})"
     
     def soft_delete(self):
         if not hasattr(self, "is_deleteed") and not hasattr(self, "is_active"):
