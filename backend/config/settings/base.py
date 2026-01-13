@@ -52,7 +52,8 @@ INSTALLED_APPS = [
     # local apps
     'apps.authentication.apps.AuthenticationConfig',
     "apps.users.apps.UsersConfig",
-    "apps.posts.apps.PostsConfig"
+    "apps.posts.apps.PostsConfig",
+    "apps.ratings.apps.RatingsConfig"
 
 ]
 
