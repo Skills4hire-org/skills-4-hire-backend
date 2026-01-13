@@ -4,6 +4,7 @@ from django.db import models
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.utils import timezone
+from django.db.models import F
 
 import uuid
 
@@ -88,7 +89,8 @@ class Post(models.Model):
         if not hasattr(self, "is_deleted"):
             return None
         
-        self.is_deleted = True
+        self.is_deleted=~F("is_deleted")
+        self.is_active=~F("is_active")
         self.save()
 
     def __str__(self):
@@ -169,9 +171,9 @@ class Comment(models.Model):
             logger.error("required attributes are empty, 'is_active', 'is_deleted'")
             raise ValueError(f"{self.__class__} must have both 'is_deleted' and 'is_actve' attribute")
 
-        self.is_active = False
-        self.is_deleted = True
-        self.deleted_at = timezone.now()
+        self.is_active=~F("is_active")
+        self.is_deleted=~F("is_deleted")
+        self.deleted_at=F("deleted_at") if self.is_deleted else timezone.now()
         self.save(update_fields=["is_active", "is_deleted", "deleted_at"])
 
 
@@ -254,6 +256,5 @@ class PostLike(models.Model):
         if not hasattr(self, "is_active"):
             raise ValueError("is_active field is required")
         
-        self.is_active = False
+        self.is_active=~F("is_active")
         self.save()
-        

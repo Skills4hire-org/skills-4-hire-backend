@@ -15,6 +15,7 @@ from .models import Post, Comment, PostLike
 from .serializers import PostCreateSerializer, PostDetailSerializer, CommentSerializer
 from .paginations import CustomPostPagination
 from .permission import IsOwnerOrReadOnly
+from .utils.posts import get_post_by_id
 
 logger = logging.getLogger(__name__)
 
@@ -103,18 +104,13 @@ class PostViewSet(viewsets.ModelViewSet):
         post_pk is expected in the URL kwargs.
         """ 
         post_pk = self.kwargs.get("post_id")
-        if post_pk is None:
-            logger.error("Post PK not found in URL kwargs for liking.")
-            return Response(
-                {"detail": "Post ID is required to like a post."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        post_instance = get_object_or_404(Post, pk=post_pk.strip(), is_active=True, is_delete=False)
+        post = get_post_by_id(post_pk.strip())
+        if not post.get("success"):
+            return Response(status=status.HTTP_404_NOT_FOUND, data={"detail":f"{post.get('msg')}"})
 
         try:
             with transaction.atomic():
-                like = PostLike.objects.create(user=request.user, post=post_instance, is_active=True)
+                like = PostLike.objects.create(user=request.user, post=post["post"], is_active=True)
         
         except Exception as exc:
             logger.error(f"Failed to create a like for post {post_pk}: {exc}")
@@ -129,19 +125,15 @@ class PostViewSet(viewsets.ModelViewSet):
         post_pk is expected in the URL kwargs.
         """
         post_pk = self.kwargs.get("post_id")
-        if post_pk is None:
-            logger.error("Post PK not found in URL kwargs for unliking.")
-            return Response(
-                {"detail": "Post ID is required to unlike a post."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        post_instance = get_object_or_404(Post, pk=post_pk.strip(), is_active=True, is_delete=False)
+        post = get_post_by_id(post_pk.strip())  
+        if not post.get("success"):
+            return Response(status=status.HTTP_404_NOT_FOUND, data={"detail":f"{post.get('msg')}"})
         try:
             with transaction.atomic():
                 like_instance = get_object_or_404(
                     PostLike,
                     user=request.user,
-                    post=post_instance,
+                    post=post["post"],
                     is_active=True
                 )
                 like_instance.soft_delete()
@@ -171,14 +163,10 @@ class CommentViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         post_pk = self.kwargs.get("post_pk")
-        
-        if post_pk is None:
-            logger.error("Post PK not found in URL kwargs for comment creation.")
-            return Response(
-                {"detail": "Post ID is required to create a comment."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        post_instance = get_object_or_404(Post, pk=post_pk, is_active=True, is_deleted=False)
+        post = get_post_by_id(post_pk.strip())
+        if not post.get("success"):
+            return Response(status=status.HTTP_404_NOT_FOUND, data={"detail":f"{post.get('msg')}"})
+        post_instance = post["post"]
         try:
             with transaction.atomic():
                 comment_instance = serializer.save(post=post_instance, user=request.user)
@@ -221,14 +209,10 @@ class CommentViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         post_pk = self.kwargs.get("post_pk")
-        if post_pk is None:
-            logger.error("Post PK not found in URL kwargs for reply creation.")
-            return Response(
-                {"detail": "Post ID is required to create a reply."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        post_instance = get_object_or_404(Post, pk=post_pk, is_active=True, is_deleted=False)
-
+        post = get_post_by_id(post_pk.strip())
+        if not post.get("success"):
+            return Response(status=status.HTTP_404_NOT_FOUND, data={"detail":f"{post.get('msg')}"})
+        post_instance = post["post"]
         comment_pk = self.kwargs.get("comment_id")
         if comment_pk is None:
             logger.error("Comment PK not found in URL kwargs for reply creation.")

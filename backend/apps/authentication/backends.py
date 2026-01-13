@@ -23,7 +23,6 @@ class EmailPhoneBackend(ModelBackend):
                 Q(email__iexact=username) |
                 Q(phone__iexact=username)
             ).first()
-
         except UserModel.DoesNotExist:
             UserModel().set_password(password)
 
