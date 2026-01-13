@@ -147,10 +147,10 @@ class PostViewSet(viewsets.ModelViewSet):
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
 
-    queryset = Comment.objects.filter(
-        is_active=True, is_deleted=False
-    ).select_related("users").prefetch_related("post_media")
-
+    queryset = (Comment.objects.filter(
+            is_active=True, is_deleted=False
+        ).select_related("users").prefetch_related("post_media")
+    )
 
     permission_classes = [IsOwnerOrReadOnly]
 

@@ -35,7 +35,8 @@ urlpatterns += [
 urlpatterns += [
     path("api/v1/", include("apps.authentication.urls")),
     path("api/v1/", include("apps.users.urls")),
-    path("api/v1/", include("apps.posts.urls"))
+    path("api/v1/", include("apps.posts.urls")),
+    path("api/v1/", include("apps.ratings.urls"))
 ]
 
 
