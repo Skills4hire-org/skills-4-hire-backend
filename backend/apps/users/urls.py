@@ -6,7 +6,8 @@ from .views import (
     ProfileReadView,
     switch_role_view,
     AddressViewSet,
-    ProviderSkillViewSet
+    ProviderSkillViewSet,
+    ServiceViewSet
 )
 
 routers = DefaultRouter()
@@ -14,6 +15,7 @@ routers = DefaultRouter()
 routers.register(r"", ProfileReadView, basename="profile")
 routers.register(r"address", AddressViewSet, basename="address")
 routers.register(r"skills", ProviderSkillViewSet, basename="skills")
+routers.register(r"services", ServiceViewSet, basename="services")
 
 
 urlpatterns = [

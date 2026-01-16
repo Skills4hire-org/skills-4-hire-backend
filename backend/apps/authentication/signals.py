@@ -21,7 +21,6 @@ def post_send_otp(sender, instance, created, **kwargs):
         return 
 
     logger.debug("Start OTP generation for user %s", instance.pk)
-
     code = create_otp_for_user(instance)
     otp_email_for_user(instance, code)
     
@@ -31,15 +30,11 @@ def post_create_profile(sender, instance, created, **kwrags):
     """ 
     Authomaticatlly creates user profiles after account registrations
     """
-
     if not created or not isinstance(instance, User):
         return 
-    
     if BaseProfile.objects.filter(user=instance).exists():
         return 
-
     profile = BaseProfile(user=instance, display_name=instance.full_name)
-
     profile.save()
 
     

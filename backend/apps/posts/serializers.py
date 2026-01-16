@@ -80,17 +80,17 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
         allowed_services = {
             "providers": [Post.PostType.GENERAL, Post.PostType.SERVICE, Post.PostType.QUESTION],
-            "client": [Post.PostType.GENERAL, Post.PostType.JOB, Post.PostType.QUESTION],
+            "customer": [Post.PostType.GENERAL, Post.PostType.JOB, Post.PostType.QUESTION],
         }
 
         if getattr(user, "active_role", None) == User.RoleChoices.SERVICE_PROVIDER and post_type not in allowed_services["providers"]:
             raise serializers.ValidationError({"post_type": f"Post privileges for providers: {allowed_services['providers']}"})
 
-        if getattr(user, "active_role", None) == User.RoleChoices.CLIENT and post_type not in allowed_services["client"]:
-            raise serializers.ValidationError({"post_type": f"Post privileges for clients: {allowed_services['client']}"})
+        if getattr(user, "active_role", None) == User.RoleChoices.CUSTOMER and post_type not in allowed_services["customer"]:
+            raise serializers.ValidationError({"post_type": f"Post privileges for customer: {allowed_services['customer']}"})
 
-        if amount is not None and getattr(user, "active_role", None) != User.RoleChoices.CLIENT:
-            raise serializers.ValidationError({"amount": "Only users with the client role may set `amount`."})
+        if amount is not None and getattr(user, "active_role", None) != User.RoleChoices.CUSTOMER:
+            raise serializers.ValidationError({"amount": "Only users with the customer role may set `amount`."})
 
         if post_type == Post.PostType.JOB and not amount:
             raise serializers.ValidationError({"amount": "Job posts require an `amount`."})

@@ -1,9 +1,13 @@
 from django.db import models
 from django.contrib.auth.models import BaseUserManager, AbstractBaseUser, PermissionsMixin
-import uuid
+from django.db.models import F
+
 from autoslug import AutoSlugField
+
 from phonenumber_field.modelfields import PhoneNumberField
+
 from apps.authentication import otp_models
+import uuid
 
 class CustomBaseUserManager(BaseUserManager):
     """ 
@@ -63,7 +67,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     class RoleChoices(models.TextChoices):
         ADMIN = "ADMIN", "Admin"
-        CLIENT = "CLIENT", "Client"
+        CUSTOMER = "CUSTOMER", "Customer"
         SERVICE_PROVIDER = "SERVICE_PROVIDER", "Service_provider"
 
 
@@ -88,12 +92,12 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     first_name = models.CharField(max_length=200)
     last_name = models.CharField(max_length=200)
 
-    # user roles in [admin, client, service_provide]
+    # user roles in [admin, customer, service_provider]
     active_role = models.CharField(max_length=30, choices=RoleChoices.choices, default=None, blank=True, null=True)
 
      # Boolean fields
     is_provider = models.BooleanField(default=False)
-    is_client = models.BooleanField(default=False)
+    is_customer = models.BooleanField(default=False)
    
     is_active = models.BooleanField(default=False, db_index=True)
     is_verified = models.BooleanField(default=False, db_index=True)
@@ -130,6 +134,12 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         " string rep. of user instances"
         return f"CustomUser({self.email}, {self.phone}, {self.full_name}, {self.active_role})"
 
+    def soft_delete(self):
+        if hasattr(self, "is_deleted"):
+            self.is_deleted =~ F("is_deleted")
+            self.is_active =~ F("is_active")
+        
+        self.save(update_fields=["is_deleted", "is_active"])
 
     class Meta:
         ordering = ["-created_at"]
@@ -140,7 +150,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
             models.Index(fields=["active_role"], name="active_role_idx"),
             models.Index(fields=["first_name", "last_name"], name="first_last_name_idx"),
             models.Index(fields=["is_provider"], name="provider_idx"),
-            models.Index(fields=["is_client"], name="client_idx")
+            models.Index(fields=["is_customer"], name="customer_idx")
 
         ]
 

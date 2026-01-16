@@ -48,6 +48,7 @@ INSTALLED_APPS = [
     'django_celery_beat',
     'rest_framework_simplejwt.token_blacklist',
     'django_filters',
+    "django_countries",
 
     # local apps
     'apps.authentication.apps.AuthenticationConfig',

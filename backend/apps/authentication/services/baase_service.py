@@ -14,5 +14,4 @@ class BaseService:
         self.serializer = serializer
 
     def _validate_serializer(self):
-
         return self.serializer.is_valid(raise_exception=True)
