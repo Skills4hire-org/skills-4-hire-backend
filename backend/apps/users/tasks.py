@@ -15,7 +15,7 @@ def auto_update_role():
 
     logger.debug("Running Tasks... Updating role")
     try:
-        User.objects.filter(active_role=CustomUser.RoleChoices.CLIENT).update(is_client=True)
+        User.objects.filter(active_role=CustomUser.RoleChoices.CUSTOMER).update(is_customer=True)
 
         User.objects.filter(active_role=CustomUser.RoleChoices.SERVICE_PROVIDER).update(is_provider=True)
 
