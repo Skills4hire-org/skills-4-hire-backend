@@ -172,14 +172,13 @@ class CommentViewSet(viewsets.ModelViewSet):
             qs = qs.none()
             return qs
 
-        
                         
     @transaction.atomic
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
 
-        print(self.kwargs)
+
         post_pk = kwargs.get("posts_pk")
         post = get_post_by_id(post_pk.strip())
         if not post.get("success"):

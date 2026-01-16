@@ -44,11 +44,6 @@ class CustomBaseUserManager(BaseUserManager):
 
     def create_superuser(self, email, password, **extra_fields):
         """ Create and save a super user instane """
-        # if not extra_fields.get("is_superuser"):
-        #     raise ValueError("super user field must be created ")
-        # if not extra_fields.get("is_staff"):
-        #     raise ValueError("is_staff must be provided")
-        
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_staff", True)
 
