@@ -13,7 +13,7 @@ def get_post_by_id(post_id):
     
     try: 
         with transaction.atomic():
-            post_instnce = get_object_or_404(Post, is_active=True, is_deleted=False)
+            post_instnce = get_object_or_404(Post, pk=post_id, is_active=True, is_deleted=False)
 
     except Exception as exc :
         logger.exception(f"Error retrieving post with ID {post_id}")

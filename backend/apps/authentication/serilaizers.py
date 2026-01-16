@@ -10,9 +10,9 @@ from rest_framework.exceptions import ValidationError
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
 from django.db.models import Q
 from rest_framework_simplejwt.tokens import RefreshToken, BlacklistedToken
+from django.db import transaction
+
 logging.basicConfig(level=logging.INFO)
-
-
 User = get_user_model()
 
 def validate_email(email):
@@ -180,18 +180,15 @@ class RegistrationsSerializer(serializers.Serializer):
 
         try:
             confirm_password = validated_data.pop("confirm_password")
-            user = User.objects.create_user(**validated_data)
+            with transaction.atomic():
+                user = User.objects.create_user(**validated_data)
 
             logging.info(_(f"A new user instance created: {user}"))
 
             return user
-        except Exception as exc:
-            logging.error(_(f"user creation failed: {exc}"))
-
-            raise ValidationError(detail={
-                "success": False,
-                "message": _(f"Error: {exc}")
-            }, code=status.HTTP_400_BAD_REQUEST)
+        except Exception:
+            logging.error(_(f"user creation failed:"))
+            raise 
 
     
 class AccountVerificationSerializer(serializers.Serializer):

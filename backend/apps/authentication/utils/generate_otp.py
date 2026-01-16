@@ -88,9 +88,6 @@ def otp_email_for_user(user, code):
         raise ValidationError("Invalid email subject or context.")
         
     try:
-
-        print("DEBUG", subject)
-        print("DEBUG", context)
         send_email_notification.delay(
             subject, 
             context,

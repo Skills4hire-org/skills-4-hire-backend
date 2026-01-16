@@ -11,11 +11,9 @@ class EmailPhoneBackend(ModelBackend):
     """ 
     Custom backend for authenticating user using email and phone
     """
-
     def authenticate(self, request, username=None, password=None, **kwargs):
         if username is None:
             username = kwargs.get(UserModel.USERNAME_FIELD)
-
         if username is None and password is None:
             return
         try:
@@ -25,7 +23,6 @@ class EmailPhoneBackend(ModelBackend):
             ).first()
         except UserModel.DoesNotExist:
             UserModel().set_password(password)
-
         if user.check_password(password) and self.user_can_authenticate(user):
             return user
 

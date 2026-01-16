@@ -175,33 +175,24 @@ profile_view = ProfileView.as_view()
 
 class ProfileReadView(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "delete"]
-
-    
-    def get_queryset(self):
-
-        profile = (
+    queryset = (
             BaseProfile.objects.select_related(
                 "provider_profile", "client_profile"
                 ).prefetch_related(
                     "address", "avaters"
                 )
-    
-        )
-
-        return profile
-
+    )
+    def get_queryset(self):
+        return self.queryset.all()
     serializer_class = BaseProfileReadSerializer
 
     @action(methods=["get"], detail=False, url_path="me")
     def me(self, request):
-
         user_profile = get_object_or_404(
             self.get_queryset(),
             user=request.user
         )
-
         serializer = self.get_serializer(user_profile)
-
         return Response(data={
             "status": "successful",
             "data": serializer.data
@@ -294,8 +285,7 @@ class ProviderSkillViewSet(viewsets.ModelViewSet):
             return ProviderSkills.objects.none()
         
         if not self.request.user.is_authenticated:
-            return ProviderSkills.objects.none()
-        
+            return ProviderSkills.objects.none() 
         skills = ProviderSkills.objects.select_related(
             "profile", "skill"
         ).filter(
@@ -310,7 +300,6 @@ class ProviderSkillViewSet(viewsets.ModelViewSet):
             permission_classes = [permissions.IsAuthenticated, IsProvider, IsSkillOwner]
         if self.methods in ("post"):
             permission_classes = [permissions.IsAuthenticated, IsProvider]
-
         else:
             permission_classes = [permissions.IsAuthenticated]
 
@@ -321,9 +310,7 @@ class ProviderSkillViewSet(viewsets.ModelViewSet):
         """
         Create a new provider skill associated with the authenticated user's provider profile.
         """
-
         skill_name = request.query_params.get("skill_name")
-
         serializer = self.get_serializer(data=request.data, context={
             "request": request,
             "skill_name": skill_name

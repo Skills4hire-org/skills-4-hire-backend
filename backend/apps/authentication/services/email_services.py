@@ -52,13 +52,12 @@ class EmailService:
             raise ValueError("Receipient list cannot be empty")
 
         if not self.template_name or not self.context:
-            logging.warn("template name and context are not provided")
+            logging.warning("template name and context are not provided")
             raise ValueError("template name and context are not provided")
 
         html_content = render_to_string(self.template_name, self.context)
 
         html_text = strip_tags(html_content) # returns a text vesiosn of the html page
-
         try:
             message = EmailMultiAlternatives(
                 subject=self.subject,
