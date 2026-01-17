@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.db import transaction, DatabaseError
 
 from .base_model import BaseProfile, Address, Avater, SkillCategory
-from .provider_models import ProviderModel, ProviderSkills, Service
+from .provider_models import ProviderModel, ProviderSkills, Service,ServiceImage
 from .customer_models import CustomerModel
 from .helpers import save_both_profiles, save_customer_profile, save_provider_profile, check_active_role, logger
 
@@ -266,7 +266,16 @@ class SwitchRoleSerializer(serializers.Serializer):
         request.user.save(update_fields=["active_role"])
         return request.user
 
+class ServiceImageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ServiceImage
+        fields = [
+            "image_url",
+            "image_public_id"
+        ]
+    
 class ServiceSerializer(serializers.ModelSerializer):
+    images = ServiceImageSerializer(required=False)
     class Meta:
         model = Service
         fields = [
@@ -274,6 +283,7 @@ class ServiceSerializer(serializers.ModelSerializer):
             "description",
             "min_charge",
             "max_charge",
+            "images",
             "is_active",
             "created_at"
         ]
@@ -286,6 +296,7 @@ class ServiceSerializer(serializers.ModelSerializer):
     
     def create(self, validated_data):
         request = self.context.get("request")
+        service_image = validated_data.get("images", None)
         if check_active_role(request) != User.RoleChoices.SERVICE_PROVIDER:
             raise serializers.ValidationError("User is not a provider")
         profile = request.user.profile.provider_profile if hasattr(request.user.profile, "provider_profile") else None
@@ -294,6 +305,9 @@ class ServiceSerializer(serializers.ModelSerializer):
         try:
             with transaction.atomic():
                 service = Service.objects.create(profile=profile, **validated_data)
+                if service_image:
+                    images = [ServiceImage(service=service, **data) for data in service_image]
+                    ServiceImage.objects.bulk_create(images)
         except DatabaseError:
             logger.exception("Failed  to populate database. service request failed on database operations", exc_info=True)
             raise
@@ -301,4 +315,21 @@ class ServiceSerializer(serializers.ModelSerializer):
             raise
             
         return validated_data
-
+    
+    @transaction.atomic
+    def update(self, instance, validated_data):
+        images = validated_data.get("images", None)
+        request = self.context.get("request")
+        if images is not None:
+            if not hasattr(request.user.profile.provider_profile, "services"):
+                raise serializers.ValidationError("User has no services to update")
+            service = request.user.profile.provider_profile.services.images.filter(image_id=instance.images.image_id, is_active=True).first()
+            for field, value in images.items():
+                setattr(service, field, value)
+            service.save()
+        instance.name = validated_data.get("name", instance.name)
+        instance.description = validated_data.get("description", instance.description)
+        instance.min_charge = validated_data.get("min_charge", instance.min_charge)
+        instance.max_charge = validated_data.gaet("max_cahrge", instance.max_cahrge)
+        instance.save()
+        return instance

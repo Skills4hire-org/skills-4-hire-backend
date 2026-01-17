@@ -217,9 +217,9 @@ class ServiceViewSet(viewsets.ModelViewSet):
         return super().check_object_permissions(request, obj)
     
     def get_queryset(self):
-        qs = self.queryset.all().filter(is_active=True, is_deleted=False)
-        if not qs:
-            return self.queryset.none()
+        qs = self.queryset.all().filter(profile=self.request.user.profile.provider_profile, is_active=True, is_deleted=False)
+        if not qs.exists():
+            return qs.none()
         return qs
     
     @method_decorator(cache_page(60 * 15))

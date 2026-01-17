@@ -160,3 +160,18 @@ class Service(models.Model):
             return True
         else:
             return False
+
+
+class ServiceImage(models.Model):
+    image_id = models.UUIDField(max_length=20, primary_key=True, unique=True, db_index=True, default=uuid.uuid4)
+    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="images")
+    image_url = models.URLField(max_length=200, null=True, blank=True)
+    image_public_id = models.URLField(max_length=200, null=True, blank=True)
+
+    is_active = models.BooleanField(default=True, db_index=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"ServiceImage({self.image_url}, {self.service.name})"
