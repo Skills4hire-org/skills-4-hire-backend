@@ -54,7 +54,10 @@ INSTALLED_APPS = [
     'apps.authentication.apps.AuthenticationConfig',
     "apps.users.apps.UsersConfig",
     "apps.posts.apps.PostsConfig",
-    "apps.ratings.apps.RatingsConfig"
+    "apps.ratings.apps.RatingsConfig",
+    "apps.bookings.apps.BookingsConfig",
+    "apps.wallet.apps.WalletConfig",
+    # "apps.notifications.apps.NotificationsConfig",
 
 ]
 
