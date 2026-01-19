@@ -1,6 +1,12 @@
 from rest_framework.serializers import ValidationError
 
 from ..authentication.models import CustomUser
+from ..users.base_model import BaseProfile
+
+from django.db import transaction, DatabaseError
+from django.shortcuts import get_object_or_404
+
+from uuid import UUID
 
 def check_request(request):
     if not hasattr(request, "user"):
@@ -21,3 +27,17 @@ def is_customer(request):
         if role == CustomUser.RoleChoices.CUSTOMER:
             return True
     return False
+
+def _base_profile_by_pk(pk: UUID) -> BaseProfile:
+    if pk is None:
+        raise ValidationError("Profile pk is also required")
+    if not isinstance(pk, UUID):
+        raise ValidationError("PK is not a valid UUID instance")
+    try:
+        with transaction.atomic():
+            base_profile = get_object_or_404(BaseProfile, pk=pk, active=True, is_deleted=False)
+    except DatabaseError:
+        raise 
+    except Exception:
+        raise
+    return base_profile
