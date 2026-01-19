@@ -3,6 +3,7 @@ from django.db.models.signals import post_save
 from django.contrib.auth import get_user_model
 from apps.authentication.utils.generate_otp import create_otp_for_user, otp_email_for_user
 from apps.users.base_model import BaseProfile
+from ..wallet.helpers import _save_wallet_on_account_creation
 
 import logging
 
@@ -37,4 +38,10 @@ def post_create_profile(sender, instance, created, **kwrags):
     profile = BaseProfile(user=instance, display_name=instance.full_name)
     profile.save()
 
-    
+@receiver(post_save, sender=User)
+def auto_create_wallet(sender, instance, created, **kwargs):
+    if not created or not isinstance(instance, User):
+        return 
+    if _save_wallet_on_account_creation(instance):
+        logger.info("Wallet created successfully")
+    return 

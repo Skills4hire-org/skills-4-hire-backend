@@ -4,10 +4,19 @@ from rest_framework.routers import DefaultRouter
 
 from . import views
 
-routers = DefaultRouter()
 
-routers.register(f"bookings", views.BookingViewSet, basename="bookings")
+booking_list = views.BookingViewSet.as_view({
+    "post": "create",
+    "get": "list"
+})
+booking_detail = views.BookingViewSet.as_view({
+    "put": "update",
+    "patch": "patial_update",
+    "get": "retrieve",
+    "delete": "destroy"
+})
 
 urlpatterns = [
-    path("", include(routers.urls))
+    path("profile/<uuid:profile_pk>/bookings/", booking_list, name="booking-list"),
+    path("profile/<uuid:profile_pk>/bookings/<uuid:booking_pk>/", booking_detail, name="booking-detail")
 ]

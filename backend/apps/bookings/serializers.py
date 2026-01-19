@@ -31,7 +31,7 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
     def validate_price(self, value):
         request = self.context.get("request")
         wallet = check_user_wallet(request)
-        main_balance = getattr(wallet, "main_balance", None)
+        main_balance = getattr(wallet, "main_balance")
         if main_balance is None:
             raise serializers.ValidationError("User wallet has no balance")
         if round(int(value, 2)) > main_balance:
