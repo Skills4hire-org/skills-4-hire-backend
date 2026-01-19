@@ -290,8 +290,12 @@ class ServiceSerializer(serializers.ModelSerializer):
         read_only_fields = ["created_at", "is_active"]
     def validate(self, attrs):
         validate_request(self.context.get("request"))
-        if attrs["min_charge"] <= 0 or attrs["max_charge"] <= 0:
+        min_charge = attrs["min_charge"] 
+        max_charge = attrs["max_charge"]
+        if min_charge <= 0 or max_charge <= 0:
             raise serializers.ValidationError("Charge cannot be negetive")
+        if min_charge >= max_charge:
+            raise serializers.ValidationError("Min charge can not be greater than the max_cahrge")
         return attrs
     
     def create(self, validated_data):

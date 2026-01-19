@@ -13,6 +13,13 @@ class IsCustomer(BasePermission):
         if user_active_role != User.RoleChoices.CUSTOMER:
             return False
         return True
+    
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+        active_role = getattr(user, "active_role", None)
+        if active_role == User.RoleChoices.CUSTOMER:
+            return obj.customer == user
+        return False
 
 class IsCustomerOrProvider(BasePermission):
     """ A Custom permission class that grant access to user who's active role is either customer or provider"""
