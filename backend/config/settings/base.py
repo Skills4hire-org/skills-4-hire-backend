@@ -15,9 +15,9 @@ environ.Env.read_env(os.path.join(BASE_DIR, ".env"))
 SECRET_KEY = env("SECRET_KEY")
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = env.bool("DEBUG")
+DEBUG = ""
 
-ALLOWED_HOSTS = ['127.0.0.1', "localhost", "skills-4-hire-backend.onrender.com"]
+ALLOWED_HOSTS = []
 
 
 BASE_URL = env("BASE_URL")
@@ -28,6 +28,7 @@ OTP_EXPIRY = env.int("OTP_EXPIRY")
 RESTRICTED_PATHS = env("RESTRICTED_PATHS").split(",")
 # User model to user 
 AUTH_USER_MODEL = "authentication.CustomUser"
+DJANGO_SETTINGS_MODULE= env("DJANGO_SETTINGS_MODULE")
 
 # Application definition
 
@@ -62,18 +63,14 @@ INSTALLED_APPS = [
 ]
 
 REST_FRAMEWORK = {
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.CursorPagination',
-    'PAGE_SIZE': 100
-}
-
-REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated"
-    ]
-
+    ],
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.CursorPagination',
+    'PAGE_SIZE': 100
 }
 
 SIMPLE_JWT = {
@@ -88,7 +85,7 @@ SIMPLE_JWT = {
 }
 
 AUTHENTICATION_BACKENDS = [
-    "apps.authentication.backends.EmailPhoneBackend",
+    "apps.authentication.backends.CustomBackend",
     'django.contrib.auth.backends.ModelBackend'
 ]
 
@@ -152,26 +149,13 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
-if DEBUG: 
-    DATABASES = {
+
+DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
         "NAME": BASE_DIR / "db.sqlite3",
     }
 }
-else:
-    DATABASES = {
-        'default': {
-            'ENGINE': env("POSTGRES_ENGINE"),
-            'NAME': env("POSTGRES_NAME"),
-            "USER": env("POSTGRES_USER"),
-            "PASSWORD": env("POSTGRES_PASSWORD"),
-            "PORT": env("POSTGRES_PORT"),
-            "HOST": env("POSTGRES_HOST")
-        }
-    }
-
-
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

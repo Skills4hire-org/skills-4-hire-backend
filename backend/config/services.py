@@ -7,8 +7,13 @@ from rest_framework import permissions
 def health(request):
     print(request.auth)
     return JsonResponse(data={
-        "SUCCESS": True,
-        "message": "Django is alive and active"
+       "status": "success",
+       "paths": {
+           "auth": "api/v1/auth/",
+           "users": "api/v1/users",
+           "posts": "api/v1/posts",
+           "bookings": "api/v1/bookings"
+       }
     }
     )
 

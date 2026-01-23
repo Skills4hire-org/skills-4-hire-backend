@@ -1,11 +1,13 @@
 from config.settings.base import *
 
-DEBUG = False
+DEBUG = env("DEBUG")
 
+ALLOWED_HOSTS = [
+    ""
+]
 CORS_ALLOWED_ORIGINS = [
     "skills-4-hire-backend.onrender.com"
 ]
-
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
@@ -16,6 +18,16 @@ CACHES = {
     }
 }
 
-
 CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")
 CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:6379/1")
+
+DATABASES = {
+        'default': {
+            'ENGINE': env("POSTGRES_ENGINE"),
+            'NAME': env("POSTGRES_NAME"),
+            "USER": env("POSTGRES_USER"),
+            "PASSWORD": env("POSTGRES_PASSWORD"),
+            "PORT": env("POSTGRES_PORT"),
+            "HOST": env("POSTGRES_HOST")
+        }
+    }

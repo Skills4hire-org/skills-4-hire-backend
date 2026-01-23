@@ -35,7 +35,7 @@ def _base_profile_by_pk(pk: UUID) -> BaseProfile:
         raise ValidationError("PK is not a valid UUID instance")
     try:
         with transaction.atomic():
-            base_profile = get_object_or_404(BaseProfile, pk=pk, active=True, is_deleted=False)
+            base_profile = get_object_or_404(BaseProfile, pk=pk, is_active=True, is_deleted=False)
     except DatabaseError:
         raise 
     except Exception:
