@@ -168,8 +168,6 @@ class ProfileView(APIView):
 
 
 profile_view = ProfileView.as_view()
-    
-
 
 class ProfileReadView(viewsets.ModelViewSet):
     http_method_names = ["get", "post", "delete"]
