@@ -31,6 +31,8 @@ COPY build.sh /app
 # give permission
 RUN chmod +x build.sh
 
+ENV PYTHONPATH=/app
+
 # expose port
 EXPOSE 8000
 

@@ -59,9 +59,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
     def validate_duration(self, value):
         if value < 1:
             raise serializers.ValidationError("Duration must be greater than or equal to 1.")
-
         return value
-    
 
     def validate(self, attrs):
         post_type = attrs.get("post_type")

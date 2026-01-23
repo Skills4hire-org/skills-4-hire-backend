@@ -2,7 +2,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
-from .health_check import health, check_docker_update
+from .services import health, check_docker_update
 from rest_framework import permissions
 from drf_yasg.views import get_schema_view
 from drf_yasg import openapi
@@ -19,19 +19,19 @@ schema_view = get_schema_view(
 )
 
 
+# ADMIN view and health checks
 urlpatterns = [
     path('admin/', admin.site.urls),
     path("health/", health, name="health"),
     path("docker/", check_docker_update, name="docker")
 ]
-
+# Project Documentation
 urlpatterns += [
     path("docs/", schema_view.with_ui("swagger", cache_timeout=0), name="swagger-documentation"),
     path("re_docs/", schema_view.with_ui("redoc", cache_timeout=0), name="redoc-documentation"),
 ]
 
 # App level url config
-
 urlpatterns += [
     path("api/v1/", include("apps.authentication.urls")),
     path("api/v1/", include("apps.users.urls")),
@@ -40,10 +40,10 @@ urlpatterns += [
     path("api/v1/", include("apps.bookings.urls")),
 ]
 
+# Debug toolbar config
+DEBUG  = getattr(settings, "DEBUG")
+DJANGO_ENV = getattr(settings, "DJANGO_SETTINGS_MODULE", "config.settings.dev")
 
-# debug  = getattr(settings, "DEBUG")
-
-
-# if debug:
-#    from debug_toolbar.toolbar import  debug_toolbar_urls
-#    urlpatterns += debug_toolbar_urls()
+if DEBUG and DJANGO_ENV != "config.settings.prod":
+   from debug_toolbar.toolbar import  debug_toolbar_urls
+   urlpatterns += debug_toolbar_urls()
