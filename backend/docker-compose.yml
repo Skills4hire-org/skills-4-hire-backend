@@ -10,6 +10,11 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: "unless-stopped"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   redis:
     image: redis:latest
@@ -34,17 +39,20 @@ services:
     build: .
     container_name: db-migrate
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     env_file:
       - .env
-    command: sc -c "python3 manage.py makemigrations && python3 manage.py migrate"
-    
+    command: ["python3", "manage.py", "migrate", "--noinput"]
+     
 
   web:
     container_name: skills-4-hire
     depends_on:
-      - redis
-      - db
+      db:
+        condition: service_healthy
+      db_migrate:
+        condition: service_completed_successfully
     build: .
     command: ["gunicorn", "config.wsgi:application", "--bind", "0.0.0.0:8000"]
     env_file:
