@@ -22,8 +22,8 @@ class Bookings(models.Model):
     customer = models.ForeignKey(User, on_delete=models.CASCADE,  related_name="bookings")
     provider = models.ForeignKey(ProviderModel, on_delete=models.CASCADE, related_name="bookings")  
     service = models.ManyToManyField(Service, related_name="booking_service", blank=True)
-    cancelled_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="booking_cancelled")
-    address = models.ForeignKey(Address, on_delete=models.CASCADE, related_name="booking_address")
+    cancelled_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="booking_cancelled", null=True, blank=True)
+    address = models.ForeignKey(Address, on_delete=models.CASCADE, related_name="booking_address", blank=True, null=True)
 
     currency = models.CharField(max_length=20, default="NGN")
     price = models.DecimalField(max_digits=10, decimal_places=2, null=False)
