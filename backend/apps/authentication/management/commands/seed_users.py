@@ -15,7 +15,7 @@ class Command(BaseCommand):
             roles = getattr(self.User.RoleChoices, "choices")
             user_email = self.faker.email(safe=True)
             password = self.faker.password(length=8)
-            self.User.objects.create(email=user_email, password=password, 
+            self.User.objects.create_user(email=user_email, password=password, 
                                     first_name=self.faker.first_name(), last_name=self.faker.last_name(),
                                     phone=self.faker.phone_number(), active_role=random.choice("roles"))
             self.stdout.write(self.style.SUCCESS(f"population data {user_email}: password: {password}"))
