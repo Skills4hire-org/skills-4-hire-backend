@@ -13,11 +13,13 @@ def check_request(request):
         raise AttributeError("request is not a valid HTTP request instance")
     return True
     
-def check_user_wallet(request):
-    if check_request(request):
-        if hasattr(request.user, "wallet"):
-            return request.user.wallet
-    return False
+def get_user_wallet(request=None, user=None):
+    if user is None and request is not None:
+        if check_request(request):
+            user = getattr(request, "user")
+    if user and hasattr(user, "wallet"):
+        return user.wallet
+    return None
 
 def is_customer(request):
     if check_request(request):
