@@ -20,11 +20,18 @@ class Command(BaseCommand):
         bookings_list = []
         self.stdout.write(self.style.NOTICE("Starting Booking Populations...."))
         for _ in range(n_bookings):
-            valid_providers = [getattr(provider.profile, "provider_profile") or getattr(provider.profile, "client_profile") for provider in providers if getattr(provider.profile, "provider_profile") or getattr(provider.profile, "client_profile")]
+            self.stdout.write(self.style.NOTICE("Starting to populate booking collections..."))
+            valid_providers = []
+
+            for provider in providers:
+                profile = provider.profile
+                if hasattr(profile, "provider_profile"):
+                    valid_providers.append(profile.provider_profile)
+                elif hasattr(profile, "client_profile"):
+                    valid_providers.append(profile.client_profile)
+
             bookings = Bookings(booking_status=random.choice(booking_status), customer=random.choice(customers), provider=random.choice(valid_providers),
-                                currency=self.faker.currency(), price=random.randint(1000, 10000), notes=self.faker.texts(), description=self.faker.texts(),
-                                start_date=timezone.now(), end_date=timezone.now() + timezone.timedelta(days=13))
-            
+                                currency=self.faker.currency(), price=random.randint(1000, 10000), notes=self.faker.texts(), descriptions=self.faker.texts(), start_date=timezone.now(), end_date=timezone.now() + timezone.timedelta(days=13))             
             bookings_list.append(bookings)
 
             if len(bookings_list) == n_bookings:

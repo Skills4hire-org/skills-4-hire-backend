@@ -7,6 +7,7 @@ from ...provider_models import ProviderModel
 
 from faker import Faker
 import random
+import uuid
 
 class Command(BaseCommand):
     help = "Populate user profiles"
@@ -27,10 +28,10 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Successfully Populated base profile db for users"))
         profile_base = BaseProfile.objects.all()
         for profile in profile_base:
-            if profile.user.active_role == getattr(self.User.RoleChoice, "CUSTOMER"):
+            if profile.user.active_role == getattr(self.User.RoleChoices, "CUSTOMER"):
                 CustomerModel.objects.create(profile=profile, website=self.faker.url(), total_hires=random.randint(10, 50))
                 print("Populated")
-            elif profile.user.active_role == getattr(self.User.RoleChoice, "SERVICE_PROVIDER"):
+            elif profile.user.active_role == getattr(self.User.RoleChoices, "SERVICE_PROVIDER"):
                 availability_choices = getattr(ProviderModel.Availability, "values")
                 ProviderModel.objects.create(profile=profile, headline=self.faker.text(), occupation=self.faker.job(), 
                                             availability=random.choice(availability_choices))
