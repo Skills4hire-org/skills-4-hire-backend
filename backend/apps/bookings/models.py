@@ -1,7 +1,7 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.forms import ValidationError
-from pytz import timezone
+from django.utils import timezone
 
 from ..users.provider_models import ProviderModel, Service
 from ..users.base_model import Address

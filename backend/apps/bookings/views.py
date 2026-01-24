@@ -73,4 +73,3 @@ class BookingViewSet(viewsets.ModelViewSet):
     @action(methods=["patch"], url_path="decline", detail=True)
     def decline_booking(self, request):
         pass
-    
