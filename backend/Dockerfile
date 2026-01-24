@@ -1,5 +1,5 @@
 # use python 3.13
-FROM python:3.13.0-slim
+FROM python:3.13-slim AS builder
 
 # project directory
 WORKDIR /app
@@ -31,13 +31,10 @@ COPY build.sh /app
 # give permission
 RUN chmod +x build.sh
 
-ENV PYTHONPATH=/app
-
 # expose port
 EXPOSE 8000
 
 # entry point
 CMD ["python3", "manage.py", "migrate"]
-CMD ["sh", "./build.sh"]
 
 
