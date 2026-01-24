@@ -13,10 +13,16 @@ booking_detail = views.BookingViewSet.as_view({
     "put": "update",
     "patch": "patial_update",
     "get": "retrieve",
-    "delete": "destroy"
+    "delete": "destroy",
 })
+
+booking_status = views.BookingViewSet.as_view({
+    "patch": "booking_status_update"
+})
+
 
 urlpatterns = [
     path("profile/<uuid:profile_pk>/bookings/", booking_list, name="booking-list"),
-    path("profile/<uuid:profile_pk>/bookings/<uuid:booking_pk>/", booking_detail, name="booking-detail")
+    path("profile/<uuid:profile_pk>/bookings/<uuid:pk>/", booking_detail, name="booking-detail"),
+    path("profile/<uuid:profile_pk>/bookings/<uuid:pk>/", booking_status, name="booking-status")
 ]

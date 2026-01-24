@@ -2,19 +2,26 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 
-from .serializers import Bookings, BookingCreateSerialzer
+
+from .serializers import Bookings, BookingCreateSerialzer, BookingStatusUpdateSerializer
 from .permissions import IsCustomer, IsCustomerOrProvider
 from .helpers import _base_profile_by_pk
+from .paginations import CustomBookingPagination
 
 from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import  method_decorator
 from django.views.decorators.cache import cache_page
 from django.db import transaction
+from django_filters.rest_framework import DjangoFilterBackend
+
 
 class BookingViewSet(viewsets.ModelViewSet):
     serializer_class = BookingCreateSerialzer
     queryset  = Bookings.objects.select_related("customer", "provider__profile", "service")
+    pagination_class = CustomBookingPagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ["booking_status"]
 
     def get_queryset(self):
         """" A base queryset to fetch all booking associated to the request.user"""
@@ -30,7 +37,7 @@ class BookingViewSet(viewsets.ModelViewSet):
     
     def get_object(self):
         queryset = self.filter_queryset(self.get_queryset())
-        lookup = self.kwargs.get("booking_pk")
+        lookup = self.kwargs.get("pk")
         obj = get_object_or_404(queryset, pk=lookup)
         self.check_object_permissions(self.request, obj)
         return obj
@@ -66,11 +73,33 @@ class BookingViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Booking instance deleted"}, status=status.HTTP_204_NO_CONTENT)
         return Response({"detail": "Failed to delete booking instance"}, exception=True,status=status.HTTP_400_BAD_REQUEST)
     
-    @action(methods=["patch"], url_path="approve", detail=True)
-    def approve_booking(self, request):
-        pass
-
-    @action(methods=["patch"], url_path="decline", detail=True)
-    def decline_booking(self, request):
-        pass
+    @action(methods=["patch"], detail=True)
+    def booking_status_update(self, request, pk=None):
+        booking_instance = self.get_object()
+        serializer = BookingStatusUpdateSerializer(data=request.data, context={"request": request, "booking": booking_instance})
+        serializer.is_valid(raise_exception=True)
+        status = serializer.validated_data.get("status")
+        try:
+            self.perform_create(serializer)
+        except Exception:
+            raise 
+        return Response({"status": "success", "detail": f"Booking instance {status}"}, status=status.HTTP_200_OK)
     
+    @action(methods=["get"], detail=True)
+    def fetch_bookings(self, request):
+        status = request.query_params.get("status")
+        qs = self.filter_queryset(self.get_queryset())
+        if status is None:
+            qs = qs.none()
+        qs = qs.filter(booking_status__iexact=status)
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = self.get_serializer(page)
+            return self.get_paginated_response({
+                "status": "success", "detail": serializer.data}, status=status.HTTP_200_OK)
+        serializer = self.get_serializer(qs)
+        return Response({"status": "success", "detail": serializer.data}, status=status.HTTP_200_OK)
+
+
+
+        
