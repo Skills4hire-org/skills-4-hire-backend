@@ -15,7 +15,7 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         customers = (self.User.objects.filter(active_role=self.User.RoleChoices.CUSTOMER))
         providers = (self.User.objects.filter(active_role=self.User.RoleChoices.SERVICE_PROVIDER))
-        booking_status = getattr(Bookings.BookingStatus, "choices")
+        booking_status = getattr(Bookings.BookingStatus, "values")
         n_bookings = 500
         bookings_list = []
         for _ in range(n_bookings):
