@@ -10,9 +10,9 @@ def health(request):
        "status": "success",
        "paths": {
            "auth": "api/v1/auth/",
-           "users": "api/v1/users",
-           "posts": "api/v1/posts",
-           "bookings": "api/v1/bookings"
+           "users": "api/v1/users/",
+           "posts": "api/v1/posts/",
+           "bookings": "api/v1/bookings/"
        }
     }
     )
