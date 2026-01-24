@@ -14,17 +14,22 @@ class Command(BaseCommand):
     User = get_user_model()
 
     def handle(self, *args, **options):
+        self.stdout.write(self.style.NOTICE("Populating user profiles..."))
         gender_choices = getattr(BaseProfile.GenderChoices, "values")
         users = self.User.objects.all().filter(is_active=True)
         base_profile_list = []
         for user in users:
+            if BaseProfile.objects.filter(user=user).exists():
+                continue
             base_profile = BaseProfile(user=user, gender=random.choice(gender_choices), bio=self.faker.texts())
             base_profile_list.append(base_profile)
         BaseProfile.objects.bulk_create(base_profile_list)
         self.stdout.write(self.style.SUCCESS("Successfully Populated base profile db for users"))
-        for profile in base_profile_list:
+        profile_base = BaseProfile.objects.all()
+        for profile in profile_base:
             if profile.user.active_role == getattr(self.User.RoleChoice, "CUSTOMER"):
                 CustomerModel.objects.create(profile=profile, website=self.faker.url(), total_hires=random.randint(10, 50))
+                print("Populated")
             elif profile.user.active_role == getattr(self.User.RoleChoice, "SERVICE_PROVIDER"):
                 availability_choices = getattr(ProviderModel.Availability, "values")
                 ProviderModel.objects.create(profile=profile, headline=self.faker.text(), occupation=self.faker.job(), 
