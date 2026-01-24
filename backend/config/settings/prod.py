@@ -2,12 +2,8 @@ from config.settings.base import *
 
 DEBUG = env("DEBUG")
 
-ALLOWED_HOSTS = [
-    ""
-]
-CORS_ALLOWED_ORIGINS = [
-    "skills-4-hire-backend.onrender.com"
-]
+ALLOWED_HOSTS = ['127.0.0.1']
+
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
@@ -28,6 +24,11 @@ DATABASES = {
             "USER": env("POSTGRES_USER"),
             "PASSWORD": env("POSTGRES_PASSWORD"),
             "PORT": env("POSTGRES_PORT"),
-            "HOST": env("POSTGRES_HOST")
+            "HOST": env("POSTGRES_HOST"),
+            "POOL_MODE": env("POSTGRES_POLL_MODE"),
+            "OPTIONS": {
+                "sslmode": "require",
+            },
+            "CONN_MAX_AGE": 0,
         }
     }
