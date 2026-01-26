@@ -93,7 +93,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         return Response({"status": "success", "detail": f"Booking instance {status}"}, status=status.HTTP_200_OK)
     
     @method_decorator(cache_page(60 * 15))
-    @action(methods=["get"], detail=True)
+    @action(methods=["get"], detail=False)
     def fetch_bookings(self, request):
         status = request.query_params.get("status")
         qs = self.filter_queryset(self.get_queryset())
