@@ -9,6 +9,12 @@ from .models import Bookings
 from .helpers import get_user_wallet, is_customer
 from .services import _cancel_booking, _accept_booking
 
+from decimal import Decimal
+import logging
+
+
+logger = logging.getLogger(__name__)
+
 class BookingCreateSerialzer(serializers.ModelSerializer):
     address = AddresSerializer(required=True)
     service = ServiceSerializer(required=False)
@@ -27,24 +33,27 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
         ]
     def validate(self, attrs):
         validate_request(self.context.get("request"))
-        if attrs["start_date"] >= attrs["end_date"]:
-            raise serializers.ValidationError("'end_date' cannot be greater that the 'start_date'")
-        
+        if attrs.get("start_date") or attrs.get("end_date"):
+            if attrs["start_date"] >= attrs["end_date"]:
+                raise serializers.ValidationError("'end_date' cannot be greater that the 'start_date'")
+        return attrs
+
     def validate_price(self, value):
         request = self.context.get("request")
+        validate_request(self.context.get("request"))
         wallet = get_user_wallet(request=request)
         main_balance = getattr(wallet, "main_balance")
         if main_balance is None:
             raise serializers.ValidationError("User wallet has no balance")
-        if round(int(value, 2)) > main_balance:
+        if Decimal(value) > Decimal(main_balance):
             raise serializers.ValidationError("Insufficient Balance. Top up to continue")
         return value
     
     def create(self, validated_data):
-        address = validated_data.get("adress")
+        address = validated_data.get("address")
         service = validated_data.get("service")
         provider = self.context.get("provider")
-        request = self.context.get(request)
+        request = self.context.get("request")
         if not is_customer(request):
             raise serializers.ValidationError("User is not a customer")
         try:
@@ -63,6 +72,7 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
                 if address:
                     address, created = Address.objects.get_or_create(**address)
                     booking.address = address
+                    booking.save()
                 if service:
                     services = []
                     for data in service:
@@ -70,9 +80,36 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
                         services.append(service_data)
                     booking.service.set(services)
         except Exception as e:
-            raise serializers.ValidationError(f"Error creating booking: {str(e)}")
+          raise serializers.ValidationError(f"Error creating booking: {str(e)}")  
         return booking
-
+        
+    def update(self, instance, validated_data):
+        address = validated_data.pop("address", None)
+        service = validated_data.pop("service", None)
+        if address:
+            booking_address = getattr(instance, "address", None)
+            if booking_address:
+                address_obj = get_object_or_404(Address, pk=booking_address.pk, is_active=True, is_deleted=False)
+                for key, value in address.items():
+                    if hasattr(booking_address, key):
+                        setattr(address_obj, key, value)
+                    address_obj.save()
+                instance.address = address_obj
+                instance.save()
+            else:
+                user_address = Address.objects.create(profile=instance.customer.profile, **address)
+                instance.address = user_address
+                instance.save()
+        if service:
+            services = []
+            for data in service:
+                service_data = get_object_or_404(Service, name=data["name"], provider=instance.provider)
+                services.append(service_data)
+            instance.service.set(services)
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
+        instance.save()
+        return instance
 
 class BookingStatusUpdateSerializer(serializers.Serializer):
     choices = getattr(Bookings.BookingStatus, "values")
