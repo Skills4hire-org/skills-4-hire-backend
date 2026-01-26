@@ -12,7 +12,7 @@ User = get_user_model()
 
 class Bookings(models.Model):
     class BookingStatus(models.TextChoices):
-        PENDING = "PENING", "Pending"
+        PENDING = "PENDING", "Pending"
         COMPLETED = "COMPLETED", "Completed"
         CANCELLED = "CANCELLED", "Cancelled"
 
