@@ -103,7 +103,6 @@ class BookingViewSet(viewsets.ModelViewSet):
     @method_decorator(cache_page(60 * 15))
     @action(methods=["get"], detail=False)
     def fetch_bookings(self, request):
-        logger.debug("Found view")
         status = request.query_params.get("status")
         qs = self.filter_queryset(self.get_queryset())
         if status is None:
