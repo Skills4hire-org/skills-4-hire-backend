@@ -7,6 +7,7 @@ from .serializers import Bookings, BookingCreateSerialzer, BookingStatusUpdateSe
 from .permissions import IsCustomer, IsCustomerOrProvider
 from .helpers import _base_profile_by_pk
 from .paginations import CustomBookingPagination
+from ..users.base_model import BaseProfile
 
 from django.db.models import Q
 from django.shortcuts import get_object_or_404

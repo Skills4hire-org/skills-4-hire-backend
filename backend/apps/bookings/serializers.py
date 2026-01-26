@@ -36,42 +36,74 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
         main_balance = getattr(wallet, "main_balance")
         if main_balance is None:
             raise serializers.ValidationError("User wallet has no balance")
-        if round(int(value, 2)) > main_balance:
+        if round(int(value), 2) > main_balance:
             raise serializers.ValidationError("Insufficient Balance. Top up to continue")
         return value
     
     def create(self, validated_data):
-        address = validated_data.get("adress")
+        address = validated_data.get("address")
         service = validated_data.get("service")
         provider = self.context.get("provider")
-        request = self.context.get(request)
+        request = self.context.get("request")
         if not is_customer(request):
             raise serializers.ValidationError("User is not a customer")
         try:
             with transaction.atomic():
-                booking = Bookings.objects.create(
-                    customer=request.user, 
-                    provider=provider,
-                    price=validated_data.get("price"),
-                    notes=validated_data.get("notes"),
-                    descriptions=validated_data.get("descriptions"),
-                    start_date=validated_data.get("start_date"),
-                    end_date=validated_data.get("end_date"),
-                    currency=validated_data.get("currency"),
-                    payment_remark=validated_data.get("payment_remark")
-                    )
+                booking = Bookings.objects.create(customer=request.user, provider=provider, **validated_data)
                 if address:
-                    address, created = Address.objects.get_or_create(**address)
-                    booking.address = address
+                    add_obj, created = Address.objects.get_or_create(profile=getattr(request.user, "profile"), 
+                                                                     postal_code=address.get("postal_code"))
+                    if created:
+                        for key, value in address.items():
+                            if hasattr(add_obj, key):
+                                setattr(add_obj, key, value)
+                        add_obj.save()
+                        booking.address = add_obj
+                        booking.save()
+                    booking.address = add_obj
+                    booking.save()
                 if service:
                     services = []
                     for data in service:
-                        service_data = get_object_or_404(Service, name=data["name"], profile=provider)
+                        service_data = get_object_or_404(Service, name=data["name"].title(), profile=provider)
                         services.append(service_data)
                     booking.service.set(services)
         except Exception as e:
             raise serializers.ValidationError(f"Error creating booking: {str(e)}")
         return booking
+    
+    def update(self, instance, validated_data):
+        address = validated_data.pop("address")
+        service = validated_data.pop("service")
+        if address:
+            booking_address = getattr(instance, "address", None)
+            if booking_address:
+                with transaction.atomic():
+                    address_obj = get_object_or_404(Address, pk=booking_address.pk, is_active=True, is_deleted=False)
+                    for key, value in address.items():
+                        if hasattr(booking_address, key):
+                            setattr(address_obj, key, value)
+                        address_obj.save()
+                    instance.address = address_obj
+                    instance.save()
+            else:
+                with transaction.atomic():
+                    user_address = Address.objects.create(profile=instance.customer.profile, **address)
+                    instance.address = user_address
+                    instance.save()
+        if service:
+            services = []
+            for data in service:
+                service_data = get_object_or_404(Service, name=data["name"].title(), provider=instance.provider)
+                services.append(service_data)
+            instance.service.set(services)
+        for key, value in validated_data.items():
+            setattr(instance, key, value)
+        instance.save()
+        return instance
+            
+        
+
 
 
 class BookingStatusUpdateSerializer(serializers.Serializer):

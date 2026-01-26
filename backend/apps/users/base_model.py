@@ -91,6 +91,11 @@ class Address(models.Model):
         if user == self.profile.user:
             return True
         return False
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["profile", "postal_code"], name="unique_name_postal_code_constraints")
+        ]
     
 class Avater(models.Model):
     avater_id = models.UUIDField(primary_key=True, unique=True, null=False, default=uuid.uuid4, max_length=20)
