@@ -4,7 +4,7 @@ from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
-from ..users.serializers import AddresSerializer, ServiceSerializer, validate_request, Address, Service
+from ..users.serializers import AddresSerializer, ServiceSerializer, validate_request, Address, Service, ProviderProfileSerializer
 from .models import Bookings
 from .helpers import get_user_wallet, is_customer
 from .services import _cancel_booking, _accept_booking
@@ -143,7 +143,30 @@ class BookingStatusUpdateSerializer(serializers.Serializer):
         
         return instance
 
-
-        
+class BookingOutSerializer(serializers.ModelSerialzer):
+    customer = serializers.CharField(source="customer.email", read_only=True)
+    provider = ProviderProfileSerializer(read_only=True)
+    service = ServiceSerializer(read_only=True)
+    address = AddresSerializer(read_only=True)
+    class Meta:
+        model = Bookings
+        fields = [
+            "booking_id",
+            "booking_status",
+            "customer",
+            "provider",
+            "service",
+            "address",
+            'currency',
+            "price",
+            "notes",
+            "descriptions",
+            "payment_remark",
+            "is_active",
+            "start_date",
+            "end_date",
+            "created_at",
+            "cancelled_at"
+        ]
 
 

@@ -3,7 +3,8 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 
 
-from .serializers import Bookings, BookingCreateSerialzer, BookingStatusUpdateSerializer
+from .serializers import (Bookings, BookingCreateSerialzer, BookingStatusUpdateSerializer,
+                        BookingOutSerializer)
 from .permissions import IsCustomer, IsCustomerOrProvider
 from .helpers import _base_profile_by_pk
 from .paginations import CustomBookingPagination
@@ -21,12 +22,16 @@ import logging
 logger = logging.getLogger(__name__)
 
 class BookingViewSet(viewsets.ModelViewSet):
-    serializer_class = BookingCreateSerialzer
     queryset  = Bookings.objects.select_related("customer", "provider__profile", "address").prefetch_related("service")
     pagination_class = CustomBookingPagination
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["booking_status"]
 
+    def get_serializer_class(self):
+        if self.request.method == "get":
+            return BookingOutSerializer
+        return BookingCreateSerialzer
+    
     def get_queryset(self):
         """" A base queryset to fetch all booking associated to the request.user"""
         qs = self.queryset.filter(is_active=True, is_deleted=False).all()
