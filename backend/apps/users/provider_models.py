@@ -151,6 +151,9 @@ class Service(models.Model):
 
     class Meta:
         verbose_name = "services"
+        constraints = [
+            models.UniqueConstraint(fields=["name", "profile"], name="unique_service_constraints")
+        ]
         indexes = [
             models.Index(fields=("is_active", "is_deleted"), name="srv_act_del_idx"),
         ]
@@ -160,6 +163,11 @@ class Service(models.Model):
             return True
         else:
             return False
+        
+    def clean(self):
+        if self.name:
+            self.name.title()
+        super().clean()
 
 
 class ServiceImage(models.Model):
