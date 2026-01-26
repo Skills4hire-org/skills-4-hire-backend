@@ -9,6 +9,12 @@ from .models import Bookings
 from .helpers import get_user_wallet, is_customer
 from .services import _cancel_booking, _accept_booking
 
+from decimal import Decimal
+import logging
+
+
+logger = logging.getLogger(__name__)
+
 class BookingCreateSerialzer(serializers.ModelSerializer):
     address = AddresSerializer(required=True)
     service = ServiceSerializer(required=False)
@@ -27,16 +33,19 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
         ]
     def validate(self, attrs):
         validate_request(self.context.get("request"))
-        if attrs["start_date"] >= attrs["end_date"]:
-            raise serializers.ValidationError("'end_date' cannot be greater that the 'start_date'")
-        
+        if attrs.get("start_date") or attrs.get("end_date"):
+            if attrs["start_date"] >= attrs["end_date"]:
+                raise serializers.ValidationError("'end_date' cannot be greater that the 'start_date'")
+        return attrs
+
     def validate_price(self, value):
         request = self.context.get("request")
+        validate_request(self.context.get("request"))
         wallet = get_user_wallet(request=request)
         main_balance = getattr(wallet, "main_balance")
         if main_balance is None:
             raise serializers.ValidationError("User wallet has no balance")
-        if round(int(value), 2) > main_balance:
+        if Decimal(value) > Decimal(main_balance):
             raise serializers.ValidationError("Insufficient Balance. Top up to continue")
         return value
     
@@ -69,7 +78,7 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
                         services.append(service_data)
                     booking.service.set(services)
         except Exception as e:
-            raise serializers.ValidationError(f"Error creating booking: {str(e)}")
+          raise serializers.ValidationError(f"Error creating booking: {str(e)}")  
         return booking
     
     def update(self, instance, validated_data):
@@ -102,10 +111,6 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
         instance.save()
         return instance
             
-        
-
-
-
 class BookingStatusUpdateSerializer(serializers.Serializer):
     choices = getattr(Bookings.BookingStatus, "values")
     status = serializers.ChoiceField(choices=choices)

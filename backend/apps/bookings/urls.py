@@ -11,7 +11,7 @@ booking_list = views.BookingViewSet.as_view({
 })
 booking_detail = views.BookingViewSet.as_view({
     "put": "update",
-    "patch": "patial_update",
+    "patch": "partial_update",
     "get": "retrieve",
     "delete": "destroy",
 })

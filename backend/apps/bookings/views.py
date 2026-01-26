@@ -19,7 +19,7 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 class BookingViewSet(viewsets.ModelViewSet):
     serializer_class = BookingCreateSerialzer
-    queryset  = Bookings.objects.select_related("customer", "provider__profile", "service")
+    queryset  = Bookings.objects.select_related("customer", "provider__profile", "address").prefetch_related("service")
     pagination_class = CustomBookingPagination
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["booking_status"]
@@ -29,8 +29,14 @@ class BookingViewSet(viewsets.ModelViewSet):
         qs = self.queryset.filter(is_active=True, is_deleted=False).all()
         if qs is None:
             return self.queryset.none()
-        return qs.filter(Q(customer=self.request.user), Q(provider=self.request.user.profile.provider_profile))
-    
+        try:
+            provider_profile = getattr(self.request.user.profile, "provider_profile")
+            qs = qs.filter(Q(customer=self.request.user) | Q(provider=provider_profile))
+        except BaseProfile.provider_profile.RelatedObjectDoesNotExist:
+            qs = qs.filter(customer=self.request.user)
+
+        return qs
+
     def get_permissions(self):
         if self.action in ("create", "update", "destroy"):
             return [permissions.IsAuthenticated(), IsCustomer()]
