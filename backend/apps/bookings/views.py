@@ -16,6 +16,9 @@ from django.views.decorators.cache import cache_page
 from django.db import transaction
 from django_filters.rest_framework import DjangoFilterBackend
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 class BookingViewSet(viewsets.ModelViewSet):
     serializer_class = BookingCreateSerialzer
@@ -95,6 +98,7 @@ class BookingViewSet(viewsets.ModelViewSet):
     @method_decorator(cache_page(60 * 15))
     @action(methods=["get"], detail=False)
     def fetch_bookings(self, request):
+        logger.debug("Found view")
         status = request.query_params.get("status")
         qs = self.filter_queryset(self.get_queryset())
         if status is None:
@@ -103,10 +107,9 @@ class BookingViewSet(viewsets.ModelViewSet):
             qs = qs.filter(booking_status__iexact=status.upper())
         page = self.paginate_queryset(qs)
         if page is not None:
-            serializer = self.get_serializer(page)
-            return self.get_paginated_response({
-                "status": "success", "detail": serializer.data}, status=status.HTTP_200_OK)
-        serializer = self.get_serializer(qs)
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(qs, many=True)
         return Response({"status": "success", "detail": serializer.data}, status=status.HTTP_200_OK)
 
 
