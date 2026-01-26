@@ -92,13 +92,14 @@ class BookingViewSet(viewsets.ModelViewSet):
             raise 
         return Response({"status": "success", "detail": f"Booking instance {status}"}, status=status.HTTP_200_OK)
     
+    @method_decorator(cache_page(60 * 15))
     @action(methods=["get"], detail=True)
     def fetch_bookings(self, request):
         status = request.query_params.get("status")
         qs = self.filter_queryset(self.get_queryset())
         if status is None:
             qs = qs.none()
-        qs = qs.filter(booking_status__iexact=status)
+        qs = qs.filter(booking_status__iexact=status.upper())
         page = self.paginate_queryset(qs)
         if page is not None:
             serializer = self.get_serializer(page)

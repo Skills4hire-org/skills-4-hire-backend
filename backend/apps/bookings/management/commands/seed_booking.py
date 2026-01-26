@@ -18,6 +18,7 @@ class Command(BaseCommand):
         booking_status = getattr(Bookings.BookingStatus, "values")
         n_bookings = 500
         bookings_list = []
+        self.stdout.write(self.style.NOTICE("Starting Booking Populations...."))
         for _ in range(n_bookings):
             self.stdout.write(self.style.NOTICE("Starting to populate booking collections..."))
             valid_providers = []
@@ -36,8 +37,4 @@ class Command(BaseCommand):
             if len(bookings_list) == n_bookings:
                 Bookings.objects.bulk_create(bookings_list)
         self.stdout.write(self.style.SUCCESS("Successfully populated booking database."))
-        
-
-
-        
 
