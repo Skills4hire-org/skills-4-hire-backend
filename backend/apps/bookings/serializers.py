@@ -50,8 +50,8 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
         return value
     
     def create(self, validated_data):
-        address = validated_data.get("address")
-        service = validated_data.get("service")
+        address = validated_data.pop("address", None)
+        service = validated_data.pop("service", None)
         provider = self.context.get("provider")
         request = self.context.get("request")
         if not is_customer(request):
