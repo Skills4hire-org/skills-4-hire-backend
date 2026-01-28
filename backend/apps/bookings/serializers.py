@@ -56,28 +56,28 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
         request = self.context.get("request")
         if not is_customer(request):
             raise serializers.ValidationError("User is not a customer")
+        
         with transaction.atomic():
             booking = Bookings.objects.create(customer=request.user, provider=provider, **validated_data)
             if address:
-                add_obj, created = Address.objects.get_or_create(profile=getattr(request.user, "profile"), 
-                                                                    postal_code=address.get("postal_code"))
-            if created:
-                for key, value in address.items():
-                    if hasattr(add_obj, key):
-                        setattr(add_obj, key, value)
-                add_obj.save()
-                booking.address = add_obj
-                booking.save()
-            else:
-                booking.address = add_obj
-                booking.save()
-        if service:
-            services = []
-            for data in service:
-                service_data = get_object_or_404(Service, name=[value["name"].upper() for value in data.values()], 
+                add_obj, created = Address.objects.get_or_create(profile=getattr(request.user, "profile"),                                                                              postal_code=address.get("postal_code"))
+                if created:
+                    for key, value in address.items():
+                        if hasattr(add_obj, key):
+                            setattr(add_obj, key, value)
+                    add_obj.save()
+                    booking.address = add_obj
+                    booking.save()
+                else:
+                    booking.address = add_obj
+                    booking.save()
+            if service:
+                services = []
+                for data in service:
+                    service_data = get_object_or_404(Service, name=[value["name"].upper() for value in data.values()], 
                                                  profile=provider)
-                services.append(service_data)
-            booking.service.set(services)  
+                    services.append(service_data)
+                booking.service.set(services)  
         return booking
     
     def update(self, instance, validated_data):
