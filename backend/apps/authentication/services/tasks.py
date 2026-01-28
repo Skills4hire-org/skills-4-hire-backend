@@ -1,56 +1,38 @@
 from celery import shared_task
-from apps.authentication.services.email_services import Email, EmailService
+
 from django.core.exceptions import ValidationError
-import logging
-from apps.authentication.otp_models import OTP_Base
 from django.db import IntegrityError, transaction
-from rest_framework_simplejwt.tokens import OutstandingToken, BlacklistedToken
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 
+from rest_framework_simplejwt.tokens import OutstandingToken, BlacklistedToken
+
+from ..one_time_password import OneTimePassword
+from .email_services import _send_mail_base
+
+import logging
+
 
 User = get_user_model()
-
-
 logger = logging.getLogger(__name__)
 
 @shared_task
-def send_email_notification(subject, context, template_name, receipient):
+def send_email_on_quene(content: dict):
     """
-    Sends a notification email asynchronously using Celery.
-
-    Args:
-        subject (str): Email subject.
-        context (dict): Template rendering context.
-        template_name (str): Path to the email template.
-        receipient (str): Recipient email address.
+    Docstring for send_email_on_quene
+    
+    :param content: Description
+    :type content: dict
     """
+    if content is None or any([value is None for value in content.values()]):
+        raise ValidationError("Email content cannot be empty")
+    
     try:
-        # Create and send Notification email
-        service = EmailService(
-            email=Email(
-                subject=subject,
-                context=context,
-                template_name=template_name,
-                receipient=receipient
-            )
-        )
-
-        service.send_mail()
-        logger.info(
-    "Notification Email sent successfully to %s",
-        receipient
-        )
-
-
-    except ValidationError:
+        _send_mail_base(context=content)
+    except Exception:
         raise
-    except (ConnectionError, TimeoutError) as net_err:
-        logger.error("Network error while sending email: %s", net_err, exc_info=True)
-        raise ValidationError(f"Network error while sending email: {net_err}") from net_err
-    except Exception as exc:
-        logger.exception("Unexpected error while sending email.")
-        raise ValidationError(f"Unexpected error while sending email: {exc}") from exc
+    else:
+        logger.error("Failed to quene email message")
 
 
 @shared_task
@@ -66,7 +48,7 @@ def auto_delete_otp():
 
     deleted_otps = 0
     try:
-        otp_records = OTP_Base.objects.all().only("otp_id", "code")
+        otp_records = OneTimePassword.objects.all().only("otp_id", "code")
 
         for otp in otp_records:
             with transaction.atomic():

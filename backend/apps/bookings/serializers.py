@@ -142,7 +142,7 @@ class BookingStatusUpdateSerializer(serializers.Serializer):
         
         return instance
 
-class BookingOutSerializer(serializers.ModelSerialzer):
+class BookingOutSerializer(serializers.ModelSerializer):
     customer = serializers.CharField(source="customer.email", read_only=True)
     provider = ProviderProfileSerializer(read_only=True)
     service = ServiceSerializer(read_only=True)

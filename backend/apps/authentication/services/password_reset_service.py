@@ -1,11 +1,10 @@
-from apps.authentication.services.baase_service import BaseService
+from .base import BaseService
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 from django.core.exceptions import ValidationError
 from django.conf import settings
 from apps.authentication.services.resend_otp_service import ResendOtpService
-from apps.authentication.helpers import send_email_to_user
-from apps.authentication.services.email_services import EmailService
-from apps.authentication.utils.generate_otp import hash_secret
+from ..helpers import _send_email_to_user
+from ..utils.template_helpers import generate_context_for_password_reset
 from django.core.cache import cache
 
 
@@ -49,11 +48,8 @@ class PasswordResetService(ResendOtpService):
     def send_reset_email(self, code, user):
         try:
             name = user.full_name
-            template = "authentication/password_reset.html"
-
-            subject, context = EmailService.pasword_reset_message(name=name, code=code)
-
-            send_email_to_user(subject, context, template, user.email)
+            context = generate_context_for_password_reset(code=code, email=user.email, name=name)
+            _send_email_to_user(context=context)
         except Exception as exc:
             raise ValidationError(f"Failed to send email {exc}")
     

@@ -1,25 +1,23 @@
-
-from rest_framework.views import APIView
-from apps.authentication.services.registration_service import (
+from .services.registration_service import (
     RegistrationsService
 )
-from apps.authentication.services.account_verification_service import (
+from .services.account_verification_service import (
     AccountVerificationService
 )
 
-from apps.authentication.services.resend_otp_service import (
+from .services.resend_otp_service import (
     ResendOtpService
 )
 
-from apps.authentication.services.password_reset_service import (
+from .services.password_reset_service import (
     PasswordResetService
 )
 
-from apps.authentication.services.password_confirm_service import (
+from .services.password_confirm_service import (
     PasswordConfirmService
 )
 
-from apps.authentication.serilaizers import (
+from .serilaizers import (
     RegistrationsSerializer,
     AccountVerificationSerializer,
     ResendOtpSerializer,
@@ -27,15 +25,20 @@ from apps.authentication.serilaizers import (
     CustomTokenObtainPairSerializer,
     LogoutSerializer
 )
+from .utils.helpers import create_otp_for_user
+from .helpers import _send_email_to_user
+from .utils.template_helpers import genrate_context_for_otp
+
+from rest_framework.views import APIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status, permissions
-from apps.authentication.utils.generate_otp import create_otp_for_user, otp_email_for_user
-from django.conf import settings
-from django_redis import get_redis_connection
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework import generics
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from django.conf import settings
+
 
 BASE_URL = getattr(settings, "BASE_URL")
 
@@ -134,8 +137,8 @@ class ResendOtpView(APIView):
             email = resend_otp_service._decode_serializer()
             user = resend_otp_service.get_user(email)
             code = create_otp_for_user(user)
-
-            otp_email_for_user(user, code)
+            context = genrate_context_for_otp(code=code, email=user.email)
+            _send_email_to_user(context)
 
             return Response({"detail": "OTP code sent. check your email address"}, status=status.HTTP_200_OK)
         except Exception as exc:

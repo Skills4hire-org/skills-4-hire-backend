@@ -19,11 +19,13 @@ DEBUG = ""
 
 ALLOWED_HOSTS = []
 
+SENDGRID_API_KEY = env("SENDGRID_API_KEY")
+SENDGRID_SENDER = env("SENDGRID_SENDER")
 
 BASE_URL = env("BASE_URL")
 OTP_RETRIES_PER_DAY = env.int("OTP_RETRIES_PER_DAY")
 MAX_OTP_LENGTH = env.int("MAX_OTP_LENGTH")
-APP_NAME = env("APP_NAME")
+APP_NAME = env("APP_NAME", default="Skills-4-Hire")
 OTP_EXPIRY = env.int("OTP_EXPIRY")
 RESTRICTED_PATHS = env("RESTRICTED_PATHS").split(",")
 # User model to user 

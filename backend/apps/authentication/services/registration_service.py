@@ -1,7 +1,8 @@
 import logging
 from apps.authentication.exceptions import SerializerNotValidException
 from django.db import transaction
-from apps.authentication.services.baase_service import BaseService
+
+from .base import BaseService
 
 
 logging.basicConfig(level=logging.INFO)

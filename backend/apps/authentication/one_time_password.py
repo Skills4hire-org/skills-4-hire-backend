@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 User = getattr(settings, "AUTH_USER_MODEL")
 
-class OTP_Base(models.Model):
+class OneTimePassword(models.Model):
     otp_id = models.UUIDField(
         max_length=20, 
         unique=True,
@@ -15,14 +15,15 @@ class OTP_Base(models.Model):
         default=uuid.uuid4
         )
     
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="codes")
-    code = models.CharField(max_length=100, unique=True, db_index=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="one_time_codes")
+    hash_code = models.CharField(max_length=100, unique=True, db_index=True)
 
+    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     is_used = models.BooleanField(default=False)
     
     def __str__(self):
-        return f"OTP_Base({self.user.email}, {self.code})"
+        return f"OneTimePassword({self.user.email}, {self.code})"
 
     def is_expired(self) -> bool:
         expiry_minute = getattr(settings, "OTP_EXPIRY", 15)   
@@ -30,6 +31,19 @@ class OTP_Base(models.Model):
         if timezone.now() > expires_at:
             return True
         return False
+    
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=["user", "hash_code"], name="unique_code_user")
+        ]
+
+        indexes = [
+            models.Index(fields=["hash_code"], name="hash_cde_idx"),
+            models.Index(fields=["is_active", "is_used"], name='active_used_idx')
+        ]
+        
+        verbose_name = "OneTimePassword"
+        ordering = ["-created_at"]
 
 
         

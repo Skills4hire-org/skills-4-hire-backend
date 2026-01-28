@@ -1,32 +1,30 @@
 from django.test import TestCase
-from apps.authentication.services.tasks import send_email_notification
-from rest_framework.response import Response
-from datetime import datetime
-from rest_framework.decorators import api_view, permission_classes
-from rest_framework import permissions
+from django.contrib.auth import get_user_model
 
-@api_view(http_method_names=["GET"])
-@permission_classes(permission_classes=[permissions.AllowAny])
-def test_email_service(request):
+from .helpers import _send_email_to_user
+from .utils.helpers import create_otp_for_user
+from .utils.template_helpers import genrate_context_for_otp
 
-    name="ogenna israel"
-    context= {
-            "name": name,
-            "app_name": "app_name",
-            "year": datetime.now().year
-        }
-    subject="hello"
-    receipient = "ogennaisrael@gmail.com"
-    try:
+User = get_user_model()
 
-        send_email_notification.delay(
-            subject,
-            context,
-            "authentication/test.html",
-            receipient
-        )
-    except Exception as e:
-        raise e
+def tst_email_service(request):
+    ...    
 
-    return Response({"message": "email sent"})
+
+class EmailNotifTest(TestCase):
+    def setUp(self):
+        user = User.objects.create_user(email="test_user@example.com", password="0987poiu")
+
+    # def test_send_email_to_user(self):
+    #     user = User.objects.first()
+    #     result = _send_email_to_user()
+    #     print(result)
+
+    def test_generate_context(self):
+        user = User.objects.first()
+        code = "0988"
+        email = user.email
+        result = genrate_context_for_otp(code=code, email=email)
+        print(result)
+
 

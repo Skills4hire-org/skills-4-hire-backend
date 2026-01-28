@@ -1,10 +1,10 @@
-from apps.authentication.services.baase_service import BaseService
+from .base import BaseService
 from django.core.exceptions import ValidationError
-from apps.authentication.otp_models import OTP_Base
+from apps.authentication.one_time_password import OneTimePassword
 from django.shortcuts import get_object_or_404
 from django.contrib.auth.tokens import PasswordResetTokenGenerator
 import logging 
-from apps.authentication.utils.generate_otp import hash_secret
+from ..utils.helpers import _hash_otp_code
 from django.core.cache import cache
 from apps.authentication.helpers import blacklist_outstanding_token
 logger = logging.getLogger(__name__)
@@ -38,8 +38,8 @@ class PasswordConfirmService(BaseService):
             raise ValidationError("code is required for password reset")
 
         try:
-            hashed_code = hash_secret(code)
-            code_instance  = get_object_or_404(OTP_Base, code=hashed_code)
+            hashed_code = _hash_otp_code(code)
+            code_instance  = get_object_or_404(OneTimePassword, code=hashed_code)
             
             if code_instance.is_expired() or code_instance.is_used:
                 raise ValidationError("code is compromised. \n Invalid code provided")
@@ -82,11 +82,10 @@ class PasswordConfirmService(BaseService):
         if not (user, code):
             raise ValidationError("Both 'user', and 'code' are required to clean up jobs")
 
-        hashed_code = hash_secret(code)
-        OTP_Base.objects.get(user=user, code=hashed_code).delete()
+        hashed_code = _hash_otp_code(code)
+        OneTimePassword.objects.get(user=user, code=hashed_code).delete()
 
         # Clean up all outstanding tokens after password change
-
         blacklist_outstanding_token(user)
 
 

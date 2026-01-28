@@ -1,30 +1,50 @@
-from apps.authentication.services.tasks import send_email_notification
-from apps.authentication.utils.validate import _validate_subject_or_context
-import logging
+from .services.tasks import send_email_on_quene
+
 from rest_framework_simplejwt.tokens import OutstandingToken, BlacklistedToken
 from rest_framework.exceptions import ValidationError
 
+from django.contrib.auth import get_user_model
+
+import logging
+
 logger  = logging.getLogger(__name__)
-def send_email_to_user(subject, context, template_name, receipient):
-    if not _validate_subject_or_context(subject, context):
-        logger.error("Invalid email subject or context for user %s", receipient)
-        raise ValidationError("Invalid email subject or context.")    
+User = get_user_model()
+
+def _send_email_to_user(context: dict):
+    """
+    Docstring for _send_email_to_user
+    
+    :param subject: Description
+    :type subject: str
+    :param template_name: Description
+    :type template_name: str
+    :param content: Description
+    :type content: dict
+    :param user: Description
+    """
+    if context is None:
+        raise ValidationError("Missing Content Body")
+    email = context.get("email")
+    subject = context.get("subject")
+    template_name = context.get("template_name")
+    if not email:
+        raise ValidationError("email cannot be empty")
+    if not subject:
+        raise ValidationError("Email requires a subject")
+    if not template_name:
+        raise ValidationError("Please provide a template name to send well structured notifications")
+    
+    if not User.objects.filter(email=email).exists():
+        raise ValidationError("User dosent exits in our database")
+    email = email
+    context.update({"to_email": email, "subject": subject, "template_name": template_name})
     try:
-        send_email_notification.delay(
-            subject, 
-            context,
-            template_name,
-            receipient
-        )
-
-        logger.info("Successfully Queued ")
-    except (ConnectionError, OSError) as exc:
-        logger.error("Network connnectivity failed %s", exc)
-        raise ValidationError("Network error, check connectivity", exc)
-    except Exception as exc:
-        logger.exception("Some Common Exception occurred %s", exc)
-        raise ValidationError("Unknown error occurred ")
-
+        send_email_on_quene.delay(context)
+        logger.info(f"Email sent to quene for {email}")
+        return {"success": True, "message": "Email sent to quene successfully"}
+    except Exception:
+        logger.exception("Exception while sending email.")
+        raise
 
 
 def blacklist_outstanding_token(user):

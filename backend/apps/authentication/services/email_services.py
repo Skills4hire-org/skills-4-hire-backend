@@ -1,101 +1,59 @@
-from django.core.mail import EmailMultiAlternatives
+from sendgrid import SendGridAPIClient
+from sendgrid.helpers.mail import Mail, From, To, Content
+
 from django.template.loader import render_to_string
 from django.conf import settings
-from typing import Optional
+
+from rest_framework.exceptions import ValidationError
+
 import logging
-from django.utils.html import strip_tags
-from django.core.exceptions import ValidationError
-from dataclasses import dataclass
-from django.utils import timezone
+import os
 
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-email_host = getattr(settings, "DEFAULT_FROM_EMAIL")
-app_name = getattr(settings, "APP_NAME")
-@dataclass
-class Email:
+SENDGRID_API_KEY = getattr(settings, "SENDGRID_API_KEY", None)
+SENDGRID_SENDER = getattr(settings, "SENDGRID_SENDER", None)
+APP_NAME = getattr(settings, "APP_NAME", "SkillSpeed")
+
+def _send_mail_base(context: dict) -> bool:
     """
-    A Dataclass for handling email data 
+    Docstring for _send_mail_base
+    
+    :param context: Description
+    :type context: dict
+    :return: Description
+    :rtype: bool
     """
-    subject: str
-    context: dict
-    template_name: str
-    host_user: Optional[str] = email_host
-    receipient: Optional[str] = None 
-
-
-
-class EmailService:
-    def __init__(self, email: Email):
-        self.subject = email.subject
-        self.context = email.context
-        self.template_name = email.template_name
-        self.host_user = email.host_user
-        self.receipient = email.receipient
-        logging.debug(self.subject, self.context, self.receipient)
-
-    def _validate_subject(self):
-        """ for mat self.subject properly and mark unknow if not provided"""
+    if SENDGRID_API_KEY is None:
+        logger.warning("SENDGRID_API_KEY is empty")
+        raise ValidationError("'SENDGRID_API_KEY' cannot be empty")
+    if SENDGRID_SENDER is None:
+        logger.warning("'SENDGRID_SENDER' sender is empty, authenticate in sendgrid dashboard")
+    if any(value is None for value in context.values()):
+        logger.warning("Email context is incomplete")
+        raise ValidationError("Email context cannot have None values")
+    context.update({"app_name": APP_NAME})
+    print(context)
+    try:
+        html_content = render_to_string(context.get("template_name"), context)
+        client = SendGridAPIClient(api_key=SENDGRID_API_KEY)
+        message = Mail(
+            from_email=From(email=SENDGRID_SENDER),
+            to_emails=To(email=context.get("to_email")),
+            subject=context.get("subject"),
+            html_content=Content("text/html", html_content)
+        )
         
-        if not self.subject or not str(self.subject).strip():
-            self.subject = "Unknown"
-        else:
-            self.subject = str(self.subject).strip()
+        response = client.send(message=message)
+        if response.status_code != 202:
+            logger.error(f"SendGrid failed: {response.body}")
+            raise ValidationError(f"Email failed with status: {response.status_code}")
+    except KeyError:
+        logger.exception("Missing keys in email context")
+        raise 
+    except Exception as e:
+        logger.exception("Error preparing email")
+        raise
 
 
-    def send_mail(self):
-        #if not self._validate_subject():
-         #   logging.info("Error occurred while checking for message")
-            
-        if not self.receipient:
-            logging.info("Receipient list cannot be empty")
-            raise ValueError("Receipient list cannot be empty")
 
-        if not self.template_name or not self.context:
-            logging.warning("template name and context are not provided")
-            raise ValueError("template name and context are not provided")
-
-        html_content = render_to_string(self.template_name, self.context)
-
-        html_text = strip_tags(html_content) # returns a text vesiosn of the html page
-        try:
-            message = EmailMultiAlternatives(
-                subject=self.subject,
-                body=html_text,
-                from_email=self.host_user,
-                to=[self.receipient]
-            )
-
-            if html_content:
-                message.attach_alternative(html_content, "text/html")
-            message.send(fail_silently=False)
-        except Exception as exc:
-            logging.error(f"error occurred: {exc}")
-            raise ValidationError(f"Sending  Email failed: {exc}")
-
-    @staticmethod
-    def send_otp_message(code, name):
-        subject = f"{app_name} Verification code"
-        context = {
-            "code": code,
-            "name": str(name),
-            "app_name": app_name,
-            "year": timezone.now().year
-
-        }
-        return subject,  context
-
-    def pasword_reset_message(**kwargs):
-        name = kwargs.get("name", None)
-        code = kwargs.get("code", None)
-        subject = f"{app_name} Password Reset code"
-        context = {
-            "code": code,
-            "name": str(name),
-            "app_name": app_name,
-            "year": timezone.now().year
-
-        }
-        return subject,  context
-
-        
