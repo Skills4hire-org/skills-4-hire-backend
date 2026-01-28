@@ -1,13 +1,14 @@
-
 from django.core.exceptions import ValidationError
 from django.contrib.auth import get_user_model
-import logging
 from django.shortcuts import get_object_or_404
 from django.db import DatabaseError
-from apps.authentication.otp_models import OTP_Base
-from apps.authentication.exceptions import ServiceAlreadyExpired
-from apps.authentication.services.baase_service import BaseService
-from apps.authentication.utils.generate_otp import hash_secret
+
+from ..one_time_password import OneTimePassword
+from ..exceptions import ServiceAlreadyExpired
+from .base import BaseService
+from ..utils.helpers import _hash_otp_code
+
+import logging
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -58,8 +59,8 @@ class AccountVerificationService(BaseService):
             raise ValidationError("Request is misconfigured. Both fields are requried 'user instance', and  'code'.")
 
         try:
-            hash_code = hash_secret(code)
-            otp_instance = get_object_or_404(OTP_Base, user=user, code=hash_code)
+            hash_code = _hash_otp_code(code)
+            otp_instance = get_object_or_404(OneTimePassword, user=user, code=hash_code)
 
             if otp_instance.is_expired():
                 logging.info("OTP instance is Expired")

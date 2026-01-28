@@ -12,7 +12,7 @@ from django.db.models import Q
 from rest_framework_simplejwt.tokens import RefreshToken, BlacklistedToken
 from django.db import transaction
 
-logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 User = get_user_model()
 
 def validate_email(email):
@@ -58,7 +58,7 @@ class RegistrationsSerializer(serializers.Serializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
 
-        logging.debug(f"Data rep. {data}")
+        logger.debug(f"Data rep. {data}")
         # Ensure Phone number field is serialized to string
         data["phone"] = str(instance.phone) if instance.phone else None
 
@@ -119,8 +119,6 @@ class RegistrationsSerializer(serializers.Serializer):
             if password and confirm_password:
                 if password.strip() != confirm_password.strip():
                     raise serializers.ValidationError(_("your password do not match"))
-
-
             elif not password or  not confirm_password:
                 raise serializers.ValidationError({"Password": _("Both password fields are required")})
         except (Exception, TypeError) as exc:

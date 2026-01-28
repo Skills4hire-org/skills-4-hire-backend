@@ -8,7 +8,6 @@ from apps.authentication.views import (
     token_obtain_pair,
     logout_view
 )
-from apps.authentication.tests import test_email_service
 from rest_framework_simplejwt.views import TokenRefreshView
 
 
@@ -17,7 +16,6 @@ app_name = "authentication"
 refresh_view = TokenRefreshView.as_view()
 
 urlpatterns = [
-    path("test/email/", test_email_service, name="test"),
     path("auth/account/register/", RegistrationView.as_view(), name="register-view"),
     path("auth/account/verify/", AccountVerificationView.as_view(), name="verify-account"),
     path("auth/account/resend/otp/", ResendOtpView.as_view(), name="resend-otp"),

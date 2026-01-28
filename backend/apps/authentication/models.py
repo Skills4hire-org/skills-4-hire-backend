@@ -6,10 +6,10 @@ from autoslug import AutoSlugField
 
 from phonenumber_field.modelfields import PhoneNumberField
 
-from apps.authentication import otp_models
+from apps.authentication import one_time_password
 import uuid
 
-class CustomBaseUserManager(BaseUserManager):
+class UserManager(BaseUserManager):
     """ 
          Fullname:backend.apps.models.CustomBaseUserManager
 
@@ -112,7 +112,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     updated_at = models.DateTimeField(auto_now=True)
 
     USERNAME_FIELD = "email"
-    objects = CustomBaseUserManager()
+    objects = UserManager()
 
 
     @property
@@ -136,8 +136,8 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     def soft_delete(self):
         if hasattr(self, "is_deleted"):
-            self.is_deleted =~ F("is_deleted")
-            self.is_active =~ F("is_active")
+            self.is_deleted = True
+            self.is_active = False
         
         self.save(update_fields=["is_deleted", "is_active"])
 
