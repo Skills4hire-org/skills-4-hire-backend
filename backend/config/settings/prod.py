@@ -25,7 +25,6 @@ DATABASES = {
             "PASSWORD": env("POSTGRES_PASSWORD"),
             "PORT": env("POSTGRES_PORT"),
             "HOST": env("POSTGRES_HOST"),
-            "POOL_MODE": env("POSTGRES_POLL_MODE"),
             "OPTIONS": {
                 "sslmode": "require",
             },
