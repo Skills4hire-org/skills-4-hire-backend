@@ -26,7 +26,8 @@ class BookingViewSet(viewsets.ModelViewSet):
     pagination_class = CustomBookingPagination
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ["booking_status"]
-
+    #serializer_class = BookingOutSerializer
+    
     def get_serializer_class(self):
         if self.request.method == "get":
             return BookingOutSerializer
