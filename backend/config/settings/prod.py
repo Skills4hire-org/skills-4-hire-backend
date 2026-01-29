@@ -24,10 +24,6 @@ DATABASES = {
             "USER": env("POSTGRES_USER"),
             "PASSWORD": env("POSTGRES_PASSWORD"),
             "PORT": env("POSTGRES_PORT"),
-            "HOST": env("POSTGRES_HOST"),
-            "OPTIONS": {
-                "sslmode": "require",
-            },
-            "CONN_MAX_AGE": 0,
+            "HOST": env("POSTGRES_HOST")
         }
     }

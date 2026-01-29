@@ -1,5 +1,5 @@
 # use python 3.13
-FROM python:3.13-slim AS builder
+FROM python:alpine3.23 AS builder
 
 # project directory
 WORKDIR /app
@@ -10,7 +10,7 @@ COPY . .
 # upgrade pip
 RUN pip install --upgrade pip
 # update apt
-RUN apt-get update && apt-get install curl -y
+#RUN apt-get update && apt-get install curl -y
 
 
 ENV PYTHONDONTWRITEBYTECODE=1
