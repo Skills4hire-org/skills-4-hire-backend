@@ -161,7 +161,6 @@ class PasswordResetRequestView(APIView):
             
             code = create_otp_for_user(user)
             context = generate_context_for_password_reset(code, valid_email, name=user.full_name)
-            print(context)
         except Exception:
             raise
         send_email = _send_email_to_user(context)

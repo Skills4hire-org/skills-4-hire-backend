@@ -5,6 +5,7 @@ from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.db.models import F
+from django.conf import settings
 
 from rest_framework_simplejwt.tokens import OutstandingToken, BlacklistedToken
 
