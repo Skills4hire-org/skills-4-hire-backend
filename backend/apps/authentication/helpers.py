@@ -1,4 +1,6 @@
 from .services.tasks import send_email_on_quene
+from .utils.helpers import _hash_otp_code
+from .one_time_password import OneTimePassword
 
 from rest_framework_simplejwt.tokens import OutstandingToken, BlacklistedToken
 from rest_framework.exceptions import ValidationError
@@ -6,6 +8,7 @@ from rest_framework.exceptions import ValidationError
 from django.contrib.auth import get_user_model
 
 import logging
+import email_validator
 
 logger  = logging.getLogger(__name__)
 User = get_user_model()
@@ -64,3 +67,25 @@ def blacklist_outstanding_token(user):
 
     except Exception as exc:
         raise ValidationError(F"Error blacklisting tokens: {exc}")
+
+def validate_email(email):
+    try:
+        valid_email = email_validator.validate_email(email, check_deliverability=True)
+    except email_validator.EmailNotValidError as exc:
+        raise ValidationError("Invalid email address provided")
+    return valid_email.normalized
+
+def _get_user_by_email(email: str):
+    try:
+        user = User.objects.get(email__iexact=email)
+        return user
+    except User.DoesNotExist:
+        return None
+
+def _get_code_intance_or_none(code: str) -> OneTimePassword:
+    code = _hash_otp_code(code)
+    try:
+        code_instance = OneTimePassword.objects.get(hash_code=code, is_active=True, is_used=False)
+        return code_instance
+    except OneTimePassword.DoesNotExist:
+        return None

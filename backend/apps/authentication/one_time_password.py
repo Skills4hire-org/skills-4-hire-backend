@@ -2,7 +2,6 @@ from django.db import models
 import uuid
 from django.conf import settings
 from django.utils import timezone
-from datetime import datetime, timedelta
 
 User = getattr(settings, "AUTH_USER_MODEL")
 
@@ -16,7 +15,7 @@ class OneTimePassword(models.Model):
         )
     
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="one_time_codes")
-    hash_code = models.CharField(max_length=100, unique=True, db_index=True)
+    hash_code = models.CharField(max_length=100, unique=True, db_index=True, null=False)
 
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)

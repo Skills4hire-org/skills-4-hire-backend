@@ -4,13 +4,13 @@ from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
+from django_filters.rest_framework import DjangoFilterBackend
+from django.contrib.auth import get_user_model
 
 from rest_framework import viewsets, status, filters
 from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
-
-from django_filters.rest_framework import DjangoFilterBackend
 
 from .models import Post, Comment, PostLike
 from .serializers import PostCreateSerializer, PostDetailSerializer, CommentSerializer
@@ -18,6 +18,7 @@ from .paginations import CustomPostPagination
 from .permission import IsOwnerOrReadOnly
 from .utils.posts import get_post_by_id
 
+User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
@@ -51,7 +52,7 @@ class PostViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         # Ensure we always start from the base queryset to allow further
         # filtering by DRF filter backends.
-        return self.queryset.all()
+        return self.filter_queryset(self.queryset)
 
     @method_decorator(cache_page(60 * 5))
     def list(self, request, *args, **kwargs):
@@ -83,11 +84,34 @@ class PostViewSet(viewsets.ModelViewSet):
         # Use soft delete to preserve data and indexes
         instance.soft_delete()
 
+    @method_decorator(cache_page(60 * 10))
+    @action(detail=False, methods=["get"], url_path="offers")
+    def offers(self, request):
+        """ Returns customer jobs posts with pagination"""
+        if request and not request.user.is_authenticated:
+            return Response({'detail': 'Authentication credentials were not provided.'}, status=status.HTTP_401_UNAUTHORIZED)
+        active_role = getattr(request.user, "active_role")
+        if active_role != User.RoleChoices.CUSTOMER:
+            return Response({"status": "Failed", "deatil": "Only users with customer role can access this view"},
+                            status=status.HTTP_400_BAD_REQUEST)
+        qs = self.get_queryset()
+        if qs is None:
+            qs = qs.none()
+        else:
+            qs = qs.filter(user=request.user, post_type=Post.PostType.JOB).all()
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = self.get_serializer(qs, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(qs, many=True)
+        return Response({"status": "success", "data": serializer.data}, status=satus.HTTP_200_OK)
+
+
     @method_decorator(cache_page(60 * 15))
     @action(detail=False, methods=['get'], url_path='mine')
     def mine(self, request):
         """Return the authenticated user's posts with normal pagination and filtering."""
-        if not request.user or not request.user.is_authenticated:
+        if request.user and request.user.is_authenticated:
             return Response({'detail': 'Authentication credentials were not provided.'}, status=status.HTTP_401_UNAUTHORIZED)
 
         qs = self.filter_queryset(self.get_queryset().filter(user=request.user).order_by("-created_at"))

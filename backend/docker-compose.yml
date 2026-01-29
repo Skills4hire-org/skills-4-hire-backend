@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_DB: ${POSTGRES_NAME}
     env_file:
-      - ".env"
+      - .env
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: "unless-stopped"

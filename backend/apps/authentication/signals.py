@@ -23,6 +23,7 @@ def post_save_otp_after_account_registration(sender, instance, created, **kwargs
     logger.debug(f"Signal fired for user: {instance.email}")
     try:
         code = create_otp_for_user(instance)
+        print(code)
         context = genrate_context_for_otp(code=code, email=instance.email)
         _send_email_to_user(context)
         logger.debug(f"OTP created and email sent for user: {instance.email}")

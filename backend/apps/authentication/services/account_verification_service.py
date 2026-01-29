@@ -60,7 +60,7 @@ class AccountVerificationService(BaseService):
 
         try:
             hash_code = _hash_otp_code(code)
-            otp_instance = get_object_or_404(OneTimePassword, user=user, code=hash_code)
+            otp_instance = get_object_or_404(OneTimePassword, user=user, hash_code=hash_code)
 
             if otp_instance.is_expired():
                 logging.info("OTP instance is Expired")
@@ -82,7 +82,8 @@ class AccountVerificationService(BaseService):
                 user_instance.save(update_fields=["is_active", "is_verified"])
 
                 otp_instance.save(update_fields=['is_used'])
-    
+            
+            return True
         except DatabaseError as exc:
             logger.error("error while verifying user account", exc_info=True)
             raise ValidationError("Error while validating user and otp instances", exc)

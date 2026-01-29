@@ -4,6 +4,7 @@ from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 from django.contrib.auth import get_user_model
+from django.db.models import F
 
 from rest_framework_simplejwt.tokens import OutstandingToken, BlacklistedToken
 
@@ -31,8 +32,6 @@ def send_email_on_quene(content: dict):
         _send_mail_base(context=content)
     except Exception:
         raise
-    else:
-        logger.error("Failed to quene email message")
 
 
 @shared_task
@@ -45,17 +44,14 @@ def auto_delete_otp():
     """
 
     logger.debug("Running Job: auto delete expired otps")
-
-    deleted_otps = 0
     try:
-        otp_records = OneTimePassword.objects.all().only("otp_id", "code")
-
-        for otp in otp_records:
-            with transaction.atomic():
-                if otp.is_expired():
-                    deleted_otps += 1
-                    otp.delete()
-        logger.info(f"Automatically deleted {deleted_otps} OTP codes from the database")    
+        expiry_minute = getattr(settings, "OTP_EXPIRY", 15) 
+        with transaction.atomic():
+            one_time_codes = OneTimePassword.objects.filter(
+                created_at__lt=timezone.now() - timezone.timedelta(minutes=expiry_minute)
+            ).update(is_active=~F("is_active"), is_deleted=~F("is_deleted"))
+        
+        logger.info(f"Automatically deleted OTP codes from the database")    
     except IntegrityError as exc:
         logger.error("Database error while auto deleting OTP",  exc_info=True)
         raise ValidationError("Database error while auto deleting OTP.") 

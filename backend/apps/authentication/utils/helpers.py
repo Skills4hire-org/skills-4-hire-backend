@@ -52,7 +52,7 @@ def create_otp_for_user(user):
     try:
         with transaction.atomic():
             OneTimePassword.objects.create(user=user, hash_code=hash_code) 
-        logger.info(_("successfully created and saved OTP for user %s", user))
+        logger.debug("successfully created and saved OTP for user %s", user)
     except IntegrityError as exc:
         logger.error("Database error while creating OTP for user %s", user.id, exc_info=True)
         raise ValidationError("Database error while creating OTP.") from exc

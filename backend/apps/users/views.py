@@ -19,7 +19,7 @@ from .base_model import BaseProfile, Address, Avater
 from .provider_models import ProviderModel, ProviderSkills, Service
 from .customer_models import CustomerModel
 from .services.provider_service import ProviderService
-from .permissions import IsProvider, IsSkillOwner
+from .permissions import IsProvider, IsSkillOwner, IsBaseOrReadOnly
 
 
 from django.shortcuts import get_object_or_404
@@ -132,11 +132,11 @@ class ProfileReadView(viewsets.ModelViewSet):
     
 class AddressViewSet(viewsets.ModelViewSet):
     serializer_class = AddresSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAuthenticated, IsBaseOrReadOnly]
     queryset = Address.objects.select_related("profile")
     
     def perform_create(self, serializer):
-        serializer.save(profile=self.user.profile)
+        serializer.save(profile=self.request.user.profile)
 
     def check_object_permissions(self, request, obj):
         if request.method in ("put", "patch", "delete"):
@@ -152,7 +152,8 @@ class AddressViewSet(viewsets.ModelViewSet):
         }, status=status.HTTP_201_CREATED)
     
     def get_queryset(self):
-        address = get_object_or_404(self.queryset, profile=self.request.user.profile, is_active=True, is_deleted=False)
+        address = get_object_or_404(self.queryset, profile=self.request.user.profile, 
+        is_active=True, is_deleted=False)
         return address
     
     def destroy(self, request, *args, **kwargs):

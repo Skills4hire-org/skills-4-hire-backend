@@ -9,15 +9,7 @@ from .services.resend_otp_service import (
     ResendOtpService
 )
 
-from .services.password_reset_service import (
-    PasswordResetService
-)
-
-from .services.password_confirm_service import (
-    PasswordConfirmService
-)
-
-from .serilaizers import (
+from .serializers import (
     RegistrationsSerializer,
     AccountVerificationSerializer,
     ResendOtpSerializer,
@@ -26,8 +18,8 @@ from .serilaizers import (
     LogoutSerializer
 )
 from .utils.helpers import create_otp_for_user
-from .helpers import _send_email_to_user
-from .utils.template_helpers import genrate_context_for_otp
+from .helpers import _send_email_to_user, _get_user_by_email, _get_code_intance_or_none, blacklist_outstanding_token
+from .utils.template_helpers import genrate_context_for_otp, generate_context_for_password_reset
 
 from rest_framework.views import APIView
 from rest_framework.views import APIView
@@ -113,8 +105,15 @@ class AccountVerificationView(APIView):
             otp_instance = verification_service.get_otp_instance(user, code)
 
             verify_account = verification_service._verify_account(otp_instance, user)
-
-            return Response(data={"detail": "Account Verification Successful"}, status=status.HTTP_200_OK)
+            if verify_account:
+                return Response(data={"status": "success", "detail": {
+                                                    "message": "Account Verification Successful",
+                                                    "data": {
+                                                        "full_name": user.full_name,
+                                                        "pk": user.pk,
+                                                    }
+                                            }
+                                    }, status=status.HTTP_200_OK)
         except Exception as exc:
             return Response({
                 "detail": f"Account Verification Failed. Error: {exc}"
@@ -140,12 +139,11 @@ class ResendOtpView(APIView):
             context = genrate_context_for_otp(code=code, email=user.email)
             _send_email_to_user(context)
 
-            return Response({"detail": "OTP code sent. check your email address"}, status=status.HTTP_200_OK)
+            return Response({"status": "success", "detail": "OTP code sent. check your email address"}, status=status.HTTP_200_OK)
         except Exception as exc:
             return Response({
                 "detail": f"Error sending OTP: {exc}"
             }, status=status.HTTP_400_BAD_REQUEST)
-
 
 class PasswordResetRequestView(APIView):
     http_method_names = ["post"]
@@ -153,33 +151,29 @@ class PasswordResetRequestView(APIView):
     serializer_class = ResendOtpSerializer
 
     def post(self, request, *args, **kwargs):
-
         serializer = self.serializer_class(data=request.data)
-
+        serializer.is_valid(raise_exception=True)
+        valid_email = serializer.validated_data.get("email")
         try:
-            password_reset_service = PasswordResetService(serializer)
-            user_email = password_reset_service._decode_serializer()
-
-            user = password_reset_service.get_user(user_email)
-            generate_token = password_reset_service.generate_token_for_user(user)
+            user = _get_user_by_email(valid_email)
+            if user.is_deleted:
+                return Response({"status": "Failed", "detail": "User account already deactivated"}, status=status.HTTP_400_BAD_REQUEST)
             
-
-            store_token = password_reset_service.cache_token_in_redis_cache(user, generate_token)
             code = create_otp_for_user(user)
-
-            password_reset_service.send_reset_email(code, user)
-
-            return Response({
-                "success": True,
-                "reset_link": BASE_URL + f"api/v1/auth/account/password/reset/confirm?token={generate_token}",
-                "cache": store_token,
-            }, status=status.HTTP_200_OK)
-        except Exception as e:
-            return Response({
-            "success": False,
-            "error messages": f"Error: {e}"
-            }, status=status.HTTP_400_BAD_REQUEST
-            )
+            context = generate_context_for_password_reset(code, valid_email, name=user.full_name)
+            print(context)
+        except Exception:
+            raise
+        send_email = _send_email_to_user(context)
+        if not send_email.get("success"):
+            return Response({"status": "Failed", "detail": "email notification Failed"})
+        return Response({"status": "success", "detail": {
+            "message": "Password reset email sent...",
+            "user_data": {
+                "used_id": user.pk,
+                "user_name": user.full_name
+            }
+        }})
 
 class PasswordResetConfirmView(APIView):
     http_method_names = ["post"]
@@ -187,47 +181,29 @@ class PasswordResetConfirmView(APIView):
     serializer_class = PasswordResetConfirmSerializer
 
     def post(self, request, *args, **kwargs):
-
         serializer = self.serializer_class(data=request.data)
-
-        try:
-            password_reset_token = request.query_params.get("token").strip() or request.GET.get("token").strip()
-
-            confirm_service = PasswordConfirmService(serializer)
-            confirm_service._validate_serializer()
+        serializer.is_valid(raise_exception=True)
+        validated_data = serializer.validated_data
+        code = validated_data.get("code")
+        password = validated_data.get("password")
+        if any([code, password]) is None:
+            return Response({"status": "Failed", "detail": "'code' and 'password' are both required for password reset."}, 
+            status=status.HTTP_400_BAD_REQUEST)
+        code_instance = _get_code_intance_or_none(code.strip())
+        user = code_instance.user
+        if user and user.is_active:
+            user.set_password(password)
+            user.save(update_fields=["password"])
+        blacklist_outstanding_token(user)
+        return Response({ "success": True, "detail": {"message": "Password Reset successful",
+                "user_data": {
+                    "user_id": user.pk,
+                    "email": user.email,
+                    "full_name": user.full_name
+                }
+            },
             
-            code, password = confirm_service._decode_serializer()
-            user = confirm_service.validate_code(code)
-
-            validate_password_token = confirm_service.pasword_reset_token_check(user, password_reset_token)
-            
-            if validate_password_token:
-                # set user password 
-
-                user.set_password(password)
-                user.save(update_fields=["password"])
-            
-            confirm_service.clean_up_jobs(code, user)
-
-            return Response({
-                "success": True,
-                "detail": {
-                    "message": "Password Reset successful",
-                    "user_data": {
-                        "email": user.email,
-                        "full_name": user.full_name
-                    }
-                },
-                
-            }, status=status.HTTP_200_OK)
-        
-        except Exception as exc:
-            return Response(
-                {
-                    "success": False,
-                    "detail": f"Error reseting password: {exc}"
-                }, status=status.HTTP_400_BAD_REQUEST
-            )
+        }, status=status.HTTP_200_OK)
 
 class LoginView(TokenObtainPairView):
     """

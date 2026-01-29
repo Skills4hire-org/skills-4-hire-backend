@@ -24,4 +24,10 @@ class IsSkillOwner(BasePermission):
             return False
         return request.user.profile.provider_profile == obj.profile
 
+class IsBaseOrReadOnly(BasePermission):
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return True
+        return getattr(obj, "profile") == getattr(request.user, "profile")
+    
         
