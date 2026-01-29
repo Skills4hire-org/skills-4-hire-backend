@@ -184,9 +184,9 @@ class RegistrationsSerializer(serializers.Serializer):
             logging.info(_(f"A new user instance created: {user}"))
 
             return user
-        except Exception:
-            logging.error(_(f"user creation failed:"))
-            raise serializers.ValidationError("User creation Failed!")
+        except Exception as exc:
+            logging.error(_(f"user creation failed: {exc}"))
+            raise serializers.ValidationError(f"User creation Failed! {exc}")
 
     
 class AccountVerificationSerializer(serializers.Serializer):

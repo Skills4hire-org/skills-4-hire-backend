@@ -6,7 +6,7 @@ from autoslug import AutoSlugField
 
 from phonenumber_field.modelfields import PhoneNumberField
 
-from apps.authentication import one_time_password
+from . import one_time_password
 import uuid
 
 class UserManager(BaseUserManager):
