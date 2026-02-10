@@ -2,6 +2,15 @@ from config.settings.base import *
 
 DEBUG = env("DEBUG")
 
+ALLOWED_HOSTS = ["*"]
+
+DEBUG = env.bool("DEBUG")
+if DEBUG:
+    INSTALLED_APPS += ["debug_toolbar"]
+    MIDDLEWARE += ["debug_toolbar.middleware.DebugToolbarMiddleware"]
+
+INTERNAL_IPS = [ "127.0.0.1", "localhost" ]
+
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
@@ -15,6 +24,8 @@ CACHES = {
 CELERY_BROKER_URL = "redis://127.0.0.1:6379/0"
 CELERY_RESULT_BACKEND = "redis://127.0.0.1:6379/0"
 
-if DEBUG:
-    INSTALLED_APPS += ["debug_toolbar"]
-    MIDDLEWARE += ["debug_toolbar.middleware.DebugToolbarMiddleware"]
+CORS_ALLOW_ALL_ORIGINS = False
+
+CORS_ALLOWED_ORIGINS = [
+    "https://hoppscotch.io",
+]

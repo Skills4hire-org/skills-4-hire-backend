@@ -96,7 +96,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         status = serializer.validated_data.get("status")
         try:
-            self.perform_create(serializer)
+            self.perform_update(serializer)
         except Exception:
             raise 
         return Response({"status": "success", "detail": f"Booking instance {status}"}, status=status.HTTP_200_OK)

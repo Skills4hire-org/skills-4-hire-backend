@@ -4,7 +4,9 @@ from django.shortcuts import get_object_or_404
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
-from ..users.serializers import AddresSerializer, ServiceSerializer, validate_request, Address, Service, ProviderProfileSerializer
+from ..users.serializers import  ServiceSerializer, validate_request, Service, ProviderProfileSerializer
+from ..users.base_model import Address
+from ..users.address.serializers import AddresSerializer
 from .models import Bookings
 from .helpers import get_user_wallet, is_customer
 from .services import _cancel_booking, _accept_booking

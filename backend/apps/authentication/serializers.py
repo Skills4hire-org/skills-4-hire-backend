@@ -5,12 +5,11 @@ from django.contrib.auth.password_validation import validate_password as _valida
 from django.db.models import Q
 from django.db import transaction
 
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework import serializers
-from rest_framework_simplejwt.serializers import TokenObtainPairSerializer, TokenRefreshSerializer
-from rest_framework_simplejwt.tokens import RefreshToken, BlacklistedToken
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+from rest_framework_simplejwt.tokens import RefreshToken, BlacklistedToken, OutstandingToken
 
-from .models import CustomUser
 from .helpers import validate_email, _get_user_by_email, _get_code_intance_or_none
 import logging
 
@@ -254,65 +253,70 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     def user_can_authenticate(self, user):
-        return getattr(user, "is_active", True)
-    
+        if hasattr(user, "is_active") and hasattr(user, "is_verified"):
+            return getattr(user, "is_active", True) and getattr(user, "is_verified", True)
+        return False
+        
     def validate(self, attrs):
-        
-        login_identifier = attrs.get("email", None)
-        password = attrs.get("password", None).strip()
-        
-        try: 
-            user = User.objects.filter(
-                Q(email__iexact=login_identifier) |
-                Q(phone__iexact=login_identifier)
-            ).first()
-
+        password = attrs.get("password")
+        email = validate_email(attrs["email"])
+        valid_email = email 
+        if valid_email is None:
+            raise serializers.ValidationError(_("email returned none when verifing email address"))
+        try:
+            user = User.objects.get(email=valid_email) 
         except User.DoesNotExist:
-            user = None
-
-        if user is None:
-            raise serializers.ValidationError(_("Invalid Credentials. User doesnt exists, try registring an account."))
-        if not user.is_verified or  not user.is_active:
-            raise serializers.ValidationError("Your account is not verified")
-        if user.is_deleted:
-            raise serializers.ValidationError("Account has been deactivated, contact admin")
-        
-        if hasattr(user, "check_password"):
-            if not user or not user.check_password(password) or not  self.user_can_authenticate(user):
-                raise serializers.ValidationError("Invalid credentials provided")
+            raise AuthenticationFailed(code="invalid_credentials", detail={"status": "Failed", "message": f"account not found for user {valid_email}"})
+        if not self.user_can_authenticate(user):
+            raise AuthenticationFailed(code="invalid_request", detail={"status": "Failed", "detail": _("account not verified")})
+        if not user.check_password(password):
+            raise AuthenticationFailed(code="invalid_credentails", detail={"status": "failed", "detail": _("invalid_credentials")})
         self.user = user
         data = super().validate(attrs)
-
-        data["user_data"] = {
-            "user_id": user.pk,
-            "email": user.email,
-            "full_name": user.full_name
-        }
-
+        data.update({"user_data": {
+            "user_id": user.pk, "email": user.email,
+            "name": getattr(user, "full_name") or ""
+        }})
         return data
     
     @classmethod
-    def get_token(self, user):
-        """ 
-        Provide extra claims to token data
-        """
+    def get_token(cls, user):
         token = super().get_token(user)
-
+        token.verify()
+        token.set_jti()
         token["email"] = getattr(user, "email", None)
         token["full_name"] = getattr(user, "full_name", None)
 
         return token
 
-class LogoutSerializer(serializers.Serializer):
-    """ 
-    A simple logout serializer for validating and blacklisting refresh tokens
-    """
+class CustomLogoutSerializer(serializers.Serializer):
+    refresh_token = serializers.CharField(required=True, write_only=True, error_messages={
+        "required": _("Refresh token is required to logout.")
+    })
+    default_error_messages = {
+        "bad_token": _("Token is invalid or expired")
+    }
 
-    refresh_token = serializers.CharField(write_only=True, required=True)
-
-    def validate(self, attrs: dict) -> str:
-        attrs["refresh_token"].strip()
-
+    def get_user_from_token(token: str):
+        token = RefreshToken(token=token)
+        return token.get("user_id")
+    
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        request = self.context.get("request")
+        user = request.user 
+        if user is None or "Anonymous": 
+            raise serializers.ValidationError(_("Authentication credentials were not provided"), code="invali_request")
+        token = attrs.get("refresh_token")
+        user_id = self.get_user_from_token(token)
+        if user_id != user.pk:
+            raise serializers.ValidationError(_("Invalid Request. refresh token is Invalid"), code="refresh_token_invalid")
+        with transaction.atomic():
+            outstanding_tokens = OutstandingToken.objects.filter(user=user).all()
+            # black list all outstanding token for this user
+            BlacklistedToken.objects.bulk_create(
+                BlacklistedToken(token=token) for token in outstanding_tokens
+            )
         return attrs
 
         

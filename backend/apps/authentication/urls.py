@@ -16,13 +16,13 @@ app_name = "authentication"
 refresh_view = TokenRefreshView.as_view()
 
 urlpatterns = [
-    path("auth/account/register/", RegistrationView.as_view(), name="register-view"),
-    path("auth/account/verify/", AccountVerificationView.as_view(), name="verify-account"),
-    path("auth/account/resend/otp/", ResendOtpView.as_view(), name="resend-otp"),
-    path("auth/account/password/reset/", PasswordResetRequestView.as_view(), name="password-reset"),
-    path("auth/account/password/reset/confirm/", PasswordResetConfirmView.as_view(), name="password-confirm"),
-    path("auth/account/login/", token_obtain_pair, name="token-obtain"),
-    path("auth/account/logout/", logout_view, name="logout"),
-    path("auth/account/refresh/token/", refresh_view, name="refresh-token")
+    path("register/", RegistrationView.as_view(), name="register-view"),
+    path("verify/", AccountVerificationView.as_view(), name="verify-account"),
+    path("resend/otp/", ResendOtpView.as_view(), name="resend-otp"),
+    path("password/reset/", PasswordResetRequestView.as_view(), name="password-reset"),
+    path("password/reset/confirm/", PasswordResetConfirmView.as_view(), name="password-confirm"),
+    path("login/", token_obtain_pair, name="token-obtain"),
+    path("logout/", logout_view, name="logout"),
+    path("refresh/token/", refresh_view, name="refresh-token")
  
 ]

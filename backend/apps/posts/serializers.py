@@ -1,6 +1,7 @@
 from rest_framework import serializers
 
-from .models import Post, PostMedia, ServiceTag, SkillCategory, Comment
+from .models import Post, PostMedia, ServiceTag, Comment
+from ..users.provider_models import Category
 
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -29,8 +30,8 @@ class PostMediaSerializer(serializers.ModelSerializer):
         return value
     
 class ServiceTagSerializer(serializers.ModelSerializer):
-    # Accept service as a primary key and validate against SkillCategory queryset
-    service = serializers.PrimaryKeyRelatedField(queryset=SkillCategory.objects.all())
+    # Accept service as a primary key and validate against Category queryset
+    service = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all())
 
     class Meta:
         model = ServiceTag

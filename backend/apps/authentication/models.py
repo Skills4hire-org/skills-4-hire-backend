@@ -77,8 +77,9 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
                                 default=uuid.uuid4, 
                                 primary_key=True
                                 )
-    slug = AutoSlugField(populate_from="first_name",
-                        default=None, 
+    
+    username = models.CharField(max_length=50, null=True, blank=True)
+    slug = AutoSlugField(populate_from="username",
                         null=True, 
                         unique=True, 
                         )
@@ -158,3 +159,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         verbose_name_plural = "users"
 
     
+    def save(self, force_insert = None, force_update = None, using = None, update_fields = None):
+        if not self.username:
+            self.username = self.first_name.lower() + self.last_name.lower()
+        return super().save(force_insert, force_update, using, update_fields)   

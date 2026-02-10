@@ -52,7 +52,6 @@ class BaseProfile(models.Model):
             self.display_name = self.user.full_name if self.user.full_name else self.user.first_name
         super().save(*args, **kwargs)
 
-
 class Address(models.Model):
     address_id = models.UUIDField(
         primary_key=True, 
@@ -114,30 +113,3 @@ class Avater(models.Model):
     def __str__(self):
         return f"Avater()"
     
-    @method_decorator(transaction.atomic())
-    def soft_delete(self):
-        if not isinstance(self, Avater):
-            raise ValueError("Invalid request. Not a valid Avater instance")
-        self.avaters = None
-        self.avater_public_id = None
-        self.description = None
-        self.is_active = False
-        self.is_deleted = True
-        self.deleted_at = self.deleted_at if self.deleted_at else timezone.now()
-        self.save()
-
-class SkillCategory(models.Model):
-    skill_category_id = models.UUIDField(
-        max_length=200,
-        primary_key=True,
-        db_index=True,
-        unique=True, 
-    )
-    name = models.CharField(max_length=255, unique=True)
-    category = models.CharField(max_length=200)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"SkillCategory(), "

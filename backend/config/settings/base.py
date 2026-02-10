@@ -28,9 +28,17 @@ MAX_OTP_LENGTH = env.int("MAX_OTP_LENGTH")
 APP_NAME = env("APP_NAME", default="Skills-4-Hire")
 OTP_EXPIRY = env.int("OTP_EXPIRY")
 RESTRICTED_PATHS = env("RESTRICTED_PATHS").split(",")
+
+
 # User model to user 
 AUTH_USER_MODEL = "authentication.CustomUser"
 DJANGO_SETTINGS_MODULE= env("DJANGO_SETTINGS_MODULE")
+
+# Pusher Configurations
+PUSHER_APP_ID = env("PUSHER_APP_ID")
+PUSHER_KEY = env("PUSHER_KEY")
+PUSHER_SECRET = env("PUSHER_SECRET")
+PUSHER_CLUSTER = env("PUSHER_CLUSTER")
 
 # Application definition
 
@@ -60,7 +68,7 @@ INSTALLED_APPS = [
     "apps.ratings.apps.RatingsConfig",
     "apps.bookings.apps.BookingsConfig",
     "apps.wallet.apps.WalletConfig",
-    # "apps.notifications.apps.NotificationsConfig",
+    "apps.notification.apps.NotificationConfig",
 
 ]
 
@@ -190,6 +198,7 @@ USE_I18N = True
 USE_TZ = True
 
 
+
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
@@ -219,7 +228,7 @@ timezone = 'Africa/Lagos'
 CELERY_BEAT_SCHEDULE = {
     "delete_otp": {
         "task": "apps.authentication.services.tasks.auto_delete_otp",
-        "schedule": crontab(hour=10, minute=0)
+        "schedule": crontab(minute="*/5")
     },
     "auto_delete_exp_outstanding_jwt": {
         "task": "apps.authentication.services.tasks.clean_up_expired_jwt",

@@ -89,7 +89,7 @@ class Migration(migrations.Migration):
                 ('created_at', models.DateTimeField(auto_now_add=True)),
                 ('updated_at', models.DateTimeField(auto_now=True)),
                 ('post', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='post_tag', to='posts.post')),
-                ('service', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='service_tag', to='users.skillcategory')),
+                ('service', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='service_tag', to='users.category')),
             ],
         ),
         migrations.AddIndex(

@@ -15,7 +15,7 @@ from .serializers import (
     ResendOtpSerializer,
     PasswordResetConfirmSerializer,
     CustomTokenObtainPairSerializer,
-    LogoutSerializer
+    CustomLogoutSerializer
 )
 from .utils.helpers import create_otp_for_user
 from .helpers import _send_email_to_user, _get_user_by_email, _get_code_intance_or_none, blacklist_outstanding_token
@@ -116,7 +116,7 @@ class AccountVerificationView(APIView):
                                     }, status=status.HTTP_200_OK)
         except Exception as exc:
             return Response({
-                "detail": f"Account Verification Failed. Error: {exc}"
+                "detail": f"Account Verification Failed. Error: {str(exc)}"
             }, status=status.HTTP_400_BAD_REQUEST)
 
 class ResendOtpView(APIView):
@@ -215,7 +215,7 @@ token_obtain_pair = LoginView.as_view()
 
 
 class LogOutView(APIView):
-    serializer_class = LogoutSerializer 
+    serializer_class = CustomLogoutSerializer 
     permission_classes = [permissions.IsAuthenticated]
     http_method_names = ["post"]
 

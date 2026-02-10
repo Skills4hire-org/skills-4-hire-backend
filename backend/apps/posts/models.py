@@ -8,7 +8,7 @@ from django.db.models import F
 
 import uuid
 
-from apps.users.base_model import SkillCategory
+from ..users.provider_models import Category
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +41,7 @@ class Post(models.Model):
         choices=User.RoleChoices, 
         null=True, 
         blank=True,
-        help_text="User role when creatinf the post instance"
+        help_text="User role when creating the post instance"
     )
     
     post_type = models.CharField(
@@ -108,7 +108,7 @@ class ServiceTag(models.Model):
 
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="post_tag")
 
-    service = models.ForeignKey(SkillCategory, on_delete=models.CASCADE, related_name="service_tag")
+    service = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="service_tag")
 
 
     created_at = models.DateTimeField(auto_now_add=True)

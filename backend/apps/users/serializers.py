@@ -2,11 +2,14 @@ from rest_framework import serializers
 
 from django.contrib.auth import get_user_model
 from django.db import transaction, DatabaseError
+from django.utils.translation import gettext_lazy as _
 
-from .base_model import BaseProfile, Address, Avater, SkillCategory
-from .provider_models import ProviderModel, ProviderSkills, Service,ServiceImage
+from .base_model import BaseProfile
+from .provider_models import ProviderModel, Service,ServiceImage
 from .customer_models import CustomerModel
+from ..users.address.serializers import AddresSerializer
 from .helpers import save_both_profiles, save_customer_profile, save_provider_profile, check_active_role, logger
+from .profile_avater.serializers import AvaterSerializer
 
 User = get_user_model()
 
@@ -92,7 +95,7 @@ class BaseProfileUpdateSerializer(serializers.Serializer):
             raise serializers.ValidationError("User is not a CUSTOMER")
         return data
 
-    def update(self, instance, validated_data):
+    def create(self, instance, validated_data):
         gender =  validated_data.get("gender", None)
         bio = validated_data.get("bio", None)
         location = validated_data.get("location", None)
@@ -131,38 +134,12 @@ class BaseProfileUpdateSerializer(serializers.Serializer):
         
         return instance
 
-class AddresSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Address
-        fields = [
-            "address_id",
-            "line1",
-            "line2",
-            "city",
-            "state",
-            "postal_code",
-            "country",
-            "created_at"
-        ]
-
-
-class AvaterSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Avater
-        fields = [
-            "avater_id",
-            "avater",
-            "description",
-            "avater_public_id",
-            "created_at"
-        ]
-
 class BaseProfileReadSerializer(serializers.ModelSerializer):
 
     provider_profile = ProviderProfileSerializer(read_only=True)
     customer_profile = CustomerProfileSerializer(read_only=True)
     address = AddresSerializer(many=True, read_only=True)
-    avater = AvaterSerializer()
+    avater = AvaterSerializer(read_only=True)
     active_role = serializers.SerializerMethodField()
     
     class Meta:
@@ -187,63 +164,6 @@ class BaseProfileReadSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("This user has no user object")
 
         return obj.user.active_role
-    
-class ProviderSkillSerializer(serializers.ModelSerializer):
-    skills = serializers.PrimaryKeyRelatedField(queryset=SkillCategory.objects.all())
-    class Meta:
-        model = ProviderSkills
-        fields = [
-            
-            "skill_id",
-            "skills",
-            "efficiency",
-            "level_of_experience",
-            "description",
-            "work",
-            "is_primary",
-            "is_active",
-            "created_at"
-        ]
-
-        read_only_fields = ["skill_id", "is_active", "created_at"]
-
-    def validate(self, data):
-        experience = data.get("level_of_experience")
-        efficiency = data.get("efficiency")
-        validate_request(self.context["request"])
-        if not experience.isdigit():
-            raise serializers.ValidationError("Level of experience must be a number")
-        if int(experience) < 0:
-            raise serializers.ValidationError("Level of experience must be a positive number")
-        if efficiency not in ProviderSkills.EfficiencyStatus.choices:
-            raise serializers.ValidationError(f"Invalid data. Provided efficiency is not allowed: {ProviderSkills.EfficiencyStatus.choices}")
-        return data
-
-    def create(self, validated_data):
-        """
-        Create a new skill for the provider \n
-        Raise ValidationError if skill does not exist or user is not a provider \n
-        return the created skill
-        """
-        request = self.context["request"]
-        skill = validated_data.get("skills")
-        if not SkillCategory.objects.filter(name=skill.name).exists():
-            raise serializers.ValidationError("Invalid skill provided. skill is invalid")
-        profile = request.user.profile if hasattr(request.user, "profile") else None
-        if profile is None:
-            raise serializers.ValidationError("Invalid: No profile instance for user")
-        if not hasattr(profile, "provider_profile"):
-            raise serializers.ValidationError("User is not a provider")
-        if request.user.active_role != User.RoleChoices.SERVICE_PROVIDER:
-            raise serializers.ValidationError("User is not a provider")
-        provider_profile = profile.provider_profile
-        skill, created = ProviderSkills.objects.get_or_create(profile=provider_profile,skill=skill, **validated_data   
-        )
-        if not created:
-            raise serializers.ValidationError("Skill already exists for this provider")
-
-        return validated_data
-
 
 class SwitchRoleSerializer(serializers.Serializer):
     """Handles switching user roles"""
@@ -288,15 +208,20 @@ class ServiceSerializer(serializers.ModelSerializer):
             "created_at"
         ]
         read_only_fields = ["created_at", "is_active"]
+        
+    default_error_messages = {
+        "charge_empy": _("Charge cannot be empty")
+    }
     def validate(self, attrs):
         validate_request(self.context.get("request"))
-        for key in attrs.keys():
-            min_charge = attrs.get(key).get("min_charge") 
-            max_charge = attrs.get(key).get("max_charge")
-            if min_charge <= 0 or max_charge <= 0:
-                raise serializers.ValidationError("Charge cannot be negetive")
-            if min_charge >= max_charge:
-                raise serializers.ValidationError("Min charge can not be greater than the max_cahrge")
+        min_charge = attrs["min_charge"] if hasattr(attrs, "min_charge") else None
+        max_charge = attrs["max_charge"] if hasattr(attrs, "max_charge") else None
+        if any([min_charge, max_charge]) is None:
+            self.fail("charge_empty")
+        if min_charge <= 0 or max_charge <= 0:
+            raise serializers.ValidationError("Charge cannot be negetive")
+        if min_charge >= max_charge:
+            raise serializers.ValidationError("Min charge can not be greater than the max_cahrge")
         return attrs
     
     def create(self, validated_data):

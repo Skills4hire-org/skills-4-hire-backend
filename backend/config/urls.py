@@ -3,21 +3,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from .services import health, check_docker_update
-from rest_framework import permissions
-from drf_yasg.views import get_schema_view
-from drf_yasg import openapi
-
-schema_view = get_schema_view(
-    openapi.Info(
-        title="Skills 4 Hire API",
-        default_version="v1",
-        contact=openapi.Contact(name="Ogenna Israel", email="ogennaisrael@gmail.com"),
-        license=openapi.License(name="BSC License")
-    ),
-    permission_classes=[permissions.AllowAny],
-    public=True
-)
-
+from .drf_yasg import get_swagger_view
 
 # ADMIN view and health checks
 urlpatterns = [
@@ -27,17 +13,17 @@ urlpatterns = [
 ]
 # Project Documentation
 urlpatterns += [
-    path("docs/", schema_view.with_ui("swagger", cache_timeout=0), name="swagger-documentation"),
-    path("re_docs/", schema_view.with_ui("redoc", cache_timeout=0), name="redoc-documentation"),
+    path("docs/", get_swagger_view().with_ui("swagger", cache_timeout=0), name="swagger-documentation"),
+    path("re_docs/", get_swagger_view().with_ui("redoc", cache_timeout=0), name="redoc-documentation"),
 ]
 
 # App level url config
 urlpatterns += [
-    path("api/v1/", include("apps.authentication.urls")),
-    path("api/v1/", include("apps.users.urls")),
+    path("api/v1/auth/", include("apps.authentication.urls")),
+    path("api/v1/profile/", include("apps.users.urls")),
     path("api/v1/", include("apps.posts.urls")),
     path("api/v1/", include("apps.ratings.urls")),
-    path("api/v1/", include("apps.bookings.urls")),
+    path("api/v1/bookings/", include("apps.bookings.urls")),
 ]
 
 # Debug toolbar config

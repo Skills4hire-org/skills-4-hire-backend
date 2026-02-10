@@ -25,8 +25,8 @@ booking_fetch = views.BookingViewSet.as_view({
 
 
 urlpatterns = [
-    path("bookings/", booking_fetch, name="booking-fetch"),
-    path("profile/<uuid:profile_pk>/bookings/", booking_list, name="booking-list"),
-    path("profile/<uuid:profile_pk>/bookings/<uuid:pk>/", booking_detail, name="booking-detail"),
-    path("profile/<uuid:profile_pk>/bookings/<uuid:pk>/", booking_status, name="booking-status")
+    path("", booking_fetch, name="booking-fetch"),
+    path("<uuid:profile_pk>/bookings/", booking_list, name="booking-list"),
+    path("<uuid:profile_pk>/bookings/<uuid:pk>/", booking_detail, name="booking-detail"),
+    path("<uuid:profile_pk>/bookings/<uuid:pk>/", booking_status, name="booking-status")
 ]

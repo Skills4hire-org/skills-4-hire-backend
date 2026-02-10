@@ -3,6 +3,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
+from rest_framework.generics import CreateAPIView, DestroyAPIView
 
 from .serializers import (
     ProviderProfileSerializer, 
@@ -11,7 +12,6 @@ from .serializers import (
     BaseProfileReadSerializer,
     AddresSerializer,
     AvaterSerializer,
-    ProviderSkillSerializer,
     SwitchRoleSerializer,
     ServiceSerializer
 )
@@ -51,7 +51,6 @@ class OnboardingView(APIView):
         return Response(data={"detail": "Onboarding Complete", "active role": request.user.active_role
         }, status=status.HTTP_200_OK)
 
-
 class SwitchRoleView(APIView):
     http_method_names = ["post"]
     serializer_class = SwitchRoleSerializer
@@ -66,20 +65,9 @@ class SwitchRoleView(APIView):
         }, status=status.HTTP_200_OK)
 switch_role_view = SwitchRoleView.as_view()
 
-class ProfileView(APIView):
-    http_method_names = ["patch"]
-    serializer_class = BaseProfileUpdateSerializer
-    def patch(self, request):
-        serializer = self.serializer_class(data=request.data, context={"request": request}, partial=True)
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(data={"detail": "Profile updated ", "statis": True, "active_role": request.user.active_role,
-        }, status=status.HTTP_200_OK)
-
-profile_view = ProfileView.as_view()
     
-class ProfileReadView(viewsets.ModelViewSet):
-    http_method_names = ["get", "post", "delete"]
+class ProfileViewSet(viewsets.ModelViewSet):
+    http_method_names = ["get", "patch"]
     queryset = (
             BaseProfile.objects.select_related(
                 "provider_profile", "customer_profile"
@@ -90,12 +78,31 @@ class ProfileReadView(viewsets.ModelViewSet):
     def get_queryset(self):
         return self.queryset.all().filter(is_active=True, is_deleted=False)
     
-    serializer_class = BaseProfileReadSerializer
+    def get_permissions(self):
+        if self.action == "list":
+            return [permissions.IsAdminUser]
+        return [permissions.IsAuthenticated]
+    
+    def get_serializer_class(self):
+        if self.request.method in ("put", "patch"):
+            return BaseProfileUpdateSerializer
+        return BaseProfileReadSerializer
+    
+    @method_decorator(transaction.atomic)
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if instance != request.user.profile:
+            raise PermissionDenied()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(data={"detail": "Profile updated successfully", "status": "success", "data": serializer.data
+        }, status=status.HTTP_200_OK)
 
     @method_decorator(cache_page(60 * 15))
     @action(methods=["get"], detail=False, url_path="me")
     def me(self, request):
-        user_profile = get_object_or_404(self.get_queryset(), user=request.user)
+        user_profile = get_object_or_404(self.get_queryset(), user=request.user, is_active=True)
         serializer = self.get_serializer(user_profile)
         return Response(data={"status": "success", "data": serializer.data
         }, status=status.HTTP_200_OK)
@@ -108,93 +115,6 @@ class ProfileReadView(viewsets.ModelViewSet):
         return Response(data={"status": "success", "data": serializer.data
         }, status=status.HTTP_200_OK)
 
-    @action(methods=["post"], detail=False, url_path="avater/upload")
-    def upload_avater(self, request, *args, **kwargs):
-        serializer = AvaterSerializer(
-            request.user.profile.avaters if request.user.profile.avater else None,
-            data=request.data,
-            partial=True
-        )   
-        serializer.is_valid(raise_exception=True)
-        serializer.save(profile=request.user.profile)
-        return Response({"detail": "Profile photo saved", "status": "success"
-        }, status=status.HTTP_201_CREATED)
-
-
-    @action(methods=["delete"], detail=False, url_path="avater")
-    def delete_avater(self, request, *args, **kwargs):
-        profile = request.user.profile 
-        avater = profile.avater if hasattr(profile, "avater") else None
-        if avater:
-            avater.soft_delete()
-        return Response(data={"detail": "Profile avater removed", "status": "success"
-        }, status=status.HTTP_204_NO_CONTENT)
-    
-class AddressViewSet(viewsets.ModelViewSet):
-    serializer_class = AddresSerializer
-    permission_classes = [permissions.IsAuthenticated, IsBaseOrReadOnly]
-    queryset = Address.objects.select_related("profile")
-    
-    def perform_create(self, serializer):
-        serializer.save(profile=self.request.user.profile)
-
-    def check_object_permissions(self, request, obj):
-        if request.method in ("put", "patch", "delete"):
-            if not obj.can_edit(request.user):
-                raise PermissionDenied("You dont have access to perform this action") 
-        return super().check_object_permissions(request, obj)
-    
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        return Response(data={"detail": "Address uploaded", "status": "success"
-        }, status=status.HTTP_201_CREATED)
-    
-    def get_queryset(self):
-        address = get_object_or_404(self.queryset, profile=self.request.user.profile, 
-        is_active=True, is_deleted=False)
-        return address
-    
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        if isinstance(instance, Address):
-            instance.soft_delete()
-            return Response(data={"detail": "Address deleted successfully", "status": "success"}, status=status.HTTP_204_NO_CONTENT)
-        
-class ProviderSkillViewSet(viewsets.ModelViewSet):
-    serializer_class = ProviderSkillSerializer
-    permission_classes = [permissions.IsAuthenticated, IsProvider, IsSkillOwner]
-
-    queryset = ProviderSkills.objects.select_related("profile", "skill")
-    def get_queryset(self):
-        if getattr(self, "swagger_fake_view", False):
-            return ProviderSkills.objects.none()
-        if not self.request.user.is_authenticated:
-            return ProviderSkills.objects.none()  
-        skills =self.queryset.filter(profile=self.request.user.profile.provider_profile if hasattr(
-            self.request.user.profile, "provider_profile") else None, is_active=True, is_deleted=False)
-        return skills
-    
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response(data={"detail": "Skill added successfully", "status": "success"
-        }, status=status.HTTP_201_CREATED)
-    
-    def check_object_permissions(self, request, obj):
-        if request.method in ("put", "patch", "delete"):
-            if not obj.can_edit(request.user):
-                raise PermissionDenied("You can't perform this action")
-        return super().check_object_permissions(request, obj)
-    
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        if isinstance(instance, ProviderSkills):
-            instance.soft_delete()
-        return Response({"detail": "Skill deleted successfully", "status": "success"}, status=status.HTTP_204_NO_CONTENT)
-    
     
 class ServiceViewSet(viewsets.ModelViewSet):
     serializer_class = ServiceSerializer
@@ -214,7 +134,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
     def check_object_permissions(self, request, obj):
         if request.method in ("put", "patch", "delete"):
             if not obj.can_edit(request.user):
-                raise PermissionDenied("You can't perform this action")
+                raise PermissionDenied()
         return super().check_object_permissions(request, obj)
     
     def get_queryset(self):

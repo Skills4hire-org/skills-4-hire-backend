@@ -1,8 +1,9 @@
 from django.db import models, transaction
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from autoslug import AutoSlugField
 
-from .base_model import BaseProfile, SkillCategory
+from .base_model import BaseProfile
 import uuid 
 
 
@@ -67,6 +68,27 @@ class ProviderModel(models.Model):
 
         ]
 
+class Category(models.Model):
+    skill_category_id = models.UUIDField(
+        max_length=200,
+        primary_key=True,
+        db_index=True,
+        unique=True, 
+    )
+    name = models.CharField(max_length=255, unique=True)
+    category = models.CharField(max_length=200, unique=True)
+    slug = AutoSlugField(populate_from="category", unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+
+        constraints = [
+            models.UniqueConstraint(fields=["name", "category"], name="unique_name_category")
+        ]
+
+    def __str__(self):
+        return f"Category(), "
 
 
 class ProviderSkills(models.Model):
@@ -76,7 +98,7 @@ class ProviderSkills(models.Model):
         EXPERT = "EXPERT", "Expert"
 
     skill_id = models.UUIDField(max_length=20, primary_key=True, unique=True, default=uuid.uuid4, db_index=True)
-    skills = models.ForeignKey(SkillCategory, on_delete=models.SET_NULL, related_name="skills", null=True)
+    category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="skills", null=True)
     profile = models.ForeignKey(ProviderModel, on_delete=models.CASCADE, related_name="skills")
     efficiency = models.CharField(max_length=20, choices=EfficiencyStatus.choices, default=EfficiencyStatus.BEGINEER)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -94,7 +116,7 @@ class ProviderSkills(models.Model):
         verbose_name = "provider_skills"
         constraints = [
             models.UniqueConstraint(
-                fields=("profile", "skills"),
+                fields=("profile", "category"),
                 name="profile_name_contraints"
             )
         ]
