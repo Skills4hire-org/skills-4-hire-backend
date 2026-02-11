@@ -73,9 +73,9 @@ class ServiceSerializer(serializers.ModelSerializer):
                         image.service.add(service)
         except DatabaseError:
             logger.exception("Failed  to populate database. service request failed on database operations", exc_info=True)
-            raise
+            raise DatabaseError("Failed to send save provider service")
         except Exception:
-            raise
+            raise serializers.ValidationError("Failed to save provider service!")
             
         return validated_data
     
