@@ -36,7 +36,7 @@ class SkillView(ListCreateAPIView):
     
     def create(self, request, *args, **kwargs):
         user_profile_pk = kwargs.get("profile_pk")
-        if request.user.profile.provider_profile.pk != user_profile_pk:
+        if request.user.profile.pk != user_profile_pk:
             raise PermissionDenied()
         serializer = self.get_serializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)

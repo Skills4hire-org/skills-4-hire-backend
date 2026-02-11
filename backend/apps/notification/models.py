@@ -15,7 +15,7 @@ class Notification(models.Model):
     content = models.TextField(null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
-    read_at = models.DateTimeField(blank=True, null=False)
+    read_at = models.DateTimeField(blank=True, null=True)
 
     is_deleted = models.BooleanField(default=False)
     is_read = models.BooleanField(default=False)

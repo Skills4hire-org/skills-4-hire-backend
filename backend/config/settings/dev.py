@@ -8,6 +8,13 @@ DEBUG = env.bool("DEBUG")
 if DEBUG:
     INSTALLED_APPS += ["debug_toolbar"]
     MIDDLEWARE += ["debug_toolbar.middleware.DebugToolbarMiddleware"]
+    INSTALLED_APPS += ["silk"]
+
+    MIDDLEWARE += ["silk.middleware.SilkyMiddleware"]
+
+    SILKY_PYTHON_PROFILER = True
+    SILKY_META = True
+    SILKY_ANALYZE_QUERIES = True
 
 INTERNAL_IPS = [ "127.0.0.1", "localhost" ]
 

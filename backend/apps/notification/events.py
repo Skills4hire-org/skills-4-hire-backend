@@ -6,3 +6,4 @@ class NotificationEvents(Enum):
     EARNING = "Earning Notification"
     SYSTEM = "System Alert" 
     BOOKING = "Booking Alert"
+    PAYMENT = "Payment Alart"

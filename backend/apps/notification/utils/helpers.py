@@ -1,7 +1,7 @@
 from django.conf import settings
 
 
-async def validate_pusher_credentials(payload: dict) -> bool:
+def validate_pusher_credentials(payload: dict) -> bool:
     payload_copy = payload.copy()
     api_key = payload_copy.get("api_key")
     secret = payload_copy.get("secret")

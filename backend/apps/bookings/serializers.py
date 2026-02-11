@@ -1,15 +1,18 @@
 from django.db import transaction
 from django.shortcuts import get_object_or_404
+from django.utils.translation import gettext_lazy as _
 
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
-from ..users.serializers import  ServiceSerializer, validate_request, Service, ProviderProfileSerializer
+from ..users.serializers import validate_request, Service, ProviderProfileSerializer, BaseProfileReadSerializer
+from ..users.services.serializers import ServiceSerializer
 from ..users.base_model import Address
 from ..users.address.serializers import AddresSerializer
 from .models import Bookings
 from .helpers import get_user_wallet, is_customer
 from .services import _cancel_booking, _accept_booking
+from ..authentication.serializers import UserReadSerializer
 
 from decimal import Decimal
 import logging
@@ -75,11 +78,9 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
                     booking.save()
             if service:
                 services = []
-                for data in service:
-                    service_data = get_object_or_404(Service, name=[value["name"].upper() for value in data.values()], 
-                                                 profile=provider)
-                    services.append(service_data)
-                booking.service.set(services)  
+                service_data = get_object_or_404(Service, name=service["name"].upper(), 
+                                                profile=provider)
+                booking.service.add(service_data)  
         return booking
     
     def update(self, instance, validated_data):
@@ -118,35 +119,42 @@ class BookingStatusUpdateSerializer(serializers.Serializer):
 
     def validate_status(self, value):
         validate_request(self.context.get("request"))
-        if value.upper() is not self.choices:
+        if value.upper() not in self.choices:
             raise serializers.ValidationError("Bad Request. status is not in active choices")
         return value
     
     def update(self, instance, validated_data):
-        status = validated_data.get("status", instance.status)
+        status = validated_data.get("status", instance.booking_status)
         request = self.context.get("request")
-        booking_instance = self.context.get("booking")
-        if booking_instance:
-            if request.user not in (getattr(booking_instance, "customer"), getattr(booking_instance.provider.profile, "user")):
-                raise PermissionDenied("You dont have access to perform this action")
-            if booking_instance.booking_status != Bookings.BookingStatus.PENDING:
-                raise serializers.ValidationError("Bad Request. You can only update pending bookings")
-        if status.upper() == Bookings.BookingStatus.CANCELLED:
-            if not _cancel_booking(booking_instance, request.user):
-                raise serializers.ValidationError("Failed to cancel booking")
-        elif status.upper() == Bookings.BookingStatus.COMPLETED:
-            if request.user != getattr(booking_instance.provider.profile, "user"):
-                raise serializers.ValidationError("Only providers are able to accept bookings")
-            if not _accept_booking(booking_instance, request.user):
-                raise serializers.ValidationError("Error occurred while accepting booking")
-        else:
-            raise serializers.ValidationError("Bad Request. Invalid request")
+        if not isinstance(instance, Bookings):
+            raise serializers.ValidationError(_("Instance is not of type Bookings"))
         
+        customer = getattr(instance, "customer", None)
+        service_provider = getattr(instance.provider, "profile", None)
+        if customer is None or service_provider is None:
+            raise serializers.ValidationError(_("Invalid booking instance. Missing customer or provider information"))
+        
+        if instance.booking_status != Bookings.BookingStatus.PENDING:
+            raise serializers.ValidationError(_("Only pending bookings can be updated"))
+        
+        if status.upper() == Bookings.BookingStatus.CANCELLED:
+            if not _cancel_booking(instance, request.user):
+                raise serializers.ValidationError(_("Failed to cancel booking"))
+        elif status.upper() == Bookings.BookingStatus.COMPLETED:
+            if request.user != getattr(service_provider, "user"):
+                raise serializers.ValidationError(_("Only providers are able to accept bookings"))
+            if not _accept_booking(instance, request.user):
+                raise serializers.ValidationError(_("Error occurred while accepting booking"))
+        else:
+            raise serializers.ValidationError(_("Bad Request. Invalid request"))
+        
+        instance.booking_status = status.upper()
+        instance.save()
         return instance
 
 class BookingOutSerializer(serializers.ModelSerializer):
-    customer = serializers.CharField(source="customer.email", read_only=True)
-    provider = ProviderProfileSerializer(read_only=True)
+    customer = UserReadSerializer(read_only=True)
+    provider = BaseProfileReadSerializer(source="provider.profile")
     service = ServiceSerializer(read_only=True)
     address = AddresSerializer(read_only=True)
     class Meta:

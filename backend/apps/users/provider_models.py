@@ -181,7 +181,8 @@ class Service(models.Model):
         ]
 
     def can_edit(self, user):
-        if user == self.profile.profile.user:
+        provider_profile = getattr(user.profile, "provider_profile")
+        if self.profile == provider_profile:
             return True
         else:
             return False
@@ -194,7 +195,7 @@ class Service(models.Model):
 
 class ServiceImage(models.Model):
     image_id = models.UUIDField(max_length=20, primary_key=True, unique=True, db_index=True, default=uuid.uuid4)
-    service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="images")
+    service = models.ManyToManyField(Service, related_name="images")
     image_url = models.URLField(max_length=200, null=True, blank=True)
     image_public_id = models.URLField(max_length=200, null=True, blank=True)
 

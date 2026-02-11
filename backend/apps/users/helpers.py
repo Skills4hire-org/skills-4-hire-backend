@@ -8,6 +8,7 @@ from rest_framework.serializers import ValidationError
 from django.db import transaction
 from django.db.models import F
 from django.db.utils import DatabaseError
+from django.utils.translation import gettext_lazy as _
 
 import logging
 
@@ -85,7 +86,7 @@ def check_active_role(request):
         return active_role
     except Exception:
         logger.exception("Failed to fetch active role for user %s", request.user, exc_info=True)
-        raise
+        raise ValidationError(_("Faild to fetch the current user active role"))
 
 
             

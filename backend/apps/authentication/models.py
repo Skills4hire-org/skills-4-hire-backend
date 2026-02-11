@@ -159,7 +159,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         verbose_name_plural = "users"
 
     
-    def save(self, force_insert = None, force_update = None, using = None, update_fields = None):
+    def save(self, *args, **kwargs):
         if not self.username:
             self.username = self.first_name.lower() + self.last_name.lower()
-        return super().save(force_insert, force_update, using, update_fields)   
+        return super().save(*args, **kwargs)   

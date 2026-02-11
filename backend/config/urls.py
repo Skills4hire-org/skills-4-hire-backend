@@ -20,10 +20,10 @@ urlpatterns += [
 # App level url config
 urlpatterns += [
     path("api/v1/auth/", include("apps.authentication.urls")),
-    path("api/v1/profile/", include("apps.users.urls")),
+    path("api/v1/", include("apps.users.urls")),
     path("api/v1/", include("apps.posts.urls")),
     path("api/v1/", include("apps.ratings.urls")),
-    path("api/v1/bookings/", include("apps.bookings.urls")),
+    path("api/v1/", include("apps.bookings.urls")),
 ]
 
 # Debug toolbar config
@@ -32,4 +32,7 @@ DJANGO_ENV = getattr(settings, "DJANGO_SETTINGS_MODULE", "config.settings.dev")
 
 if DEBUG and DJANGO_ENV != "config.settings.prod":
    from debug_toolbar.toolbar import  debug_toolbar_urls
+   urlpatterns += [
+    path("silk/", include("silk.urls", namespace="silk")),
+]
    urlpatterns += debug_toolbar_urls()

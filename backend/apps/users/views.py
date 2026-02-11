@@ -6,20 +6,14 @@ from rest_framework.exceptions import PermissionDenied
 from rest_framework.generics import CreateAPIView, DestroyAPIView
 
 from .serializers import (
-    ProviderProfileSerializer, 
     OnboardingSerializer, 
     BaseProfileUpdateSerializer, 
     BaseProfileReadSerializer,
-    AddresSerializer,
-    AvaterSerializer,
     SwitchRoleSerializer,
-    ServiceSerializer
 )
-from .base_model import BaseProfile, Address, Avater
-from .provider_models import ProviderModel, ProviderSkills, Service
-from .customer_models import CustomerModel
-from .services.provider_service import ProviderService
-from .permissions import IsProvider, IsSkillOwner, IsBaseOrReadOnly
+from .base_model import BaseProfile
+from .provider_models import Service
+from .permissions import IsProvider, IsSkillOwner
 
 
 from django.shortcuts import get_object_or_404
@@ -80,14 +74,15 @@ class ProfileViewSet(viewsets.ModelViewSet):
     
     def get_permissions(self):
         if self.action == "list":
-            return [permissions.IsAdminUser]
-        return [permissions.IsAuthenticated]
+            return [permissions.IsAdminUser()]
+        return [permissions.IsAuthenticated()]
     
     def get_serializer_class(self):
-        if self.request.method in ("put", "patch"):
+        if self.action in ("partial_update", "update"):
             return BaseProfileUpdateSerializer
         return BaseProfileReadSerializer
     
+
     @method_decorator(transaction.atomic)
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -108,58 +103,11 @@ class ProfileViewSet(viewsets.ModelViewSet):
         }, status=status.HTTP_200_OK)
 
     @method_decorator(cache_page(60 * 15)) # cache view for 15 minutes
-    @action(methods=["get"], detail=True)
-    def public(self, request, pk=None):
-        profile = get_object_or_404(self.get_queryset(), pk=pk)
-        serializer = self.get_serializer(profile)
-        return Response(data={"status": "success", "data": serializer.data
-        }, status=status.HTTP_200_OK)
-
-    
-class ServiceViewSet(viewsets.ModelViewSet):
-    serializer_class = ServiceSerializer
-    queryset = Service.objects.select_related("profile")
-    permission_classes = [permissions.IsAuthenticated, IsProvider, IsSkillOwner]
-
-    @transaction.atomic()
-    def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        with transaction.atomic():
-            self.perform_create(serializer)
-        headers = self.get_success_headers(serializer.data)
-        return Response(data={"detail": "Service created successfully", "status": "success"
-        }, status=status.HTTP_201_CREATED, headers=headers)
-    
-    def check_object_permissions(self, request, obj):
-        if request.method in ("put", "patch", "delete"):
-            if not obj.can_edit(request.user):
-                raise PermissionDenied()
-        return super().check_object_permissions(request, obj)
-    
-    def get_queryset(self):
-        qs = self.queryset.all().filter(profile=self.request.user.profile.provider_profile, is_active=True, is_deleted=False)
-        if not qs.exists():
-            return qs.none()
-        return qs
+    def retrieve(self, request, *args, **kwargs):
+        return super().retrieve(request, *args, **kwargs)
     
     @method_decorator(cache_page(60 * 15))
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
-    
-    @transaction.atomic()
-    def update(self, request, *args, **kwargs):
-        return super().update(request, *args, **kwargs)
-    
-    @transaction.atomic()
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        if isinstance(instance, Service):
-            instance.soft_delete()
-        return Response(data={"detail": "Service deleted successfully", "status": "success"}, status=status.HTTP_204_NO_CONTENT)
-
-
-
         
-
-        
+    

@@ -319,4 +319,15 @@ class CustomLogoutSerializer(serializers.Serializer):
             )
         return attrs
 
-        
+
+class UserReadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "email", "first_name",
+            "last_name",
+            "is_provider", "is_customer",
+            "active_role", "phone",
+            "is_active", "is_verified",
+            
+        ]   

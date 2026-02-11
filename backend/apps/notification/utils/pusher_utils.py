@@ -12,7 +12,6 @@ PUSHER_KEY = getattr(settings, "PUSHER_KEY", None)
 PUSHER_SECRET = getattr(settings, "PUSHER_SECRET", None)
 PUSHER_CLUSTER = getattr(settings, "PUSHER_CLUSTER", None)
 
-@sync_to_async
 def get_pusher_client() -> Pusher:
     pusher_client_payload = {
         "app_id": PUSHER_APP_ID,

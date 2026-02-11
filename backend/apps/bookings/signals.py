@@ -1,5 +1,6 @@
 from django.dispatch import receiver
 from django.db.models.signals import post_save
+from asgiref.sync import async_to_sync
 
 from .models import Bookings
 from ..notification.services import send_push_notification, create_notification
@@ -10,7 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 @receiver(signal=post_save, sender=Bookings)
-async def send_real_time_updates_to_providers(sender, instance: Bookings, created: bool, **kwargs):
+def send_real_time_updates_to_providers(sender, instance: Bookings, created: bool, **kwargs):
     if not created:
         logger.error("")
         return 
@@ -23,19 +24,20 @@ async def send_real_time_updates_to_providers(sender, instance: Bookings, create
     if user_instance is None:
         return 
     
-    event = NotificationEvents.BOOKING.value,
+    event = NotificationEvents.BOOKING.value
+    print("DEBUG", event)
     try:
-        save_notification = await create_notification(
+        save_notification =   async_to_sync(create_notification)(
             event=event,
             message="You have a new booking request.",
             user=user_instance
         )
 
-        await send_push_notification(
+        async_to_sync(send_push_notification)(
             user_pk=user_instance.pk,
             event=event,
             data={
-                "booking_id": instance.pk
+                "booking_id": str(instance.pk)
             }
         )
     except Exception as e:
