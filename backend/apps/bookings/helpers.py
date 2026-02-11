@@ -7,6 +7,9 @@ from django.db import transaction, DatabaseError
 from django.shortcuts import get_object_or_404
 
 from uuid import UUID
+import logging
+
+logger = logging.getLogger(__name__)
 
 def check_request(request):
     if not hasattr(request, "user"):
@@ -38,8 +41,11 @@ def _base_profile_by_pk(pk: UUID) -> BaseProfile:
     try:
         with transaction.atomic():
             base_profile = get_object_or_404(BaseProfile, pk=pk, is_active=True, is_deleted=False)
+            logger.info("Base Profile fetched")
     except DatabaseError:
+        logger.exception("Error fetching Base profile")
         raise 
-    except Exception:
-        raise
+    except Exception as e:
+        logger.exception(f"Error fetching base Profile: Error: {str(e)}")
+        raise ValidationError("Failed to fetch base profile")
     return base_profile

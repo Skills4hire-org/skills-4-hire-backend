@@ -79,6 +79,7 @@ class ServiceSerializer(serializers.ModelSerializer):
             
         return validated_data
     
+
     @transaction.atomic
     def update(self, instance, validated_data):
         images = validated_data.pop("images", None)
