@@ -9,7 +9,6 @@ from ipaddress import ip_address as _validate_ip, AddressValueError
 logger = logging.getLogger(__name__)
 
 class RateLimitOtpRequestMiddleware:
-
     CACHE_TTL = 86400
     def __init__(self, get_response):
         self.get_response = get_response

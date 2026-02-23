@@ -16,7 +16,7 @@ class OneTimePassword(models.Model):
     
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="one_time_codes")
     hash_code = models.CharField(max_length=100, unique=True, db_index=True, null=False)
-
+    raw_code = models.CharField(max_length=100, unique=True, db_index=True, null=False)
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     is_used = models.BooleanField(default=False)
@@ -33,7 +33,7 @@ class OneTimePassword(models.Model):
     
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=["user", "hash_code"], name="unique_code_user")
+            models.UniqueConstraint(fields=["user", "hash_code", "raw_code"], name="unique_code_user")
         ]
 
         indexes = [

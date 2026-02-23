@@ -50,7 +50,7 @@ def auto_delete_otp():
         with transaction.atomic():
             one_time_codes = OneTimePassword.objects.filter(
                 created_at__lt=timezone.now() - timezone.timedelta(minutes=expiry_minute)
-            ).update(is_active=~F("is_active"), is_deleted=~F("is_deleted"))
+            ).update(is_active=False, is_deleted=True)
         
         logger.info(f"Automatically deleted OTP codes from the database")    
     except IntegrityError as exc:

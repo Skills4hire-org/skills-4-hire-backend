@@ -4,6 +4,7 @@ from django.conf import settings
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
 from django.db import transaction, IntegrityError
+from django.contrib.auth.hashers import make_password, check_password
 
 from ..exceptions import  retry_on_failure
 from ..one_time_password import OneTimePassword
@@ -21,8 +22,18 @@ User = get_user_model()
 def _hash_otp_code(code: str):
     if code is None:
         raise ValidationError("Code cannot be empty")
-    hash_code = hashlib.sha256(code.encode()).hexdigest()
-    return hash_code
+    try:
+        code_hash = make_password(code)
+    except Exception as e:
+        raise Exception("Error Hashing password!")
+    return code_hash
+
+def verify_hashed_code(code: str, hashed: str) -> bool:
+    if code is None or hashed is None:
+        raise ValidationError("To verify code, both the raw code and the hashed code are required")
+    is_valid = check_password(code, hashed)
+    return is_valid
+
 
 def _generate_code():
     try:
@@ -40,9 +51,9 @@ def _generate_code():
 def _generate_unique_otp():
     code = _generate_code()
     hash_code = _hash_otp_code(code)
-    if OneTimePassword.objects.filter(hash_code=hash_code).exists():
+    if OneTimePassword.objects.filter(raw_code=code).exists():
         logger.warning(_("OTP Already Exists!"))
-        raise ValidationError(_("Failed. OTP already exists"))
+        raise ValidationError()
     return code, hash_code
 
 def create_otp_for_user(user):
@@ -51,12 +62,12 @@ def create_otp_for_user(user):
     code, hash_code = _generate_unique_otp()
     try:
         with transaction.atomic():
-            OneTimePassword.objects.create(user=user, hash_code=hash_code) 
+            OneTimePassword.objects.create(user=user, hash_code=hash_code, raw_code=code) 
         logger.debug("successfully created and saved OTP for user %s", user)
     except IntegrityError as exc:
-        logger.error("Database error while creating OTP for user %s", user.id, exc_info=True)
+        logger.error("Database error while creating OTP for user %s", user.pk, exc_info=True)
         raise ValidationError("Database error while creating OTP.") from exc
     except ValueError as exc:
-        logger.error("Invalid OTP value generated for user %s", user.id, exc_info=True)
+        logger.error("Invalid OTP value generated for user %s", user.pk, exc_info=True)
         raise ValidationError("Error validating OTP code.") from exc
     return code

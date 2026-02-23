@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>WebSocket Test</title>
+</head>
+<body>
+
+<h2>WebSocket Test</h2>
+
+<div id="status">Status: Connecting...</div>
+<div id="notification-log" style="border:1px solid #ccc; height:200px; overflow:auto; margin-bottom:15px;"></div>
+
+<!-- Simple Text Box -->
+<input type="text" id="messageInput" placeholder="Type message here">
+<button onclick="sendMessage()">Send</button>
+
+{% csrf_token %}
+
+<script>
+    // ===== WebSocket (UNCHANGED SIMPLE VERSION) =====
+    const socket = new WebSocket(
+        'ws://' + window.location.host + '/ws/notifications/'
+    );
+
+    socket.onopen = function() {
+        document.getElementById('status').innerText = "Status: Connected ✅";
+    };
+
+    socket.onmessage = function(e) {
+        const data = JSON.parse(e.data);
+        const log = document.getElementById('notification-log');
+
+        const div = document.createElement('div');
+        div.innerText = "🔔 " + data.message;
+
+        log.appendChild(div);
+    };
+
+    socket.onclose = function() {
+        document.getElementById('status').innerText = "Status: Disconnected ❌";
+    };
+
+    // ===== CSRF Helper =====
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let cookie of cookies) {
+                cookie = cookie.trim();
+                if (cookie.startsWith(name + '=')) {
+                    cookieValue = cookie.substring(name.length + 1);
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // ===== Send POST Request =====
+    function sendMessage() {
+        const message = document.getElementById("messageInput").value;
+
+        fetch("/send/message/", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "X-CSRFToken": getCookie("csrftoken")
+            },
+            body: JSON.stringify({
+                message: message
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            console.log(data);
+            document.getElementById("messageInput").value = "";
+        })
+        .catch(error => console.error(error));
+    }
+</script>
+
+</body>
+</html>

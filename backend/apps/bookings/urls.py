@@ -19,7 +19,7 @@ booking_detail = views.BookingViewSet.as_view({
 
 
 booking_fetch = views.BookingViewSet.as_view({
-    "get": "fetch_bookings"
+    "get": "fetch_bookings",
 })
 
 

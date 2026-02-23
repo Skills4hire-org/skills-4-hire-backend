@@ -3,7 +3,7 @@ from django.db.models.signals import post_save
 from django.contrib.auth import get_user_model
 
 from ..users.base_model import BaseProfile
-from ..wallet.helpers import _save_wallet_on_account_creation
+from ..wallet.services import WalletService
 from .utils.helpers import (create_otp_for_user)
 from .helpers import _send_email_to_user, logger
 from .utils.template_helpers import genrate_context_for_otp
@@ -20,10 +20,10 @@ def post_save_otp_after_account_registration(sender, instance, created, **kwargs
         return 
     if not created: 
         return
-    logger.debug(f"Signal fired for user: {instance.email}")
+
+    logger.info(f"Signal fired for user: {instance.email}")
     try:
         code = create_otp_for_user(instance)
-        print(code)
         context = genrate_context_for_otp(code=code, email=instance.email)
         _send_email_to_user(context)
         logger.debug(f"OTP created and email sent for user: {instance.email}")
@@ -47,6 +47,6 @@ def post_create_profile(sender, instance, created, **kwrags):
 def auto_create_wallet(sender, instance, created, **kwargs):
     if not created or not isinstance(instance, User):
         return 
-    if _save_wallet_on_account_creation(instance):
+    if WalletService.create_wallet(instance):
         logger.info("Wallet created successfully")
     return 

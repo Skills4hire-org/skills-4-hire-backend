@@ -1,15 +1,16 @@
 from django.db import models
-from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db.models import F
 from django.utils import timezone
 from django.core.validators import MinValueValidator, MaxValueValidator
 
-from ..users.base_model import BaseProfile
+from ..users.provider_models import ProviderModel
 
 import uuid
 import logging
 
 logger = logging.getLogger(__name__)
+UserModel = get_user_model()
 
 class ProfileReview(models.Model):
     review_id = models.UUIDField(
@@ -19,8 +20,8 @@ class ProfileReview(models.Model):
         db_index=True
     )
 
-    profile = models.ForeignKey(BaseProfile, on_delete=models.CASCADE, related_name="reviews")
-    reviewed_by = models.ForeignKey(getattr(settings, "AUTH_USER_MODEL"), on_delete=models.SET_NULL, related_name="reviews", null=True)
+    profile = models.ForeignKey(ProviderModel, on_delete=models.CASCADE, related_name="reviews")
+    reviewed_by = models.ForeignKey(UserModel, on_delete=models.SET_NULL, related_name="reviews", null=True)
 
     review = models.TextField(null=True, blank=True)
 
@@ -69,8 +70,8 @@ class ProfileRating(models.Model):
         db_index=True
     )
 
-    profile = models.ForeignKey(BaseProfile, on_delete=models.CASCADE, related_name="ratings")
-    rate_by = models.ForeignKey(getattr(settings,  "AUTH_USER_MODEL"), on_delete=models.SET_NULL, null=True, related_name="ratings")
+    profile = models.ForeignKey(ProviderModel, on_delete=models.CASCADE, related_name="ratings")
+    rate_by = models.ForeignKey(UserModel, on_delete=models.SET_NULL, null=True, related_name="ratings")
 
     rating = models.PositiveIntegerField(validators=[
         MinValueValidator(1),
