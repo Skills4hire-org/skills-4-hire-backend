@@ -11,6 +11,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken, BlacklistedToken, OutstandingToken
 
 from .helpers import validate_email, _get_user_by_email, _get_code_intance_or_none
+from .one_time_password import OneTimePassword
 import logging
 
 
@@ -196,16 +197,27 @@ class AccountVerificationSerializer(serializers.Serializer):
     Both fields are write-only and required.
     """
     email = serializers.EmailField(max_length=200, write_only=True, required=True)
-
     code = serializers.CharField(max_length=50, write_only=True, required=True)
 
-    def validate_email(self, value):
-        return validate_email(value.lower())
+    def validate_email(self, value: str):
+        return validate_email(value)
         
     def validate_code(self, value):
         if not isinstance(value, str):
-            raise serializers.ValidationError("A string instance is only allowed")
+            raise serializers.ValidationError(_(f"String instance expected, but got {type(value)}"))
         return value.strip()
+    
+    def validate(self, attrs):
+        code, email = attrs["email"], attrs["code"]
+        user = _get_user_by_email(email=email)
+        if user is None:
+            raise serializers.ValidationError(_("User not found"), code="user_not_found")
+        code_intance = _get_code_intance_or_none(code, user=user)
+        if code_intance is None:
+            raise serializers.ValidationError(_("OneTImePassword Not Found"), code="not_found")
+        if not code_intance.is_active or code_intance.is_used:
+            raise serializers.ValidationError(_('code already expired'), code="invalid_code")
+        return attrs
 
 class ResendOtpSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=50, write_only=True, required=True)
@@ -214,7 +226,7 @@ class ResendOtpSerializer(serializers.Serializer):
         valid_email = validate_email(value.lower())
         user = _get_user_by_email(valid_email)
         if not user:
-            raise serializers.ValidationError("No user with this given credentials", code="email_invalid")
+            raise serializers.ValidationError(_('User not found'), code="email_invalid")
         return valid_email
 
 
@@ -228,8 +240,8 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         if code_instance is None:
             raise serializers.ValidationError(_("OneTimePassword object not found"))
         user = code_instance.user
-        if user.is_deleted:
-            raise serializers.ValidationError("Account already disabled. try activating account")
+        if not user.is_active or user.is_verified:
+            raise serializers.ValidationError("Account not verified")
         return value
     
     def validate_password(self, value):
@@ -243,7 +255,7 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     def validate(self, attrs):
         password = attrs.get("password", None)
         confirm_password = attrs.get("confirm_password", None)
-        if any([password, confirm_password]) is None:
+        if password is None or confirm_password is None:
             raise serializers.ValidationError(_("Password reset requires 'password' and 'confirm_password'"))
         if password.strip() != confirm_password.strip():
             raise serializers.ValidationError(_("Password Mismatch. Please provide a matching password"))

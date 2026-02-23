@@ -1,10 +1,11 @@
-from django.db import models
+from django.db import models, transaction
 from django.contrib.auth import get_user_model
 from django.forms import ValidationError
 from django.utils import timezone
 
 from ..users.provider_models import ProviderModel, Service
 from ..users.base_model import Address
+from .helpers import user_in_booking
 
 import uuid
 
@@ -24,13 +25,14 @@ class Bookings(models.Model):
     service = models.ManyToManyField(Service, blank=True)
     cancelled_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="booking_cancelled", null=True, blank=True)
     address = models.ForeignKey(Address, on_delete=models.CASCADE, related_name="booking_address", blank=True, null=True)
+    accepted_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="booking_accpeted", blank=True,null=True)
 
     currency = models.CharField(max_length=20, default="NGN")
     price = models.DecimalField(max_digits=10, decimal_places=2, null=False)
 
-    notes = models.TextField()
+    notes = models.TextField(blank=True)
     descriptions = models.TextField()
-    payment_remark = models.TextField()
+    payment_remark = models.TextField(blank=True)
 
     is_active = models.BooleanField(default=True, db_index=True)
     is_deleted = models.BooleanField(default=False, db_index=True)
@@ -41,6 +43,7 @@ class Bookings(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     cancelled_at = models.DateTimeField(blank=True, null=True)
+    accepted_at = models.DateTimeField(blank=True, null=True)
     deleted_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
@@ -67,3 +70,20 @@ class Bookings(models.Model):
         self.is_deleted = True
         self.deleted_at = timezone.now()
         self.save()
+
+    @transaction.atomic()
+    def cancel_booking(self, user):
+        if not user_in_booking(user=user, booking=self):
+            raise ValidationError("Invalid request, can't perform this action")
+        self.booking_status = self.BookingStatus.CANCELLED
+        self.cancelled_by = user
+        self.cancelled_at = timezone.now()
+        self.save(update_fields=("booking_status", "cancelled_by", "cancelled_at"))
+
+    def accept_booking(self, user):
+        if not user_in_booking(user, booking=self):
+            raise ValidationError("Invalid request, can't perform this action")
+        self.booking_status = self.BookingStatus.COMPLETED
+        self.accepted_by = user
+        self.accepted_at = timezone.now()
+        self.save(update_fields=("booking_status",))

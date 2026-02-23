@@ -43,6 +43,12 @@ class ServiceSerializer(serializers.ModelSerializer):
     default_error_messages = {
         "charge_empty": _("Charge cannot be empty")
     }
+
+    def validate_name(self, value):
+        if not isinstance(value, str):
+            raise serializers.ValidationError("invalid name for service")
+        return value.strip().title()
+    
     def validate(self, attrs):
         validate_request(self.context.get("request"))
         min_charge = attrs.get("min_charge")
@@ -85,8 +91,6 @@ class ServiceSerializer(serializers.ModelSerializer):
         images = validated_data.pop("images", None)
         request = self.context.get("request")
         user_profile = getattr(request.user.profile, "provider_profile")
-        print(user_profile)
-        print(instance.profile)
         if instance.profile != user_profile:
             raise PermissionDenied()
         with transaction.atomic():

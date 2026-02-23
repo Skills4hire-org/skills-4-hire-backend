@@ -116,6 +116,9 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = "email"
     objects = UserManager()
 
+    @property
+    def id(self):
+        return self.pk
 
     @property
     def is_admin(self):

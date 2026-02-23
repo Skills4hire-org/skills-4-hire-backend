@@ -2,6 +2,8 @@ from rest_framework.permissions import BasePermission
 
 from django.contrib.auth import get_user_model
 
+from .helpers import user_in_booking
+
 User = get_user_model()
 
 class IsCustomer(BasePermission):
@@ -25,13 +27,10 @@ class IsCustomerOrProvider(BasePermission):
     """ A Custom permission class that grant access to user who's active role is either customer or provider"""
     def has_object_permission(self, request, view, obj):
         user = request.user
-        active_role = getattr(user, "active_role", None)
-        if active_role == User.RoleChoices.CUSTOMER:
-            return obj.customer == user
-        if active_role == User.RoleChoices.SERVICE_PROVIDER:
-            if hasattr(user.profile, "provider_profile"):
-                provider_profile = getattr(user.profile, "provider_profile")
-                return obj.provider == provider_profile
-            else:
-                raise AttributeError("Service provider has no provider profile")
+        if user.is_superuser or user.is_staff:
+            return True
+        else:
+            if user_in_booking(user, obj):
+                return True
         return False
+        

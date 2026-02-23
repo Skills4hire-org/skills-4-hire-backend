@@ -24,6 +24,8 @@ urlpatterns += [
     path("api/v1/", include("apps.posts.urls")),
     path("api/v1/", include("apps.ratings.urls")),
     path("api/v1/", include("apps.bookings.urls")),
+    path("api/v1/", include("apps.notification.urls")),
+    # path("rest/auth/", include("rest_framework.urls"))
 ]
 
 # Debug toolbar config

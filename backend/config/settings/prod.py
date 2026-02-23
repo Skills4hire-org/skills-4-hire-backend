@@ -1,29 +1,39 @@
 from config.settings.base import *
+import dj_database_url
 
-DEBUG = env("DEBUG")
+DEBUG = env("DEBUG", default=False)
 
 ALLOWED_HOSTS = ['127.0.0.1']
 
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION":env("REDIS_INTERNAL_URL"),
+        "LOCATION":env("PRODUCTION_REDIS_URL"),
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient"
         }
     }
 }
 
-CELERY_BROKER_URL = env("CELERY_BROKER_URL", default="redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = env("CELERY_RESULT_BACKEND", default="redis://localhost:6379/1")
+CELERY_BROKER_URL = env("PRODUCTION_REDIS_URL", default="redis://redis:6379/0")
+CELERY_RESULT_BACKEND = env("PRODUCTION_REDIS_URL", default="redis://redis:6379/1")
 
 DATABASES = {
-        'default': {
-            'ENGINE': env("POSTGRES_ENGINE"),
-            'NAME': env("POSTGRES_NAME"),
-            "USER": env("POSTGRES_USER"),
-            "PASSWORD": env("POSTGRES_PASSWORD"),
-            "PORT": env("POSTGRES_PORT"),
-            "HOST": env("POSTGRES_HOST")
-        }
+        'default': dj_database_url.config(
+            env=env("DATABASE_URL"),
+            default="postgres://postgres[]",
+            ssl_require=True,
+            conn_health_checks=True,
+            conn_max_age=0
+        )
     }
+
+
+CHANNEL_LAYERS = {
+    "default": {
+        "BACKEND": "channels_redis.core.RedisChannelLayer",
+        "CONFIG": {
+            "hosts": [env("PRODUCTION_REDIS_URL")],
+        },
+    }
+}

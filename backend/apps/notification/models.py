@@ -10,7 +10,8 @@ UserModel = get_user_model()
 class Notification(models.Model):
     notification_id = models.UUIDField(max_length=20, primary_key=True, unique=True, default=uuid.uuid4)
 
-    user = models.ForeignKey(UserModel, on_delete=models.CASCADE, related_name="notifications")
+    sender = models.ForeignKey(UserModel, on_delete=models.CASCADE, related_name="notifications", null=True, blank=True)
+    receiver = models.ForeignKey(UserModel, on_delete=models.CASCADE, related_name="received_notifications")
     event = models.CharField(max_length=200, null=True, blank=True)
     content = models.TextField(null=True, blank=True)
 
@@ -34,12 +35,12 @@ class Notification(models.Model):
         return "Notification Service ({}, {})".format(self.user.email, self.event)
     
     def mark_as_read(self):
-        setattr(self, "is_read", True)
-        setattr(self, "read_at", timezone.now())
         with transaction.atomic():
+            setattr(self, "is_read", True)
+            setattr(self, "read_at", timezone.now())
             self.save(update_fields=["is_read", "read_at"])
 
     def delete(self):
-        setattr(self, "is_deleted", True)
         with transaction.atomic():
+            setattr(self, "is_deleted", True)
             self.save(update_fields="is_deleted")

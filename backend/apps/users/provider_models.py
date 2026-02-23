@@ -48,7 +48,6 @@ class ProviderModel(models.Model):
     max_charge = models.DecimalField(decimal_places=2, max_digits=10, blank=True, null=True)
     favourite = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True, db_index=True)
-    is_online = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False, db_index=True)
 
 
