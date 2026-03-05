@@ -48,7 +48,6 @@ class ProviderModel(models.Model):
     max_charge = models.DecimalField(decimal_places=2, max_digits=10, blank=True, null=True)
     favourite = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True, db_index=True)
-    is_online = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False, db_index=True)
 
 
@@ -75,14 +74,23 @@ class Category(models.Model):
         db_index=True,
         unique=True, 
     )
+    class SkillCategory(models.TextChoices):
+        DIGITAL =  "DIGITAL"
+        VOCATIONAL = "VOCATIONAL"
+        CRAFT = "CRAFT"
+
     name = models.CharField(max_length=255, unique=True)
-    category = models.CharField(max_length=200, unique=True)
+    category = models.CharField(
+        max_length=200, unique=True,
+        choices=SkillCategory.choices,
+        default=SkillCategory.DIGITAL.value
+    )
     slug = AutoSlugField(populate_from="category", unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True, db_index=True)
 
     class Meta:
-
         constraints = [
             models.UniqueConstraint(fields=["name", "category"], name="unique_name_category")
         ]
@@ -90,8 +98,18 @@ class Category(models.Model):
     def __str__(self):
         return f"Category(), "
 
+    def clean(self):
+        super().clean()
+        if self.name:
+            self.name.title()
+        self.save()
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
 class ProviderSkills(models.Model):
+
     class EfficiencyStatus(models.TextChoices):
         BEGINEER = "BEGINEER", "Begineer"
         INTERMIDIATE = "INTERMIDIATE", "Intermidiate"
@@ -147,7 +165,7 @@ class Service(models.Model):
     profile = models.ForeignKey(ProviderModel, on_delete=models.CASCADE, related_name="services")
 
     name = models.CharField(max_length=500, blank=True, null=True)
-    description = models.CharField(blank=True)
+    description = models.CharField(blank=True, max_length=2000)
     min_charge = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     max_charge = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 

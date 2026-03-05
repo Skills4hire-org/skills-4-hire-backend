@@ -22,6 +22,7 @@ ALLOWED_HOSTS = []
 SENDGRID_API_KEY = env("SENDGRID_API_KEY")
 SENDGRID_SENDER = env("SENDGRID_SENDER")
 
+# UTILS
 BASE_URL = env("BASE_URL")
 OTP_RETRIES_PER_DAY = env.int("OTP_RETRIES_PER_DAY")
 MAX_OTP_LENGTH = env.int("MAX_OTP_LENGTH")
@@ -32,7 +33,12 @@ RESTRICTED_PATHS = env("RESTRICTED_PATHS").split(",")
 
 # User model to user 
 AUTH_USER_MODEL = "authentication.CustomUser"
-DJANGO_SETTINGS_MODULE= env("DJANGO_SETTINGS_MODULE")
+
+# SETTING MODULE
+DJANGO_ENVIRON= env("DJANGO_ENVIRON")
+
+# Channels Config
+ASGI_APPLICATION = "config.asgi.application"
 
 # Pusher Configurations
 PUSHER_APP_ID = env("PUSHER_APP_ID")
@@ -60,6 +66,7 @@ INSTALLED_APPS = [
     'rest_framework_simplejwt.token_blacklist',
     'django_filters',
     "django_countries",
+    "channels",
 
     # local apps
     'apps.authentication.apps.AuthenticationConfig',
@@ -73,9 +80,10 @@ INSTALLED_APPS = [
 ]
 
 REST_FRAMEWORK = {
-    'DEFAULT_AUTHENTICATION_CLASSES': (
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        # 'rest_framework.authentication.SessionAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
-    ),
+    ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticated"
     ]
@@ -141,29 +149,8 @@ TEMPLATES = [
     },
 ]
 
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": env("LOCATION"),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient"
-        }
-    }
-}
-
 WSGI_APPLICATION = 'config.wsgi.application'
 
-
-# Database
-# https://docs.djangoproject.com/en/5.2/ref/settings/#databases
-
-
-DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
-    }
-}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -201,6 +188,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/5.2/howto/static-files/
 
 STATIC_URL = 'static/'
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
@@ -216,8 +204,6 @@ EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL")
 
 # Celery config
-CELERY_BROKER_URL = env("redis://redis:6379/0", default="redis://localhost:6379/0")
-CELERY_RESULT_BACKEND = env("redis://redis:6379/0", default="redis://localhost:6379/1")
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"

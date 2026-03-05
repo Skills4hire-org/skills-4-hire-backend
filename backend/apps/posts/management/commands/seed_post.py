@@ -6,7 +6,7 @@ from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 
-from ...models import Post
+from ...models import Post, Comment
 
 UserModel = get_user_model()
 
@@ -14,7 +14,7 @@ class Command(BaseCommand):
     help = "Populate Post database"
     faker = Faker()
     posts_types = Post.PostType.values
-    users = UserModel.objects.filter(is_active=True)
+    users = UserModel.objects.all()
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.NOTICE("Starting Tasks. Post Population"))
@@ -46,4 +46,27 @@ class Command(BaseCommand):
             self.stdout.write(self.style.NOTICE(f"Saving remaining {len(temp_post_storage)} posts"))
             Post.objects.bulk_create(temp_post_storage)
             temp_post_storage.clear()
+
+        amount_of_comments = 700 #per post
+        posts = Post.objects.all()[:100]
+        self.stdout.write(self.style.NOTICE("Starting Comment tasks"))
+        comment_sto = []
+        for post in posts:
+            for i in range(amount_of_comments):
+                self.stdout.write(self.style.NOTICE(f"Running Task {i + 1}"))
+                comment = Comment(
+                    user=random.choice(self.users),
+                    post=post,
+                    message=self.faker.text(max_nb_chars=50)
+                )
+                comment_sto.append(comment)
+                if len(comment_sto) == amount_of_comments:
+                    self.stdout.write(self.style.NOTICE(f"Populating Batch {post.pk}: \nComments: {len(comment_sto)} comments"))
+                    Comment.objects.bulk_create(comment_sto)
+                    comment_sto.clear()
+        self.stdout.write(self.style.SUCCESS("Comment Tasks Done"))
+
+
+
+
 

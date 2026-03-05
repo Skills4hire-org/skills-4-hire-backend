@@ -1,22 +1,33 @@
 import logging
+from typing import Any
 
+from celery.worker.consumer.mingle import exception
 from django.db import transaction
 from django.shortcuts import get_object_or_404
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth import get_user_model
+from django.db.models import Prefetch, Model, Count, Q
 
-from rest_framework import viewsets, status, filters
+from rest_framework import viewsets, status, filters, permissions
 from rest_framework.response import Response
 from rest_framework.decorators import action
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, PermissionDenied
+from yaml import serialize
 
 from .models import Post, Comment, PostLike
-from .serializers import PostCreateSerializer, PostDetailSerializer, CommentSerializer
+from .serializers import (
+    PostCreateSerializer, PostDetailSerializer,
+    CommentSerializer, RepostSerializer, PostListSerializer
+)
 from .paginations import CustomPostPagination
 from .permission import IsOwnerOrReadOnly
 from .utils.posts import get_post_by_id
+from .services import  return_paginated_view, LikeService, CommentService, list_nested_reposts
+from apps.bookings.permissions import  IsCustomer
+from apps.notification.services import send_general_notification
+from apps.notification.events import NotificationEvents
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -31,54 +42,83 @@ class PostViewSet(viewsets.ModelViewSet):
     - filtering, searching and ordering support
     - caching on list endpoints
     """
-
     queryset = (
-        Post.objects.filter(is_active=True, is_deleted=False)
-        .select_related('user')
-        .prefetch_related('post_media', 'post_tag__service')
+        Post.is_active_objects.filter(is_deleted=False)
+        .select_related('user', "parent")
+        .prefetch_related('attachment', 'post_tag__service')
     )
     pagination_class = CustomPostPagination
-    permission_classes = [IsOwnerOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['post_type', 'user']
-    search_fields = ['post_content']
+    filterset_fields = ['post_type', 'user', "post_tag__service_name__name"]
+    search_fields = ['post_content', "post_tag"]
     ordering_fields = ['created_at', 'updated_at']
 
     def get_serializer_class(self):
         if self.action in ('create', 'update', 'partial_update'):
             return PostCreateSerializer
+        elif self.action in ("list", "offers", "mine"):
+            return  PostListSerializer
+        elif self.action == "get_reposts":
+            return  RepostSerializer
         return PostDetailSerializer
 
-    def get_queryset(self):
-        # Ensure we always start from the base queryset to allow further
-        # filtering by DRF filter backends.
-        return self.filter_queryset(self.queryset)
+    def get_permissions(self):
+        if self.action == "offers":
+            return [IsCustomer()]
+        elif self.action in ("like_post", "unlike_post", "repost_post"):
+            return [permissions.IsAuthenticated()]
+        return [IsOwnerOrReadOnly()]
 
-    @method_decorator(cache_page(60 * 5))
+    def get_queryset(self):
+        # Ensure we always start from the base queryset to allow further filtering by DRF filter backends.
+        queryset = self.filter_queryset(self.queryset)
+
+        return  queryset.annotate(
+            comments_counts=Count("comments", filter=Q(comments__is_active=True), distinct=True),
+            likes_count=Count("likes", filter=Q(likes__is_active=True), distinct=True),
+            reposts_count=Count("reposts", filter=Q(reposts__is_active=True), distinct=True)
+        ).order_by("-created_at")
+
+
+    @method_decorator(cache_page(60))
     def list(self, request, *args, **kwargs):
         """List posts (cached for a short period)."""
         return super().list(request, *args, **kwargs)
 
-    @transaction.atomic
+    @method_decorator(cache_page(60))
+    def retrieve(self, request, *args, **kwargs):
+        return  super().retrieve(request, *args, **kwargs)
+
+    @method_decorator(transaction.atomic)
     def create(self, request, *args, **kwargs):
         """Create post as the authenticated user in a DB transaction."""
         serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         try:
             self.perform_create(serializer)
-        except Exception:
-            logger.exception('Failed to create Post')
-            raise
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        except Exception as e:
+            sts: str = "Failed"
+            msg = str(e)
+            code = status.HTTP_400_BAD_REQUEST
+        else:
+            sts: str = "success"
+            msg="Post created"
+            code = status.HTTP_201_CREATED
+        return  Response(
+            data={"status": sts, "msg": msg, "detail": serializer.data}, status=code
+        )
 
     def perform_create(self, serializer):
         serializer.save()
 
-    @transaction.atomic
+    @method_decorator(transaction.atomic)
     def update(self, request, *args, **kwargs):
         """Wrap updates in a transaction and prefer partial updates where appropriate."""
         return super().update(request, *args, **kwargs)
+
+    @method_decorator(transaction.atomic)
+    def destroy(self, request, *args, **kwargs):
+        return  super().destroy(request, *args, **kwargs)
 
     def perform_destroy(self, instance: Post):
         # Use soft delete to preserve data and indexes
@@ -86,63 +126,51 @@ class PostViewSet(viewsets.ModelViewSet):
 
     @method_decorator(cache_page(60 * 10))
     @action(detail=False, methods=["get"], url_path="offers")
-    def offers(self, request):
+    def offers(self, request, include_offers: bool = True, *args, **kwargs):
         """ Returns customer jobs posts with pagination"""
-        if request and not request.user.is_authenticated:
-            return Response({'detail': 'Authentication credentials were not provided.'}, status=status.HTTP_401_UNAUTHORIZED)
-        active_role = getattr(request.user, "active_role")
-        if active_role != User.RoleChoices.CUSTOMER:
-            return Response({"status": "Failed", "deatil": "Only users with customer role can access this view"},
-                            status=status.HTTP_400_BAD_REQUEST)
-        qs = self.get_queryset()
-        if qs is None:
-            qs = qs.none()
-        else:
-            qs = qs.filter(user=request.user, post_type=Post.PostType.JOB).all()
-        page = self.paginate_queryset(qs)
-        if page is not None:
-            serializer = self.get_serializer(qs, many=True)
-            return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(qs, many=True)
-        return Response({"status": "success", "data": serializer.data}, status=satus.HTTP_200_OK)
 
+        if include_offers:
+           qs = self.get_queryset()\
+                .filter(user=request.user, post_type=Post.PostType.JOB.value)\
+                .order_by("-created_at")
+        else:
+            qs = self.get_queryset()\
+                .filter(user=request.user)\
+                .order_by("-created_at")
+
+        if qs is None:
+            return  0
+        return  return_paginated_view(self, qs)
 
     @method_decorator(cache_page(60 * 15))
     @action(detail=False, methods=['get'], url_path='mine')
-    def mine(self, request):
+    def mine(self, request, *args, **kwargs):
         """Return the authenticated user's posts with normal pagination and filtering."""
-        if request.user and request.user.is_authenticated:
-            return Response({'detail': 'Authentication credentials were not provided.'}, status=status.HTTP_401_UNAUTHORIZED)
+        return  self.offers(request, *args, include_offers=False, **kwargs)
 
-        qs = self.filter_queryset(self.get_queryset().filter(user=request.user).order_by("-created_at"))
-        page = self.paginate_queryset(qs)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(qs, many=True)
-        return Response(serializer.data)
 
     @action(methods=["post"], detail=True, url_path="like")
     def like_post(self, request, *args, **kwargs):
         """
         Like a post.
         post_pk is expected in the URL kwargs.
-        """ 
-        post_pk = self.kwargs.get("post_id")
-        post = get_post_by_id(post_pk.strip())
-        if not post.get("success"):
-            return Response(status=status.HTTP_404_NOT_FOUND, data={"detail":f"{post.get('msg')}"})
-
+        """
+        post = self.get_object()
+        user = request.user
         try:
-            with transaction.atomic():
-                like = PostLike.objects.create(user=request.user, post=post["post"], is_active=True)
-        
+            like_post = LikeService(post=post, user=user)
+            new_like = like_post.create_like_post()
         except Exception as exc:
-            logger.error(f"Failed to create a like for post {post_pk}: {exc}")
-            raise
-        
-        return Response(f"Post {post_pk} liked successfully.", status=status.HTTP_201_CREATED)
+            logger.error(f"Failed to create a like for post {post.pk}: {exc}")
+            sts = False
+            msg = str(exc)
+            code=400
+        else:
+            sts = "success"
+            msg = str(new_like)
+            code=201
+
+        return Response({"status": sts, "detail": msg}, status=code)
 
     @action(methods=["delete"], detail=True, url_path="unlike")
     def unlike_post(self, request, *args, **kwargs):
@@ -150,128 +178,175 @@ class PostViewSet(viewsets.ModelViewSet):
         Unlike a post.
         post_pk is expected in the URL kwargs.
         """
-        post_pk = self.kwargs.get("post_id")
-        post = get_post_by_id(post_pk.strip())  
-        if not post.get("success"):
-            return Response(status=status.HTTP_404_NOT_FOUND, data={"detail":f"{post.get('msg')}"})
+        post = self.get_object()
         try:
-            with transaction.atomic():
-                like_instance = get_object_or_404(
-                    PostLike,
-                    user=request.user,
-                    post=post["post"],
-                    is_active=True
-                )
-                like_instance.soft_delete()
+            like_post = LikeService(post=post, user=request.user)
+            new_like = like_post.unlike_post()
         except Exception as exc:
-            logger.error(f"Failed to unlike post {post_pk}: {exc}")
-            raise
-        return Response(f"Post {post_pk} unliked successfully.", status=status.HTTP_200_OK)
+            logger.error(f"Failed to unlike post {post.pk}: {exc}")
+            msg= str(exc)
+            sts = "failed"
+            code=400
+        else:
+            msg="Unliked Post",
+            sts="success",
+            code=200
+        return Response({"status": sts, "msg": msg}, status=code)
 
 
+    @action(methods=["post"], detail=True, url_path="repost")
+    def repost_post(self, request, *args, **kwargs):
+        post_instance = self.get_object()
+
+        serializer = RepostSerializer(data=request.data, context={"request": request, "post": post_instance})
+        serializer.is_valid(raise_exception=True)
+        try:
+            self.perform_create(serializer)
+        except Exception as e:
+            msg = str(e)
+            sts = "failed"
+            code = 400
+        else:
+            msg = "reposted"
+            sts = "success"
+            code = 201
+        return Response({"status": sts, "msg": msg}, status=code)
+
+    @method_decorator(cache_page(timeout=60 * 5))
+    @action(methods=['get'], url_path="reposts", detail=True)
+    def get_reposts(self, request, *args, **kwargs):
+        queryset = self.get_queryset()
+        post = self.get_object()
+        try:
+            reposts = list_nested_reposts(post, queryset)
+        except Exception as e:
+            return  Response({"status": "failed", "msg": str(e)}, status=400)
+        return  return_paginated_view(self, reposts)
 
 class CommentViewSet(viewsets.ModelViewSet):
     serializer_class = CommentSerializer
-
     pagination_class = CustomPostPagination
 
-    queryset = (Comment.objects.filter(
-            is_active=True, is_deleted=False
-        ).select_related("user", "post", "parent").prefetch_related("post_media")
-    )
-
-    permission_classes = [IsOwnerOrReadOnly]
+    permissions = [permissions.IsAuthenticated]
+    queryset = Comment.active_objects.select_related("user", "post", "parent").all()
 
     def get_queryset(self):
-        """ Filter comment for post in URL kwargs"""
-        post_pk = self.kwargs.get("posts_pk")
-        qs = self.queryset.all()
-        if post_pk:
-            post_instance = get_post_by_id(post_pk.strip())
-            if not post_instance.get("success"):
-                raise NotFound(detail=post_instance.get("msg") or "POST_NOT_FOUND")
-            qs = qs.filter(post=post_instance.get("post"))
-            return qs.order_by("-created_at")
-        else:
-            qs = qs.none()
-            return qs
+        """ return base queryset"""
+        return self.queryset
 
-                        
+    def get_object(self) -> bool | tuple[Any, Model | Any]:
+        post_pk = self.kwargs.get("posts_pk")
+        comment_pk = self.kwargs.get('pk')
+        comment_instance = None
+        if comment_pk is not None:
+            comment_instance = Comment.active_objects.get(comment_id=comment_pk)
+            self.check_object_permissions(self.request, comment_instance)
+        else:
+            comment_instance = comment_instance
+        post = get_post_by_id(post_pk)
+        if not post.get("success"):
+            return False
+
+        post_instance = post.get("post")
+
+        return  post_instance, comment_instance
+
     @transaction.atomic
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, context={"request": request})
+        post, _ = self.get_object()
+        serializer = self.get_serializer(data=request.data, context={"request": request, "post": post})
         serializer.is_valid(raise_exception=True)
-
-
-        post_pk = kwargs.get("posts_pk")
-        post = get_post_by_id(post_pk.strip())
-        if not post.get("success"):
-            return Response(status=status.HTTP_404_NOT_FOUND, data={"detail":f"{post.get('msg')}"})
-        post_instance = post["post"]
         try:
-            with transaction.atomic():
-                comment_instance = serializer.save(post=post_instance)
-        except Exception:
-            logger.exception("Failed to create Comment")
-            raise
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
-    
+            self.perform_create(serializer)
+        except Exception as e:
+            msg = str(e)
+            code = 400
+            sts = "failed"
+        else:
+            msg = "Comment_Added"
+            code = 201
+            sts = "success"
+        return  Response({"status": sts, "detail": msg, }, status=code)
+
     @transaction.atomic
     def update(self, request, *args, **kwargs):
-        return super().update(request, *args, **kwargs)
-    
-    def perform_update(self, serializer):
-        obj = self.get_object()
-        if not obj.can_edit(self.request.user):
-            logger.warning(f"User {self.request.user} attempted to edit Comment {obj.pk} without permission.")
-            raise PermissionError("You do not have permission to edit this comment.")
-        serializer.save()
+        partial = kwargs.pop("partial", False)
+        _, instance = self.get_object()
+
+        if not instance.can_edit(request.user):
+            raise PermissionDenied()
+
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+
+        return  Response(serializer.data)
 
     @transaction.atomic
     def partial_update(self, request, *args, **kwargs):
         return super().partial_update(request, *args, **kwargs)
-    
+
+    def destroy(self, request, *args, **kwargs):
+        _, instance  = self.get_object()
+        self.perform_destroy(instance)
+        return Response(status=204)
+
     def perform_destroy(self, instance):
         if not instance.can_edit(self.request.user):
             logger.warning(f"User {self.request.user} attempted to delete Comment {instance.pk} without permission.")
-            raise PermissionError("You do not have permission to delete this comment.")
+            raise PermissionDenied()
         instance.soft_delete()
 
-    @method_decorator(cache_page(60 * 15))
+    @method_decorator(cache_page(60 * 5))
     def list(self, request, *args, **kwargs):
         """List comments (cached for a short period)."""
-        return super().list(request, *args, **kwargs)
+        queryset = self.filter_queryset(self.get_queryset())
+        post, _ = self.get_object()
 
+        service = CommentService(post=post, user=request.user)
+        list_q = service.list_comments(comments=queryset)
 
-    @action(methods=["post"], detail=True, url_path="replies")
-    def replies(self, request):
+        return  return_paginated_view(self, list_q)
+
+    @action(methods=["post"], detail=True, url_path="comments")
+    def create_replies(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-
-        post_pk = self.kwargs.get("post_pk")
-        post = get_post_by_id(post_pk.strip())
-        if not post.get("success"):
-            return Response(status=status.HTTP_404_NOT_FOUND, data={"detail":f"{post.get('msg')}"})
-        post_instance = post["post"]
-        comment_pk = self.kwargs.get("comment_id")
-        if comment_pk is None:
-            logger.error("Comment PK not found in URL kwargs for reply creation.")
-            return Response(
-                {"detail": "Comment ID is required to create a reply."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        parent_comment = get_object_or_404(Comment, pk=comment_pk, is_active=True, is_deleted=False)
-
+        post, comment = self.get_object()
+        data = serializer.validated_data
         try:
-            with transaction.atomic():
-                reply_instance = serializer.save(
-                    post=post_instance,
-                    parent=parent_comment,
-                    user=request.user
-                )
-        except Exception:
-            logger.exception("Failed to create Reply")
-            raise
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers) 
+            service = CommentService(post, request.user)
+            data.update({"parent": comment})
+            nested_comment = service.create_nested_replies(**data)
+
+        except Exception as e:
+            sts = "failed"
+            msg = str(e)
+            code = 400
+        else:
+            sts = "success",
+            msg = "Replies",
+            code = 201
+
+        if sts == "success":
+            event = NotificationEvents.SYSTEM.value
+            message = f"{request.user.user} commented on you comment"
+            send_general_notification(
+                sender=request.user,
+                receiver=comment.user,
+                message=message,
+                event=event
+            )
+        return Response({"status": sts, "msg": msg}, status=code)
+
+    @method_decorator(cache_page(60 * 5))
+    @action(methods=['get'], detail=True, url_path="comments/list")
+    def list_replies(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        post, comment_base = self.get_object()
+
+        service = CommentService(post, request.user)
+        comments = service.list_nested_comments(queryset, comment_base)
+
+        return return_paginated_view(self, comments)

@@ -33,7 +33,6 @@ def _send_mail_base(context: dict) -> bool:
         logger.warning("Email context is incomplete")
         raise ValidationError("Email context cannot have None values")
     context.update({"app_name": APP_NAME})
-    print(context)
     try:
         html_content = render_to_string(context.get("template_name"), context)
         client = SendGridAPIClient(api_key=SENDGRID_API_KEY)
