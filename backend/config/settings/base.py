@@ -4,6 +4,8 @@ import environ
 from django.utils import timezone
 from celery.schedules import crontab
 
+print("Importing Settings")
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 

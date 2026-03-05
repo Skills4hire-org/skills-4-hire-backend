@@ -9,7 +9,17 @@ from .users import (
 from .bookings import (
     BookingCreateFactory
 )
+
+from .post import (
+    PostFactory,
+    PostLikeFactory,
+    CommentFactory
+)
+
 __all__ = [
+    "CommentFactory",
+    "PostLikeFactory",
+    "PostFactory",
     "CustomUserFactory",
     "UserModel",
     "BaseProfileFactory",

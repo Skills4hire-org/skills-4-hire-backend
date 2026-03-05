@@ -74,14 +74,23 @@ class Category(models.Model):
         db_index=True,
         unique=True, 
     )
+    class SkillCategory(models.TextChoices):
+        DIGITAL =  "DIGITAL"
+        VOCATIONAL = "VOCATIONAL"
+        CRAFT = "CRAFT"
+
     name = models.CharField(max_length=255, unique=True)
-    category = models.CharField(max_length=200, unique=True)
+    category = models.CharField(
+        max_length=200, unique=True,
+        choices=SkillCategory.choices,
+        default=SkillCategory.DIGITAL.value
+    )
     slug = AutoSlugField(populate_from="category", unique=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    is_active = models.BooleanField(default=True, db_index=True)
 
     class Meta:
-
         constraints = [
             models.UniqueConstraint(fields=["name", "category"], name="unique_name_category")
         ]
@@ -89,8 +98,18 @@ class Category(models.Model):
     def __str__(self):
         return f"Category(), "
 
+    def clean(self):
+        super().clean()
+        if self.name:
+            self.name.title()
+        self.save()
+
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
 
 class ProviderSkills(models.Model):
+
     class EfficiencyStatus(models.TextChoices):
         BEGINEER = "BEGINEER", "Begineer"
         INTERMIDIATE = "INTERMIDIATE", "Intermidiate"

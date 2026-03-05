@@ -15,7 +15,8 @@ def base_client(db):
 
 
 @pytest.fixture
-def customer_client(db, base_client, customer):
+def customer_client(db, customer):
+    base_client = APIClient()
     token = RefreshToken.for_user(user=customer)
     base_client.credentials(
         HTTP_AUTHORIZATION=f"Bearer {token.access_token}"
@@ -24,7 +25,8 @@ def customer_client(db, base_client, customer):
 
 
 @pytest.fixture
-def provider_client(db, base_client, provider):
+def provider_client(db, provider):
+    base_client = APIClient()
     token = RefreshToken.for_user(user=provider)
     base_client.credentials(
         HTTP_AUTHORIZATION=f"Bearer {token.access_token}"

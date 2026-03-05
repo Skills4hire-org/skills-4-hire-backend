@@ -14,6 +14,11 @@ logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
+class IsActiveManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_active=True)
+
+
 class Post(models.Model):
     """
     A model representing a post in the system.
@@ -23,9 +28,10 @@ class Post(models.Model):
     class PostType(models.TextChoices):
         GENERAL = "GENERAL", "General"
         SERVICE = "SERVICE", "Service",
-        JOB = "JOB",  "Job",
-        QUESTION = "QUESTION", "Question"
+        JOB = "JOB",  "Job"
 
+    objects =  models.Manager()
+    is_active_objects = IsActiveManager()
 
     post_id = models.UUIDField(
         max_length=20,
@@ -49,7 +55,7 @@ class Post(models.Model):
         choices=PostType,
         default=PostType.GENERAL,
         null=True,
-        blank=True
+        blank=False
     )
 
     amount = models.DecimalField(
@@ -85,20 +91,19 @@ class Post(models.Model):
         """
         A method to soft delete a post instance
         """
-
         if not hasattr(self, "is_deleted"):
             return None
-        
-        self.is_deleted=~F("is_deleted")
-        self.is_active=~F("is_active")
-        self.save()
+        self.is_deleted = True
+        self.is_active = False
+        self.save(update_fields=("is_deleted", "is_active"))
+        return None
 
     def __str__(self):
         return f"Posts('{self.user.full_name}', {self.is_active})"
     
     
-class ServiceTag(models.Model):
-    service_tag_id = models.UUIDField(
+class PostTag(models.Model):
+    post_tag_id = models.UUIDField(
         max_length=20,
         primary_key=True,
         unique=True,
@@ -107,8 +112,7 @@ class ServiceTag(models.Model):
     )
 
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="post_tag")
-
-    service = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="service_tag")
+    service_name = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="post_tag", null=True, blank=True)
 
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -116,18 +120,25 @@ class ServiceTag(models.Model):
 
 
     def __str__(self):
-        return f"ServiceTag({self.post.pk},)"
+        return f"PostTag({self.post.pk},)"
 
     class Meta:
         constraints = [
             models.UniqueConstraint(
-                fields=["post", "service"], name="unique_post_service_tag"
+                fields=["post", "service_name"], name="unique_post_tag"
             )
         ]
 
 
+class CommentManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_active=True, is_deleted=False)
 
 class Comment(models.Model):
+
+    active_objects = CommentManager() # custom manager to ensure that only active objects are returned
+    objects = models.Manager() # default manager
+
     comment_id = models.UUIDField(max_length=20, unique=True, primary_key=True, default=uuid.uuid4, db_index=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="comments")
 
@@ -143,7 +154,7 @@ class Comment(models.Model):
     # content
     message = models.TextField(max_length=5000)
 
-    # booleanFIelds
+    # booleanfields
     is_active = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False)
     is_edited = models.BooleanField(default=False)  
@@ -154,45 +165,45 @@ class Comment(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     deleted_at = models.DateTimeField(blank=True, null=True)
 
-
     class Meta:
         ordering = ['-created_at']
         indexes = [
             models.Index(fields=["parent"], name="parent_idx"),
             models.Index(fields=["created_at"], name="time_idx"),
-            models.Index(fields=["is_active"], name="is_actice_idx")
+            models.Index(fields=["is_active"], name="is_active_idx")
         ]
 
     def __str__(self):
         return f"{self.__class__}({self.message}, {self.user.full_name if self.user.full_name else 'Anonymous'})"
     
     def soft_delete(self):
-        if not hasattr(self, "is_deleteed") and not hasattr(self, "is_active"):
+        if not hasattr(self, "is_deleted") and not hasattr(self, "is_active"):
             logger.error("required attributes are empty, 'is_active', 'is_deleted'")
-            raise ValueError(f"{self.__class__} must have both 'is_deleted' and 'is_actve' attribute")
+            raise ValueError(f"{self.__class__} must have both 'is_deleted' and 'is_active' attribute")
 
-        self.is_active=~F("is_active")
-        self.is_deleted=~F("is_deleted")
-        self.deleted_at=F("deleted_at") if self.is_deleted else timezone.now()
+        from django.utils import timezone
+
+        setattr(self, "is_active", False)
+        setattr(self, "is_deleted", True)
+        setattr(self, "deleted_at", timezone.now())
         self.save(update_fields=["is_active", "is_deleted", "deleted_at"])
 
 
     def can_edit(self, user) -> bool:
         if user == self.user:
             return True
-        if user.is_staff or user.is_admin:
-            return True
         return False
     
 
-class PostMedia(models.Model):
-    class PostMediaTypes(models.TextChoices):
+class PostAttachment(models.Model):
+    " Post attachment list photo, file, videos"
+
+    class Types(models.TextChoices):
         VIDEO = "VIDEO", "Video"
         PHOTO = "PHOTO", "Photo"
         FILE = "FILE", "File"
 
-
-    postmedia_id = models.UUIDField(
+    post_attachment_id = models.UUIDField(
         max_length=20,
         unique=True,
         primary_key=True,
@@ -200,22 +211,28 @@ class PostMedia(models.Model):
         db_index=True
     )
 
-    post_media_type = models.CharField(max_length=200, choices=PostMediaTypes, default=None, null=True, blank=True)
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="post_media", blank=True, null=True)
-    comment = models.ForeignKey(Comment, related_name="post_media", blank=True, null=True, on_delete=models.CASCADE)
-    post_media_uri = models.URLField(max_length=200, null=True, blank=True)
+    attachment_type = models.CharField(max_length=200, choices=Types.choices, default=None, null=True, blank=True)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="attachment", blank=True, null=True)
+    attachmentURL = models.URLField(max_length=200, null=True, blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"PostMedia({self.post.pk}, )"
+        return f"PostAttachment({self.post.pk}, )"
     
     class Meta:
         ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=["post"], name="post_idx")
+        ]
     
 
 class PostLike(models.Model):
+
+    objects = models.Manager()
+    is_active_objects = IsActiveManager()
+
     postlike_id = models.UUIDField(
         max_length=20,
         unique=True,
@@ -224,15 +241,16 @@ class PostLike(models.Model):
         db_index=True
     )
 
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="post_likes")
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="post_likes")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="likes")
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="likes")
 
-    is_active = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
+        ordering = ['-created_at']
         constraints = [
             models.UniqueConstraint(
                 fields=["user", "post"], name="unique_user_post_like"
@@ -246,15 +264,11 @@ class PostLike(models.Model):
     def __str__(self):
         return f"PostLike({self.user.full_name}, {self.post.pk})"
 
-    
-    # def can_edit_like(self, user):
-    #     if not hasattr(self, "user"): 
-    #         return False
-    #     return self.user == user
-    
+
     def soft_delete(self):
         if not hasattr(self, "is_active"):
             raise ValueError("is_active field is required")
-        
-        self.is_active=~F("is_active")
-        self.save()
+
+        self.is_active = False
+        self.save(update_fields=("is_active",))
+        return  None
