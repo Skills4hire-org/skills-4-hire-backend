@@ -7,10 +7,13 @@ class IsOwnerOrReadOnly(IsAuthenticatedOrReadOnly):
     Extends `IsAuthenticatedOrReadOnly` so unauthenticated requests still
     have read-only access.
     """
-
     def has_object_permission(self, request, view, obj: Any) -> bool:
         # Read permissions are allowed to any request
-        if request.method in ('GET', 'HEAD', 'OPTIONS'):
+        user = request.user
+        if not user.is_authenticated:
+            return False
+
+        if user.is_authenticated and request.method in ('GET', 'HEAD', 'OPTIONS'):
             return True
         # Write permissions only to owner
         return getattr(obj, 'user', None) == getattr(request, 'user', None)

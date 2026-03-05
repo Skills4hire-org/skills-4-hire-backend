@@ -65,6 +65,10 @@ class Bookings(models.Model):
                 raise ValidationError("End date must be after start date.")
         super().clean()
 
+    def save(self, *args, **kwargs):
+        self.clean()
+        super().save(*args, **kwargs)
+
     def soft_delete(self):
         self.is_active = False
         self.is_deleted = True

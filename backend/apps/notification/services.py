@@ -48,3 +48,24 @@ def trigger_notification(user_pk, message):
     except Exception as e:
         logger.exception(f"Error trying to trigger notifications.. {e}")
         raise Exception(f"Error {e}")
+
+
+def send_general_notification(
+        sender, receiver, message, event
+):
+
+    try:
+        create_notification(
+            sender=sender,
+            receiver=receiver,
+            event=event,
+            message=message
+        )
+
+        trigger_notification(
+            user_pk=receiver.pk,
+            message=message,
+        )
+
+    except Exception as e:
+        raise Exception(str(e))

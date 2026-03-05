@@ -38,7 +38,7 @@ def customer(db):
     user.email = "customeremail@gmail.com"
     user.is_active = True
     user.is_verified = True
-    user.is_provider = True
+    user.is_customer = True
     user.active_role = UserModel.RoleChoices.CUSTOMER
     user.save()
     return user
@@ -50,6 +50,7 @@ def another_customer(db):
     user.is_active = True
     user.is_verified = True
     user.is_provider = True
+    user.is_customer = True
     user.active_role = UserModel.RoleChoices.CUSTOMER
     user.save()
     return user
