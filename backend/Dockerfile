@@ -13,19 +13,17 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# copy into app
-COPY . /app
+COPY ./pyproject.toml ./uv.lock ./build.sh  ./
 
-# copy the build file into app
-COPY build.sh /app
+RUN uv sync --frozen --no-cache --no-dev
 
-# give permission
-RUN chmod +x build.sh
+Run chmod +x build.sh
 
-# expose port
+COPY ./backend .
+
 EXPOSE 8000
 
 # entry point
-CMD ["sh", "build.sh"]
+CMD ["uv", "run", "sh", "build.sh"]
 
 
