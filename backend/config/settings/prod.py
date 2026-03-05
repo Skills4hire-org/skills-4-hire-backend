@@ -20,10 +20,8 @@ CELERY_RESULT_BACKEND = env("PRODUCTION_REDIS_URL", default="redis://redis:6379/
 
 DATABASES = {
         'default': dj_database_url.config(
-            env=env("DATABASE_URL"),
-            default="postgres://postgres[]",
+            default=env("DATABASE_URL"),
             ssl_require=True,
-            conn_health_checks=True,
             conn_max_age=0
         )
     }

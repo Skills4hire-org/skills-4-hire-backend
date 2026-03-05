@@ -1,6 +1,9 @@
-from config.settings.base import * 
+from config.settings.base import *
+import dj_database_url
 
 import ssl
+
+from pygments.lexer import default
 
 DEBUG = env("DEBUG")
 
@@ -41,10 +44,11 @@ CORS_ALLOWED_ORIGINS = [
 ]
 
 DATABASES = {
-    "default": {
-        "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.database",
-    }
+    "default": dj_database_url.config(
+        default=env("DATABASE_URL"),
+        ssl_require=True,
+        conn_max_age=0
+    )
 }
 
 

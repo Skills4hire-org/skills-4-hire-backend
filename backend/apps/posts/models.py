@@ -41,7 +41,7 @@ class Post(models.Model):
     )
 
     post_content = models.TextField(blank=False, null=False)
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="posts")
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="posts", blank=True, null=True)
     role = models.CharField(
         max_length=200, 
         choices=User.RoleChoices, 
@@ -49,7 +49,19 @@ class Post(models.Model):
         blank=True,
         help_text="User role when creating the post instance"
     )
-    
+
+    parent = models.ForeignKey(
+        "self",
+        on_delete=models.DO_NOTHING,
+        null=True,
+        blank=True,
+        related_name="reposts",
+        db_index=True
+    )
+    reposted_by = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name="shares")
+
+    repost_quote = models.TextField(blank=True,null=True)
+
     post_type = models.CharField(
         max_length=200,
         choices=PostType,
@@ -64,18 +76,19 @@ class Post(models.Model):
         null=True, 
         blank=True
     )
-    
 
     # Boolean fields 
     is_active = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False)
     is_pinned = models.BooleanField(default=False)
+    is_reposted = models.BooleanField(default=False, db_index=True)
 
     # TimeStamp 
     start_date = models.DateTimeField(blank=True, null=True)
     end_date = models.DateTimeField(blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
+    reposted_at = models.DateTimeField(blank=True, null=True)
 
     class Meta:
         ordering = ['-created_at']
@@ -145,7 +158,7 @@ class Comment(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="comments")
     parent = models.ForeignKey(
         "self",
-        on_delete=models.CASCADE,
+        on_delete=models.DO_NOTHING,
         blank=True,
         null=True,
         related_name="replies"
