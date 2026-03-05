@@ -337,11 +337,10 @@ class PostDetailSerializer(serializers.ModelSerializer):
     reposts_count = serializers.IntegerField(read_only=True)
 
     duration = serializers.SerializerMethodField()
-    likes = serializers.SerializerMethodField()
+
     class Meta:
         model = Post
         fields = [
-            "likes",
             "comments_counts", "likes_count", "reposts_count",
             "user", "post_id", "post_content",
             "post_type", "amount", "is_active",
@@ -350,12 +349,12 @@ class PostDetailSerializer(serializers.ModelSerializer):
             "attachment", "post_tag",
             "role", "duration",
         ]
-    def get_likes(self, obj):
-        like = obj.likes.count().filter(is_active=True)
-        if like == 0:
-            return  0
-        print(like)
-        return  like
+    # def get_likes(self, obj):
+    #     like = obj.likes.count().filter(is_active=True)
+    #     if like == 0:
+    #         return  0
+    #     print(like)
+    #     return  like
 
     def get_duration(self, obj):
         start_date = obj.start_date
