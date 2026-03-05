@@ -165,7 +165,7 @@ class Service(models.Model):
     profile = models.ForeignKey(ProviderModel, on_delete=models.CASCADE, related_name="services")
 
     name = models.CharField(max_length=500, blank=True, null=True)
-    description = models.CharField(blank=True)
+    description = models.CharField(blank=True, max_length=2000)
     min_charge = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     max_charge = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
 

@@ -8,7 +8,7 @@ from django.views.decorators.cache import cache_page
 from datetime import  datetime
 
 @transaction.atomic
-def create_post(user, start_date: datetime | None, end_date: datetime | None, **kwargs):
+def create_post(user, start_date: datetime | None = None, end_date: datetime | None = None, **kwargs):
     user_active_role =  getattr(user, "active_role")
     try:
         new_post = Post.objects.create(
@@ -19,6 +19,13 @@ def create_post(user, start_date: datetime | None, end_date: datetime | None, **
     except Exception as e:
         raise Exception(e)
     return  new_post
+
+def list_nested_reposts(post, queryset):
+    qs = queryset.filter(parent=post).all()
+    if qs is None:
+        return  None
+    return  qs
+
 
 def return_paginated_view(self, queryset):
     page = self.paginate_queryset(queryset)

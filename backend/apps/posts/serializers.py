@@ -16,6 +16,7 @@ from apps.authentication.serializers import  UserReadSerializer
 from django.contrib.auth import get_user_model
 from django.utils.text import gettext_lazy as _
 from django.db.models import Prefetch
+from django.utils import  timezone
 
 User = get_user_model()
 
@@ -267,31 +268,101 @@ class CommentSerializer(serializers.ModelSerializer):
 
         return instance
 
+class RepostSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Post
+        fields = [
+            "post_id", "parent",
+            "reposted_by", "repost_quote",
+            "reposted_at", "is_reposted"
+        ]
+
+        read_only_fields = [
+            "post_id", "parent",
+            "reposted_by", "reposted_at",
+            "is_reposted"
+        ]
+
+    def validated_repost_quote(self, value):
+
+        if value and not isinstance(value, str) or len(value) < 3:
+            raise serializers.ValidationError(_("Your repost quote is Invalid"))
+        return  value.strip()
+
+    def create(self, validated_data):
+
+        request = self.context.get("request")
+        post_instance = self.context.get("post")
+
+        active_user = getattr(request, "user")
+
+        validated_data.update({"parent": post_instance})
+        try:
+            repost = create_post(
+                user=active_user,
+                **validated_data,
+                reposted_by=active_user,
+                reposted_at=timezone.now(),
+                is_reposted=True
+            )
+            post_instance.is_reposted=True
+            post_instance.save()
+        except Exception as e:
+            raise Exception(e)
+        return repost
+
+
+class PostListSerializer(serializers.ModelSerializer):
+    comments_counts = serializers.IntegerField(read_only=True)
+    likes_count = serializers.IntegerField(read_only=True)
+    reposts_count = serializers.IntegerField(read_only=True)
+
+    user = UserReadSerializer(read_only=True)
+    class Meta:
+        model = Post
+        fields = [
+            "reposts_count", "comments_counts",
+            "likes_count", "user", "post_id",
+            "post_content",  "created_at", "updated_at"
+        ]
+
 
 class PostDetailSerializer(serializers.ModelSerializer):
     attachment = PostAttachmentSerializer(many=True, read_only=True)
     post_tag = PostTagSerializer(many=True, read_only=True)
-    comments = CommentSerializer(many=True, read_only=True)
     user = UserReadSerializer(read_only=True)
 
-    duration = serializers.SerializerMethodField()
+    comments_counts = serializers.IntegerField(read_only=True)
+    likes_count = serializers.IntegerField(read_only=True)
+    reposts_count = serializers.IntegerField(read_only=True)
 
+    duration = serializers.SerializerMethodField()
+    likes = serializers.SerializerMethodField()
     class Meta:
         model = Post
         fields = [
+            "likes",
+            "comments_counts", "likes_count", "reposts_count",
             "user", "post_id", "post_content",
             "post_type", "amount", "is_active",
             "is_deleted", "is_pinned", "start_date",
             "end_date", "created_at", "updated_at",
-            "attachment", "post_tag", "comments",
-            "role", "duration"
+            "attachment", "post_tag",
+            "role", "duration",
         ]
+    def get_likes(self, obj):
+        like = obj.likes.count().filter(is_active=True)
+        if like == 0:
+            return  0
+        print(like)
+        return  like
 
     def get_duration(self, obj):
         start_date = obj.start_date
         end_date = obj.end_date
         if start_date is None or end_date is None:
             return None
-        return  end_date - start_date
+        delta = end_date - start_date
+        return  f'{delta.days} days(s)'
 
 
