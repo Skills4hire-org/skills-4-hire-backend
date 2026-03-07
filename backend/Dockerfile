@@ -5,7 +5,7 @@ FROM python:alpine3.23 AS builder
 WORKDIR /app
 
 # update apt
-RUN apt-get update && apt-get install curl -y
+RUN apt-get update
 
 # install uv from official image
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
