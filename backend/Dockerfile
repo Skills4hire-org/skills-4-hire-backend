@@ -19,7 +19,7 @@ RUN uv sync --frozen --no-cache --no-dev
 
 Run chmod +x build.sh
 
-COPY ./backend .
+COPY . .
 
 EXPOSE 8000
 
