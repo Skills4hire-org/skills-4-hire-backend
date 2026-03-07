@@ -4,12 +4,22 @@ from rest_framework.response import Response
 
 from .serializers import ConversationCreateSerializer
 from .permissions import ConversationOwner
+from .models import Conversation
+
+from django.db.models import Q
 
 class ConversationViewSet(viewsets.ModelViewSet):
 
     http_method_names = ["post", "get", "delete"]
 
     permission_classes =  [ConversationOwner]
+
+    def get_queryset(self):
+        user = self.request.user
+        queryset = Conversation.active_objects.filter(
+            Q(sender=user)|
+            Q(receiver=user)
+        ).select_related("sender", "receiver")
 
     def get_serializer_class(self):
         if self.action == "create":

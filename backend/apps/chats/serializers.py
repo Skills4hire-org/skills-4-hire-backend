@@ -18,7 +18,7 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         receiver_id = validated_data["receiver_id"]
-
+        validated_data.pop("receiver_id")
         user = self.context.get("request")["user"]
         try:
             receiver = get_user_by_pk(receiver_id)
@@ -32,7 +32,7 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
             )
             new_conversation = services.create_conversation(**validated_data)
         except Exception as e:
-            raise serializers.ValidationError(_("Error creating conversation"))
+            raise serializers.ValidationError(_(f"Error creating conversation: {str(e)}"))
 
         return  new_conversation
 

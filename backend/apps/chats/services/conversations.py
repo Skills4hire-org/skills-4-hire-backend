@@ -1,8 +1,16 @@
 from ..models import Conversation
 
 from django.db import transaction, IntegrityError
+from django.db.models import Q
 
-from rest_framework.exceptions import NotFound
+from rest_framework.exceptions import NotFound, APIException
+from rest_framework import status
+
+
+class ConversationFound(APIException):
+    default_detail = "Conversation for user found"
+    default_code = "found"
+    status_code = status.HTTP_302_FOUND
 
 
 class ConversationService:
@@ -19,10 +27,23 @@ class ConversationService:
 
         return  True
 
+    def _validate_users(self):
+        conversation = Conversation.active_objects.filter(
+            Q(sender=self.sender, receiver=self.receiver) |
+            Q(sender=self.receiver, receiver=self.sender)
+        )
+        if conversation.exists():
+           return  True
+        return  False
+
     @transaction.atomic
     def create_conversation(self, **kwargs):
         if not self._validate_required_attribute():
             return False
+
+        if self._validate_users():
+            raise ConversationFound()
+
         try:
             new_conversation = Conversation.objects.create(
                 sender=self.sender,

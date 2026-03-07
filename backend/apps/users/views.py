@@ -37,7 +37,7 @@ class OnboardingView(APIView):
         if role is None:
             return Response(data={"detail": "Invalid request: Role cannot be None"},status=400)
         if request.user.active_role:
-            return Response(data={"detailt": "Role already selected!"}, status=status.HTTP_400_BAD_REQUEST)
+            return Response(data={"detail": "Role already selected!"}, status=status.HTTP_400_BAD_REQUEST)
         serializer.save()
         request.user.active_role = role.upper()
         request.user.save(update_fields=["active_role"])
