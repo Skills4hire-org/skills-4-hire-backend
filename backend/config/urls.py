@@ -25,6 +25,7 @@ urlpatterns += [
     path("api/v1/", include("apps.ratings.urls")),
     path("api/v1/", include("apps.bookings.urls")),
     path("api/v1/", include("apps.notification.urls")),
+    path("api/v1/", include("apps.chats.urls"))
     # path("rest/auth/", include("rest_framework.urls"))
 ]
 

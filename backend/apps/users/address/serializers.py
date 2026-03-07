@@ -19,6 +19,15 @@ class AddresSerializer(serializers.ModelSerializer):
             "created_at"
         ]
 
+    def validate(self, data):
+        user = self.context.get("request")["user"]
+        if Address.objects.filter(profile=user.profile, postal_code=data["postal_code"]).exists():
+            raise serializers.ValidationError("This Address Already Exist in your Profile")
+        fields_to_capitalize = ("city", "state", "country")
+        for value in fields_to_capitalize:
+            data[value].title()
+        return  data
+
     def create(self, validated_data):
         request = self.context.get("request")
         profile_pk = self.context.get("profile_pk")

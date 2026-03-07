@@ -24,7 +24,11 @@ from .serializers import (
 from .paginations import CustomPostPagination
 from .permission import IsOwnerOrReadOnly
 from .utils.posts import get_post_by_id
-from .services import  return_paginated_view, LikeService, CommentService, list_nested_reposts
+from .services import  (
+    return_paginated_view, LikeService,
+    CommentService, list_nested_reposts,
+    get_offers_or_job_post
+)
 from apps.bookings.permissions import  IsCustomer
 from apps.notification.services import send_general_notification
 from apps.notification.events import NotificationEvents
@@ -129,17 +133,11 @@ class PostViewSet(viewsets.ModelViewSet):
     def offers(self, request, include_offers: bool = True, *args, **kwargs):
         """ Returns customer jobs posts with pagination"""
 
-        if include_offers:
-           qs = self.get_queryset()\
-                .filter(user=request.user, post_type=Post.PostType.JOB.value)\
-                .order_by("-created_at")
-        else:
-            qs = self.get_queryset()\
-                .filter(user=request.user)\
-                .order_by("-created_at")
-
-        if qs is None:
-            return  0
+        qs = get_offers_or_job_post(
+            user=request.user,
+            queryset=self.get_queryset(),
+            include_offers=True
+        )
         return  return_paginated_view(self, qs)
 
     @method_decorator(cache_page(60 * 15))

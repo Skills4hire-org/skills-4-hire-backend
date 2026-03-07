@@ -1,9 +1,11 @@
+import uuid
+
 from .services.tasks import send_email_on_quene
 from .utils.helpers import verify_hashed_code
 from .one_time_password import OneTimePassword
 
 from rest_framework_simplejwt.tokens import OutstandingToken, BlacklistedToken
-from rest_framework.exceptions import ValidationError
+from rest_framework.exceptions import ValidationError, NotFound
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
@@ -82,6 +84,13 @@ def _get_user_by_email(email: str):
         return user
     except User.DoesNotExist:
         return None
+
+def get_user_by_pk(pk: uuid.UUID):
+    try:
+        user = User.objects.get(user_id=pk, is_deleted=False, is_active=True)
+        return user
+    except User.DoesNotExist:
+        return NotFound("User not found", code=404)
 
 def _get_code_intance_or_none(code: str, user = None) -> OneTimePassword:
     try:
