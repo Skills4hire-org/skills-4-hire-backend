@@ -1,11 +1,11 @@
 # use python 3.13
-FROM python:alpine3.23 AS builder
+FROM python:3.12-slim AS builder
 
 # project directory
 WORKDIR /app
 
 # update apt
-RUN apt-get update
+RUN apt-get update && apt-get install curl -y
 
 # install uv from official image
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
