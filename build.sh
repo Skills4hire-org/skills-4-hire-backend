@@ -21,8 +21,14 @@ uv run manage.py migrate
 echo "Collecting static files"
 uv run manage.py collectstatic --noinput
 
-echo "--> Starting server..."
-sudo systemctl restart skills_for_hire_gunicorn
+echo "Running services"
+services='nginx gunicorn skills4hire-worker skills4hire-beat'
+
+for service in $services
+do
+  echo "Starting $service"
+  sudo systemctl restart "$service"
+done
 
 echo " Deployment successfull..."
 
