@@ -15,11 +15,14 @@ class ConversationViewSet(viewsets.ModelViewSet):
     permission_classes =  [ConversationOwner]
 
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False):
+            return Conversation.objects.none()
         user = self.request.user
         queryset = Conversation.active_objects.filter(
             Q(sender=user)|
             Q(receiver=user)
         ).select_related("sender", "receiver")
+        return  queryset
 
     def get_serializer_class(self):
         if self.action == "create":
