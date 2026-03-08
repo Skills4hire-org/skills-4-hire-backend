@@ -12,8 +12,8 @@ from .serializers import (
 from .utils.helpers import create_otp_for_user
 from .helpers import (
     _send_email_to_user,
-    _get_user_by_email, 
-    _get_code_intance_or_none, 
+    _get_user_by_email,
+    _get_code_instance_or_none,
     blacklist_outstanding_token,
     verify_account
 )
@@ -94,7 +94,7 @@ class AccountVerificationView(APIView):
         validated_data = serializer.validated_data
         code = validated_data["code"]
         try:
-            code_instance = _get_code_intance_or_none(code)
+            code_instance = _get_code_instance_or_none(code)
             account_verifed = verify_account(code_instance=code_instance, user=code_instance.user)
         except Exception:
             return Response({
@@ -161,7 +161,7 @@ class PasswordResetConfirmView(APIView):
         validated_data = serializer.validated_data
         code, password = validated_data["code"], validated_data["password"]
         try:
-            code_instance = _get_code_intance_or_none(code)
+            code_instance = _get_code_instance_or_none(code)
             user = code_instance.user
             with transaction.atomic():
                 user.set_password(password)

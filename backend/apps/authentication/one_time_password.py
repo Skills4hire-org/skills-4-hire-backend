@@ -20,9 +20,10 @@ class OneTimePassword(models.Model):
     is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     is_used = models.BooleanField(default=False)
-    
+    is_deleted = models.BooleanField(default=False)
+
     def __str__(self):
-        return f"OneTimePassword({self.user.email}, {self.code})"
+        return f"OneTimePassword({self.user.email}, {self.raw_code})"
 
     def is_expired(self) -> bool:
         expiry_minute = getattr(settings, "OTP_EXPIRY", 15)   

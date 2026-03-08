@@ -92,7 +92,7 @@ def get_user_by_pk(pk: uuid.UUID):
     except User.DoesNotExist:
         return NotFound("User not found", code=404)
 
-def _get_code_intance_or_none(code: str, user = None) -> OneTimePassword:
+def _get_code_instance_or_none(code: str, user = None) -> OneTimePassword | None:
     try:
         if user:
             code_instance = OneTimePassword.objects.get(raw_code=code, user=user, is_active=True, is_used=False)

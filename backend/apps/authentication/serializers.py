@@ -10,7 +10,7 @@ from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken, BlacklistedToken, OutstandingToken
 
-from .helpers import validate_email, _get_user_by_email, _get_code_intance_or_none
+from .helpers import validate_email, _get_user_by_email, _get_code_instance_or_none
 from .one_time_password import OneTimePassword
 import logging
 
@@ -212,10 +212,12 @@ class AccountVerificationSerializer(serializers.Serializer):
         user = _get_user_by_email(email=email)
         if user is None:
             raise serializers.ValidationError(_("User not found"), code="user_not_found")
-        code_intance = _get_code_intance_or_none(code, user=user)
-        if code_intance is None:
+        code_instance = _get_code_instance_or_none(code, user=user)
+        if code_instance.is_expired():
+            raise serializers.ValidationError(_("Code Already expired"), code="expired")
+        if code_instance is None:
             raise serializers.ValidationError(_("OneTImePassword Not Found"), code="not_found")
-        if not code_intance.is_active or code_intance.is_used:
+        if not code_instance.is_active or code_instance.is_used:
             raise serializers.ValidationError(_('code already expired'), code="invalid_code")
         return attrs
 
@@ -236,7 +238,9 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
     confirm_password = serializers.CharField(write_only=True, required=True, max_length=200)
 
     def validate_code(self, value):
-        code_instance = _get_code_intance_or_none(value.strip())
+        code_instance = _get_code_instance_or_none(value.strip())
+        if code_instance.is_expired():
+            raise serializers.ValidationError(_("code already expired"), code="expired")
         if code_instance is None:
             raise serializers.ValidationError(_("OneTimePassword object not found"))
         user = code_instance.user
