@@ -1,14 +1,13 @@
 import logging
 
 from django.db import models
-from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.utils import timezone
-from django.db.models import F
+
 
 import uuid
 
 from ..users.provider_models import Category
+from ..users.base_model import Address
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +21,7 @@ class IsActiveManager(models.Manager):
 class Post(models.Model):
     """
     A model representing a post in the system.
-    handles different types of posts such as general posts, service requests, job postings, and questions.
+    handles different types of posts such as general posts, service requests, job postings.
 
     """
     class PostType(models.TextChoices):
@@ -39,6 +38,8 @@ class Post(models.Model):
         unique=True,
         default=uuid.uuid4
     )
+
+    post_title = models.CharField(max_length=500, blank=False,null=True)
 
     post_content = models.TextField(blank=False, null=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="posts", blank=True, null=True)
@@ -69,6 +70,7 @@ class Post(models.Model):
         null=True,
         blank=False
     )
+    address = models.ForeignKey(Address, on_delete=models.CASCADE, related_name="posts_address", blank=True, null=True)
 
     amount = models.DecimalField(
         decimal_places=2, 

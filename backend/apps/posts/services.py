@@ -1,11 +1,15 @@
+import uuid
 
 from .models import  Post, PostLike, Comment
 
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, NotFound
 
 from django.db import  transaction
-from django.views.decorators.cache import cache_page
+from django.contrib.auth import  get_user_model
 from datetime import  datetime
+
+
+UserModel = get_user_model()
 
 @transaction.atomic
 def create_post(user, start_date: datetime | None = None, end_date: datetime | None = None, **kwargs):
@@ -26,6 +30,33 @@ def list_nested_reposts(post, queryset):
         return  None
     return  qs
 
+def get_post_by_id(post_pk: uuid.UUID):
+    try:
+        post = Post.objects.get(post_id=post_pk)
+    except Post.DoesNotExist:
+        raise NotFound("post not found", code=404)
+    return post
+
+
+def get_offers_or_job_post(user: UserModel | None, queryset, include_offers: bool = True):
+    if queryset is None:
+        return None
+    if include_offers:
+        if user is not None:
+           qs = queryset\
+                .filter(user=user, post_type=Post.PostType.JOB.value)\
+                .order_by("-created_at")
+        else:
+            qs = queryset.filter(post_type=Post.PostType.JOB.value)
+        return qs
+    else:
+        if user is not None:
+            qs = queryset\
+                .filter(user=user)\
+                .order_by("-created_at")
+
+            return qs
+        return None
 
 def return_paginated_view(self, queryset):
     page = self.paginate_queryset(queryset)

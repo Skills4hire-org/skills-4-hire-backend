@@ -1,9 +1,7 @@
-from django.core.validators import validate_ipv46_address
+
 from rest_framework import serializers
-from rest_framework.exceptions import PermissionDenied
 
 from .models import Post, PostAttachment, PostTag, Comment
-from ..users.provider_models import Category
 from .utils.posts import  (
     validate_url, check_service_in_category,
     can_make_post, verify_post_with_amount,
@@ -11,6 +9,8 @@ from .utils.posts import  (
 )
 from .services import  create_post, CommentService
 from apps.authentication.serializers import  UserReadSerializer
+from ..users.serializers import AddresSerializer
+from  ..users.base_model import Address
 
 
 from django.contrib.auth import get_user_model
@@ -78,10 +78,13 @@ class PostCreateSerializer(serializers.ModelSerializer):
     attachment = PostAttachmentSerializer(many=True, required=False)
     post_tag = PostTagSerializer(many=True, required=False)
     duration = serializers.IntegerField(min_value=1, required=False)
+    address  = AddresSerializer()
 
     class Meta:
         model = Post
         fields = [
+            "address",
+            "post_title",
             "post_content",
             "post_type",
             "amount",
@@ -98,6 +101,10 @@ class PostCreateSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         post_type = attrs.get("post_type")
         amount = attrs.get("amount")
+        address = attrs.get("address")
+
+        if post_type == Post.PostType.JOB.value and address is None:
+            raise serializers.ValidationError("Please add a location for this job offer")
 
         # Validate post_type if model exposes allowed values
         valid_post_types = getattr(Post.PostType, "values", None)
@@ -113,14 +120,14 @@ class PostCreateSerializer(serializers.ModelSerializer):
             post_type = Post.PostType.GENERAL.value
 
         if not can_make_post(user_role=active_user_role, post_type=post_type):
-            raise PermissionDenied()
+            raise serializers.PermissionDenied()
 
         if not verify_post_with_amount(
             user_role=active_user_role,
             amount=amount,
             post_type=post_type
         ):
-            raise PermissionDenied(detail="Couldn't verify post with amount")
+            raise serializers.PermissionDenied(detail="Couldn't verify post with amount")
 
         return attrs
 
@@ -129,7 +136,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
         post_attachments = validated_data.pop("attachment", [])
         post_tags = validated_data.pop("post_tag", [])
-
+        address = validated_data.pop("address", {})
         duration = validated_data.pop("duration", None)
 
         request = self.context.get("request")
@@ -156,6 +163,13 @@ class PostCreateSerializer(serializers.ModelSerializer):
                 save.append(attachment_objs)
             PostAttachment.objects.bulk_create(save)
 
+        if address:
+            address_instance, created = Address.objects.get_or_create(
+                profile=user.profile, postal_code=address["postal_code"], **address)
+            if created:
+                post_instance.address = address_instance
+            post_instance.address = address_instance
+
         # Create related PostTag records (if any)
         if post_tags:
             save = []
@@ -180,8 +194,25 @@ class PostCreateSerializer(serializers.ModelSerializer):
         instance.post_type = validated_data.get("post_type", instance.post_type)
         instance.amount = validated_data.get("amount", instance.amount)
 
+        user = self.context.get("request")['user']
+
+        address = validated_data.pop("address", {})
         attachments = validated_data.pop("attachment", [])
         post_tags = validated_data.pop("post_tag", [])
+
+        if address:
+            post_ad_instance = instance.address
+            postal_code = address["postal_code"]
+            address_instance = Address.objects.get(
+                profile=user.profile, address_id=post_ad_instance.address_id,
+                postal_code=postal_code)
+            if address_instance:
+                for key, value in address.items():
+                    setattr(address_instance, key, value)
+            else:
+                new_address = Address.objects.create(profile=user.profile, **address)
+                post_ad_instance = new_address
+            post_ad_instance.save()
 
         if attachments:
             attachment = instance.attachment

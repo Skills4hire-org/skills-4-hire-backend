@@ -1,41 +1,30 @@
 # use python 3.13
-FROM python:alpine3.23 AS builder
+FROM python:3.12-slim AS builder
 
 # project directory
 WORKDIR /app
 
-# copy django to project directory
-COPY . .
-
-# upgrade pip
-RUN pip install --upgrade pip
 # update apt
-#RUN apt-get update && apt-get install curl -y
+RUN apt-get update && apt-get install curl -y
 
+# install uv from official image
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-# copy required dependencies into the docker app
-COPY requirements.txt /app
+COPY ../pyproject.toml ./uv.lock ./build.sh  ./
 
-# install required dependecies
-RUN pip install -r requirements.txt
+RUN uv sync --frozen --no-cache --no-dev
 
-# copy into app
-COPY . /app
+Run chmod +x build.sh
 
-# copy the build file into app
-COPY build.sh /app
+COPY . .
 
-# give permission
-RUN chmod +x build.sh
-
-# expose port
 EXPOSE 8000
 
 # entry point
-CMD ["python3", "manage.py", "migrate"]
+CMD ["uv", "run", "sh", "build.sh"]
 
 
 
