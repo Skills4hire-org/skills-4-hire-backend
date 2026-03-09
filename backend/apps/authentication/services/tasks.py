@@ -18,10 +18,10 @@ import logging
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
-@shared_task(bind=True, autoretry_for=(Exception,), max_retries=3, retry_backoff=True)
-def send_email_on_quene(content: dict):
+@shared_task(bind=True, autoretry_for=(Exception,), max_retries=3, retry_backoff=3)
+def send_email_on_queue(self, content: dict):
     """
-    Docstring for send_email_on_quene
+    Docstring for send_email_on_queue
     
     :param content: Description
     :type content: dict
