@@ -8,7 +8,7 @@ echo  "pulling code latest changes"
 git pull origin master
 
 echo "activating environment"
-source  .venv/bin/activate
+source .venv/bin/activate
 
 echo "Running sync"
 uv sync

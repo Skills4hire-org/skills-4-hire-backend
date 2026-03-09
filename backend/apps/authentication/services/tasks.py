@@ -18,7 +18,7 @@ import logging
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
-@shared_task
+@shared_task(bind=True, autoretry_for=(Exception,), max_retries=3, retry_backoff=True)
 def send_email_on_quene(content: dict):
     """
     Docstring for send_email_on_quene
@@ -26,9 +26,6 @@ def send_email_on_quene(content: dict):
     :param content: Description
     :type content: dict
     """
-    if content is None or any([value is None for value in content.values()]):
-        raise ValidationError("Email content cannot be empty")
-    
     try:
         _send_mail_base(context=content)
     except Exception:

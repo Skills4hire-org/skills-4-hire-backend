@@ -19,8 +19,9 @@ DEBUG = ""
 
 ALLOWED_HOSTS = []
 
-SENDGRID_API_KEY = env("SENDGRID_API_KEY")
-SENDGRID_SENDER = env("SENDGRID_SENDER")
+RESEND_API_KEY = env("RESEND_API_KEY")
+RESEND_REQUEST_PATH = env("RESEND_REQUEST_PATH")
+FROM_EMAIL = env("FROM_EMAIL")
 
 # UTILS
 BASE_URL = env("BASE_URL")
@@ -192,14 +193,6 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
-
-EMAIL_BACKEND = env("EMAIL_BACKEND")
-EMAIL_HOST = env("EMAIL_HOST")
-EMAIL_PORT = env.int("EMAIL_PORT")
-EMAIL_USE_TLS = env.bool("EMAIL_USE_TLS")
-EMAIL_HOST_USER = env("EMAIL_HOST_USER")
-EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
-DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL")
 
 # Celery config
 CELERY_ACCEPT_CONTENT = ["json"]
