@@ -1,97 +1,342 @@
-from channels.exceptions import AcceptConnection
+"""
+Models for conversations and messages.
+
+Conversation: Represents a chat between exactly two users
+Message: Represents individual messages within a conversation
+"""
+
 from django.db import models
-from django.contrib.auth import  get_user_model
+from django.core.exceptions import ValidationError
+from django.conf import settings
 
-from apps.posts.models import PostAttachment, IsActiveManager, Post
+from .core.utils import sanitize_message_content
 
+import logging
 import uuid
 
-UserModel = get_user_model()
 
+logger = logging.getLogger(__name__)
 
+class ActiveConversationManager(models.Manager):
+    def get_queryset(self):
+        return super().get_queryset().filter(is_active=True)
 
 class Conversation(models.Model):
+    """
+    Model representing a conversation between exactly two users.
 
-    objects = models.Manager()
-    active_objects = IsActiveManager()
+    Features:
+    - Ensures only two participants
+    - Prevents duplicate conversations between same users
+    - Prevents self-conversations
+    - Automatic timestamp tracking
+    - Query optimization indexes
+    """
 
     conversation_id = models.UUIDField(
-        max_length=20,
-        primary_key=True, default=uuid.uuid4,
-        editable=False, unique=True)
+        primary_key=True,
+        unique=True,
+        db_index=True,
+        default=uuid.uuid4,
+        help_text="pk  for conversation"
+    )
+    objects = models.Manager()
+    active_objects = ActiveConversationManager()
 
-    sender = models.ForeignKey(
-        UserModel, on_delete=models.CASCADE,
-        related_name="conversation_sender",  db_index=True)
-    receiver = models.ForeignKey(
-        UserModel, on_delete=models.CASCADE,
-        related_name="conversation_receiver", db_index=True)
-
-    is_active = models.BooleanField(default=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    class Meta:
-        constraints =  [
-            models.UniqueConstraint(
-                fields=["sender", "receiver"],
-                name="unique_sender_receiver"
-            )
-        ]
-        indexes = [
-            models.Index(
-                fields=['sender', "receiver"],
-                name="send_receive_idx"
-            ),
-            models.Index(
-                fields=["is_active"],
-                name='a_idx'
-            ),
-            models.Index(
-                fields=["conversation_id"],
-                name="p_idx"
-            )
-        ]
-        db_table = 'conversations'
-        verbose_name = "conversation"
-        verbose_name_plural = 'conversations'
-
-class Message(models.Model):
-    message_id = models.UUIDField(
-        max_length=20, primary_key=True,
-        unique=True, default=uuid.uuid4,
-        editable=False
+    participant_one = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='conversations_as_participant_one',
+        help_text='First participant in the conversation'
     )
 
-    objects = models.Manager()
-    active_objects = IsActiveManager()
+    participant_two = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='conversations_as_participant_two',
+        help_text='Second participant in the conversation'
+    )
 
-    # attachment for a chat(can be , file, video, image)
-    attachment = models.ForeignKey(PostAttachment, on_delete=models.CASCADE, related_name="message")
+    is_active = models.BooleanField(
+        default=True,
+        help_text="Status of this conversation"
+    )
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text='Conversation creation timestamp'
+    )
 
-    sender = models.ForeignKey(UserModel, on_delete=models.CASCADE, related_name="message")
-
-    message = models.TextField(blank=False, null=False)
-
-    is_active = models.BooleanField(default=True)
-    is_edited = models.BooleanField(default=False, db_index=True)
-    is_delete = models.BooleanField(default=False,db_index=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    edited_at = models.DateTimeField(blank=True, null=True)
-    deleted_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text='Last message timestamp (updates when new message added)'
+    )
 
     class Meta:
-        db_table = 'message'
-        indexes = [
-            models.Index(fields=["is_active"], name="is_active_inx"),
+        db_table = 'conversations_conversation'
+        verbose_name = 'Conversation'
+        verbose_name_plural = 'Conversations'
+        ordering = ['-updated_at']
+
+        # Ensure conversations are unique between two users (regardless of order)
+        # This is a unique constraint on sorted participant IDs
+        constraints = [
+            models.UniqueConstraint(
+                fields=['participant_one', 'participant_two'],
+                name='unique_conversation_participants'
+            ),
         ]
 
-        verbose_name = "message"
+        # Indexes for fast participant lookups
+        indexes = [
+            models.Index(fields=['participant_one', 'participant_two']),
+            models.Index(fields=['participant_two', 'participant_one']),
+            models.Index(fields=['created_at']),
+            models.Index(fields=['updated_at']),
+            models.Index(
+                fields=['participant_one', 'updated_at'],
+                name='conversation_user_updated_idx'
+            ),
+            models.Index(
+                fields=['participant_two', 'updated_at'],
+                name='conversation_user2_updated_idx'
+            ),
+        ]
 
     def __str__(self):
-        return  f"Message({self.message_id}, {self.is_active}"
+        """String representation of conversation."""
+        return f"Conversation: {self.participant_one.email} <-> {self.participant_two.email}"
+
+    def save(self, *args, **kwargs):
+        """Validate conversation before saving."""
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        """
+        Validate conversation rules:
+        - Users cannot chat with themselves
+        - No duplicate conversations
+        """
+        # Check for self-conversation
+        if self.participant_one == self.participant_two:
+            raise ValidationError(
+                'A user cannot create a conversation with themselves.'
+            )
+
+        # Check for duplicate conversations (considering both orders)
+        if self.pk is None:  # Only check on creation, not update
+            duplicate = Conversation.objects.filter(
+                models.Q(
+                    participant_one=self.participant_one,
+                    participant_two=self.participant_two
+                ) | models.Q(
+                    participant_one=self.participant_two,
+                    participant_two=self.participant_one
+                )
+            ).exists()
+
+            if duplicate:
+                raise ValidationError(
+                    'A conversation already exists between these users.'
+                )
+
+    @property
+    def other_participant(self, user):
+        """
+        Get the other participant in the conversation.
+
+        Args:
+            user: The user to find the other participant for
+
+        Returns:
+            User: The other participant
+        """
+        if user == self.participant_one:
+            return self.participant_two
+        elif user == self.participant_two:
+            return self.participant_one
+        return None
+
+    def has_participant(self, user):
+        """
+        Check if user is a participant of this conversation.
+
+        Args:
+            user: User to check
+
+        Returns:
+            bool: True if user is a participant
+        """
+        return user == self.participant_one or user == self.participant_two
+
+    @property
+    def message_count(self):
+        """Get total number of messages in conversation."""
+        return self.messages.count()
+
+    @property
+    def unread_count(self, user):
+        """
+        Get number of unread messages for a user.
+
+        Args:
+            user: User to get unread count for
+
+        Returns:
+            int: Number of unread messages
+        """
+        return self.messages.filter(is_read=False).exclude(sender=user).count()
+
+    def get_last_message(self):
+        """
+        Get the last message in conversation.
+
+        Returns:
+            Message: Last message or None
+        """
+        return self.messages.first()
+
+
+class Message(models.Model):
+    """
+    Model representing a single message in a conversation.
+
+    Features:
+    - Must belong to a conversation
+    - Tracks sender and read status
+    - Automatic timestamp tracking
+    - Indexed for efficient queries
+    """
+    message_id = models.UUIDField(
+        primary_key=True,
+        unique=True,
+        db_index=True,
+        default=uuid.uuid4,
+    )
+    conversation = models.ForeignKey(
+        Conversation,
+        on_delete=models.CASCADE,
+        related_name='messages',
+        help_text='Conversation this message belongs to'
+    )
+
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='sent_messages',
+        help_text='User who sent this message'
+    )
+
+    content = models.TextField(
+        max_length=5000,
+        help_text='Message content'
+    )
+
+    is_read = models.BooleanField(
+        default=False,
+        help_text='Whether message has been read by recipient'
+    )
+
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text='Message creation timestamp'
+    )
+
+    # Track edits if needed
+    is_edited = models.BooleanField(
+        default=False,
+        help_text='Whether message has been edited'
+    )
+
+    edited_at = models.DateTimeField(
+        null=True,
+        blank=True,
+        help_text='Timestamp of last edit'
+    )
+
+    class Meta:
+        db_table = 'conversations_message'
+        verbose_name = 'Message'
+        verbose_name_plural = 'Messages'
+        ordering = ['-created_at']  # Most recent first
+
+        indexes = [
+            models.Index(fields=['conversation', 'created_at']),
+            models.Index(fields=['conversation', 'is_read']),
+            models.Index(fields=['sender']),
+            models.Index(fields=['created_at']),
+            models.Index(
+                fields=['conversation', 'is_read', 'created_at'],
+                name='message_conv_read_created_idx'
+            ),
+        ]
+
+    def __str__(self):
+        """String representation of message."""
+        preview = self.content[:50]
+        return f"Message from {self.sender.email}: {preview}..."
+
+    def save(self, *args, **kwargs):
+        """Sanitize and save message."""
+        # Sanitize content
+        self.content = sanitize_message_content(self.content)
+
+        # Validate sender is conversation participant
+        if not self.conversation.has_participant(self.sender):
+            raise ValidationError(
+                'Message sender must be a participant of the conversation.'
+            )
+
+        # Update conversation's updated_at
+        self.conversation.updated_at = self.created_at or models.functions.Now()
+        self.conversation.save(update_fields=['updated_at'])
+
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        """Validate message."""
+        if not self.content or not self.content.strip():
+            raise ValidationError('Message content cannot be empty.')
+
+        if len(self.content) > 5000:
+            raise ValidationError('Message exceeds maximum length of 5000 characters.')
+
+        # Ensure sender is conversation participant
+        if not self.conversation.has_participant(self.sender):
+            raise ValidationError(
+                'Message sender must be a participant of the conversation.'
+            )
+
+    def mark_as_read(self):
+        """Mark message as read."""
+        if not self.is_read:
+            self.is_read = True
+            self.save(update_fields=['is_read'])
+            logger.debug(f"Message {self.message_id} marked as read")
+
+    def mark_as_unread(self):
+        """Mark message as unread."""
+        if self.is_read:
+            self.is_read = False
+            self.save(update_fields=['is_read'])
+            logger.debug(f"Message {self.message_id} marked as unread")
+
+    @property
+    def recipient(self):
+        """Get the recipient of this message."""
+        if self.sender == self.conversation.participant_one:
+            return self.conversation.participant_two
+        return self.conversation.participant_one
+
+    @property
+    def is_recent(self):
+        """Check if message is from the last 24 hours."""
+        from django.utils import timezone
+        from datetime import timedelta
+
+        time_threshold = timezone.now() - timedelta(hours=24)
+        return self.created_at >= time_threshold
+
 
 class Negotiations(models.Model):
     negotiations_id = models.UUIDField(

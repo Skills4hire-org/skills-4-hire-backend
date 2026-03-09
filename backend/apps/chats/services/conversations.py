@@ -6,6 +6,9 @@ from django.db.models import Q
 from rest_framework.exceptions import NotFound, APIException
 from rest_framework import status
 
+import logging
+
+logger = logging.getLogger(__name__)
 
 class ConversationFound(APIException):
     default_detail = "Conversation for user found"
@@ -14,9 +17,9 @@ class ConversationFound(APIException):
 
 
 class ConversationService:
-    def __init__(self, sender, receiver):
-        self.sender = sender
-        self.receiver = receiver
+    def __init__(self, participant_one, participant_two):
+        self.participant_one = participant_one
+        self.participant_two = participant_two
 
 
     def _validate_required_attribute(self):
@@ -29,8 +32,8 @@ class ConversationService:
 
     def _validate_users(self):
         conversation = Conversation.active_objects.filter(
-            Q(sender=self.sender, receiver=self.receiver) |
-            Q(sender=self.receiver, receiver=self.sender)
+            Q(participant_one=self.participant_one, participant_two=self.participant_two) |
+            Q(participant_two=self.participant_one, participant_one=self.participant_two)
         )
         if conversation.exists():
            return  True
@@ -46,10 +49,11 @@ class ConversationService:
 
         try:
             new_conversation = Conversation.objects.create(
-                sender=self.sender,
-                receiver=self.receiver,
+                participant_one=self.participant_one,
+                participant_two=self.participant_two,
                 **kwargs
             )
+            logger.info(f"Conversation created and save between {self.participant_two.pk} <> {self.participant_one.pk}")
         except IntegrityError as e:
             raise IntegrityError(e)
         except Exception as e:
