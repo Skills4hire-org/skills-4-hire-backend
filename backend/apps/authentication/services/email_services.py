@@ -2,13 +2,10 @@ import requests
 
 from django.template.loader import render_to_string
 from django.conf import settings
-from drf_yasg.openapi import FORMAT_EMAIL
 
-from rest_framework.exceptions import ValidationError
 
 import logging
 import validators
-from test.unit.test_mail_helpers import response_content_with_all_three_mime_contents
 
 logger = logging.getLogger(__name__)
 
