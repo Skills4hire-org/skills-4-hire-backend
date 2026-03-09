@@ -32,10 +32,8 @@ def _send_mail_base(context: dict) -> bool:
     if any(value is None for value in context.values()):
         logger.warning("Email context is incomplete")
         raise ValidationError("Email context cannot have None values")
-    print("API_key", SENDGRID_API_KEY)
-    logger.debug(SENDGRID_API_KEY)
     context.update({"app_name": APP_NAME})
-
+    logger.debug(context)
     try:
         html_content = render_to_string(context.get("template_name"), context)
         client = SendGridAPIClient(api_key=SENDGRID_API_KEY)
@@ -54,7 +52,7 @@ def _send_mail_base(context: dict) -> bool:
         logger.exception("Missing keys in email context")
         raise 
     except Exception as e:
-        logger.exception("Error preparing email")
+        logger.exception(f"Error preparing email: {str(e)}")
         raise
 
 
