@@ -40,7 +40,7 @@ def send_resend_email(payload):
     return response.json()
 
 
-def _send_mail_base(context: dict) -> bool:
+def send_mail_base(context: dict) :
     """
     Docstring for _send_mail_base
     

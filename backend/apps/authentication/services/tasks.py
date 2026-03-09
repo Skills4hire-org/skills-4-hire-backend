@@ -10,7 +10,7 @@ from django.conf import settings
 from rest_framework_simplejwt.tokens import OutstandingToken, BlacklistedToken
 
 from ..one_time_password import OneTimePassword
-from .email_services import _send_mail_base
+from .email_services import send_mail_base
 
 import logging
 
@@ -18,16 +18,17 @@ import logging
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
-@shared_task(bind=True, autoretry_for=(Exception,), max_retries=3, retry_backoff=3)
-def send_email_on_queue(self, content: dict):
+@shared_task(autoretry_for=(Exception,), max_retries=3, retry_backoff=3)
+def send_email_on_queue(content: dict):
     """
     Docstring for send_email_on_queue
     
     :param content: Description
     :type content: dict
     """
+    logger.info(f"queue: {content}")
     try:
-        _send_mail_base(context=content)
+        send_mail_base(context=content)
     except Exception:
         raise
 
