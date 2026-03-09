@@ -1,6 +1,6 @@
 import uuid
 
-from .services.tasks import send_email_on_quene
+from .services.tasks import send_email_on_queue
 from .utils.helpers import verify_hashed_code
 from .one_time_password import OneTimePassword
 
@@ -41,13 +41,13 @@ def _send_email_to_user(context: dict):
         raise ValidationError("Please provide a template name to send well structured notifications")
     
     if not User.objects.filter(email=email).exists():
-        raise ValidationError("User dosent exits in our database")
+        raise ValidationError("User docent exits in our database")
     email = email
     context.update({"to_email": email, "subject": subject, "template_name": template_name})
     try:
-        send_email_on_quene.delay(context)
-        logger.info(f"Email message quened for {email}")
-        return {"success": True, "message": "Email sent to quene successfully"}
+        send_email_on_queue.delay(context)
+        logger.info(f"Email message queened for {email}")
+        return {"success": True, "message": "Email sent to queue successfully"}
     except Exception as e:
         logger.exception("Exception while sending email.", exc_info=True)
         raise
@@ -92,7 +92,7 @@ def get_user_by_pk(pk: uuid.UUID):
     except User.DoesNotExist:
         return NotFound("User not found", code=404)
 
-def _get_code_intance_or_none(code: str, user = None) -> OneTimePassword:
+def _get_code_instance_or_none(code: str, user = None) -> OneTimePassword | None:
     try:
         if user:
             code_instance = OneTimePassword.objects.get(raw_code=code, user=user, is_active=True, is_used=False)

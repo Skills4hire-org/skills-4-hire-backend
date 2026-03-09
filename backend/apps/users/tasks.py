@@ -18,8 +18,6 @@ def auto_update_role():
         User.objects.filter(active_role=CustomUser.RoleChoices.CUSTOMER).update(is_customer=True)
 
         User.objects.filter(active_role=CustomUser.RoleChoices.SERVICE_PROVIDER).update(is_provider=True)
-
-    
         logger.info(f"Automatically updated user roles")    
     except IntegrityError as exc:
         logger.error("Database error while auto updating roles",  exc_info=True)
@@ -27,4 +25,5 @@ def auto_update_role():
     except ValueError as exc:
         logger.error("Invalid error occurred", exc_info=True)
         raise ValidationError("Error auto updating user roles.", exc)
+
 

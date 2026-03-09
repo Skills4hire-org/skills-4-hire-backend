@@ -10,7 +10,7 @@ from django.conf import settings
 from rest_framework_simplejwt.tokens import OutstandingToken, BlacklistedToken
 
 from ..one_time_password import OneTimePassword
-from .email_services import _send_mail_base
+from .email_services import send_mail_base
 
 import logging
 
@@ -18,19 +18,17 @@ import logging
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
-@shared_task
-def send_email_on_quene(content: dict):
+@shared_task(autoretry_for=(Exception,), max_retries=3, retry_backoff=3)
+def send_email_on_queue(content: dict):
     """
-    Docstring for send_email_on_quene
+    Docstring for send_email_on_queue
     
     :param content: Description
     :type content: dict
     """
-    if content is None or any([value is None for value in content.values()]):
-        raise ValidationError("Email content cannot be empty")
-    
+    logger.info(f"queue: {content}")
     try:
-        _send_mail_base(context=content)
+        send_mail_base(context=content)
     except Exception:
         raise
 

@@ -52,4 +52,11 @@ logs/
 file.txt
 file*.txt
 
+.venv
+
+*celerybeat-shedule
+**celery**
+*.celerybeat-schedule-shm
+*celerybeat-schedule-wal*
+
 
