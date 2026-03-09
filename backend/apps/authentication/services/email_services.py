@@ -53,7 +53,7 @@ def _send_mail_base(context: dict) -> bool:
         raise 
     except Exception as e:
         logger.exception(f"Error preparing email: {str(e)}")
-        raise
+        raise Exception(str(e))
 
 
 
