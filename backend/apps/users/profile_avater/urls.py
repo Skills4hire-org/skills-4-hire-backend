@@ -1,7 +1,13 @@
-from django.urls import path
+from django.urls import path, include
 
-from . import views
+from rest_framework.routers import DefaultRouter
 
-avater_urlpatterns = [
-    path("profile/<uuid:profile_pk>/avater/", views.AvaterManagementView.as_view(), name="avater")
+from .views import AvatarViewSet
+
+router = DefaultRouter()
+
+router.register("avatar", AvatarViewSet, basename="avatar")
+
+avatar_urlpatterns = [
+    path('', include(router.urls))
 ]

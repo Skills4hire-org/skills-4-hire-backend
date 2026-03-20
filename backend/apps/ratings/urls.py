@@ -1,33 +1,16 @@
 from django.urls import path, include
 
-from .views import ReviewViewSet, RatingViewSet
 
-review_list = ReviewViewSet.as_view({
-    "get": "list",
-    "post": "create"
-})
+from rest_framework.routers import DefaultRouter
 
-review_detail = ReviewViewSet.as_view({
-    "put": "update",
-    "get": "retrieve",
-    "delete": "destroy"
-})
+from apps.ratings.views import ReviewViewSet, RatingViewSet
 
+routers = DefaultRouter()
 
-rating_list = RatingViewSet.as_view({
-    "get": "list",
-    "post": "create"
-})
-
-rating_detail = RatingViewSet.as_view({
-    "put": "update",
-    "get": "retrieve",
-    "delete": "destroy"
-})
+routers.register('ratings', RatingViewSet, basename="rating")
+routers.register("reviews", ReviewViewSet, basename='review')
 
 urlpatterns = [
-    path("profile/<uuid:profile_id>/reviews/", review_list, name="review-list"),
-    path("profile/<uuid:profile_id>/ratings/", rating_list, name="rating-list"),
-    path("profile/<uuid:profile_id>/ratings/<uuid:rating_pk>/", rating_detail, name="rating-detail"),
-    path("profile/<uuid:profile_id>/reviews/<uuid:review_pk>/", review_detail, name="review-detail")
+    path("", include(routers.urls))
 ]
+

@@ -6,8 +6,8 @@ from django.contrib.auth import get_user_model
 
 import uuid
 
-from ..users.provider_models import Category
-from ..users.base_model import Address
+from ..users.address.models import UserAddress
+from ..users.skills.models import Category
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +70,7 @@ class Post(models.Model):
         null=True,
         blank=False
     )
-    address = models.ForeignKey(Address, on_delete=models.CASCADE, related_name="posts_address", blank=True, null=True)
+    address = models.ForeignKey(UserAddress, on_delete=models.CASCADE, related_name="posts_address", blank=True, null=True)
 
     amount = models.DecimalField(
         decimal_places=2, 

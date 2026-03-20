@@ -16,26 +16,41 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write(self.style.NOTICE("Populating user profiles..."))
+
         gender_choices = getattr(BaseProfile.GenderChoices, "values")
-        users = self.User.objects.all().filter(is_active=True)
+        users = self.User.objects.filter(is_active=True)[:50]
         base_profile_list = []
+        provider_profile_list = []
+        customer_profile_list = []
+
         for user in users:
+            base_profile = None
             if BaseProfile.objects.filter(user=user).exists():
-                continue
-            base_profile = BaseProfile(user=user, gender=random.choice(gender_choices), bio=self.faker.texts())
-            base_profile_list.append(base_profile)
-        BaseProfile.objects.bulk_create(base_profile_list)
-        self.stdout.write(self.style.SUCCESS("Successfully Populated base profile db for users"))
-        profile_base = BaseProfile.objects.all()
-        for profile in profile_base:
-            if profile.user.active_role == getattr(self.User.RoleChoices, "CUSTOMER"):
-                CustomerModel.objects.create(profile=profile, website=self.faker.url(), total_hires=random.randint(10, 50))
-                print("Populated")
-            elif profile.user.active_role == getattr(self.User.RoleChoices, "SERVICE_PROVIDER"):
-                availability_choices = getattr(ProviderModel.Availability, "values")
-                ProviderModel.objects.create(profile=profile, headline=self.faker.text(), occupation=self.faker.job(), 
-                                            availability=random.choice(availability_choices))
+                base_profile = BaseProfile.objects.get(user=user)
             else:
-                self.stdout.write(self.style.ERROR("Invalid request"))
-        self.stdout.write(self.style.SUCCESS("Successfully populated profile for both users and sevice providers"))
+                base_profile = BaseProfile(user=user, gender=random.choice(gender_choices),
+                                       bio=self.faker.texts())
+                base_profile_list.append(base_profile)
+
+            if user.is_provider:
+                provider_profile = None
+                if ProviderModel.objects.filter(profile=base_profile).exists():
+                    provider_profile = None
+                else:
+                    provider_profile = ProviderModel(profile=base_profile)
+                    provider_profile_list.append(provider_profile)
+
+            elif user.is_customer:
+                customer_profile = None
+                if CustomerModel.objects.filter(profile=base_profile).exists():
+                    customer_profile = None
+                else:
+                    customer_profile = CustomerModel(profile=base_profile)
+                    customer_profile_list.append(customer_profile)
+
+        BaseProfile.objects.bulk_create(base_profile_list)
+        ProviderModel.objects.bulk_create(provider_profile_list)
+        CustomerModel.objects.bulk_create(customer_profile_list)
+
+        self.stdout.write(self.style.SUCCESS("Successfully populated profile for both users and skilled professionals"))
         

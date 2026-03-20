@@ -60,7 +60,7 @@
     function sendMessage() {
         const message = document.getElementById("messageInput").value;
 
-        fetch("/send/message/", {
+        fetch("/api/v1/send/message/", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",

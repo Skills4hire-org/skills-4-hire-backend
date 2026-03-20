@@ -1,66 +1,71 @@
-from rest_framework.generics import ListCreateAPIView, RetrieveUpdateDestroyAPIView
-from rest_framework import permissions, status
-from rest_framework.response import Response
-from rest_framework.exceptions import PermissionDenied
+from rest_framework import generics, permissions, filters
 
-from django.db import transaction
-from django.views.decorators.cache import cache_page
-from django.utils.decorators import method_decorator
+from .models import Category, Skill
+from .serializers import SkillSerializer, CategorySerializer, ProviderSkillCreateSerializer, \
+    ProviderSkillDetailSerializer, ProviderSkillListSerializer
+from .pagination import StandardPagination
 
-from .serializers import SkillReadSerializer, SkillSerializer, ProviderSkills
-from ..permissions import IsProvider, IsSkillOwner
+from django_filters.rest_framework import DjangoFilterBackend
 
-class SkillView(ListCreateAPIView):
-    permission_classes  = [permissions.IsAuthenticated, IsProvider]
+from ..permissions import IsProvider
+from ..provider_models import ProviderSkill
+
+
+
+class CategoryListView(generics.ListAPIView):
+    """GET /api/v1/providers/categories/"""
+    serializer_class = CategorySerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = Category.active_manager.all()
+
+class SkillListView(generics.ListAPIView):
+    """GET /api/v1/providers/skills/?search=python&category=1"""
+    serializer_class = SkillSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = Skill.active_objects.select_related("category")
+    filter_backends = [filters.SearchFilter, DjangoFilterBackend, filters.OrderingFilter]
+    search_fields = ["name"]
+    ordering_fields = ["name"]
+    filterset_fields = ["category__name"]
+    pagination_class = StandardPagination
+
+
+from rest_framework import viewsets, permissions, filters
+from django_filters.rest_framework import DjangoFilterBackend
+
+
+class ProviderSkillViewSet(viewsets.ModelViewSet):
+
+    http_method_names = ['post', 'get', 'patch', 'delete']
+
+    permission_classes = [IsProvider]
+
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
+    filterset_fields = ['proficiency', 'is_primary', 'skill__category']
+    search_fields = ['skill__name', 'description']
+    ordering_fields = ['sort_order', 'years_used', 'created_at']
+
 
     def get_serializer_class(self):
-        if self.request.method =='post':
-            return SkillSerializer
-        return SkillReadSerializer
-    
-    queryset = (
-        ProviderSkills.objects.select_related("category", "profile")
-    )
+        if self.action in ("create", "partial_update"):
+            return ProviderSkillCreateSerializer
+        elif self.action == 'retrieve':
+            return ProviderSkillDetailSerializer
+        return ProviderSkillListSerializer
+
     def get_queryset(self):
-        qs = self.filter_queryset(self.queryset)
+        """
+        Optimized queryset:
+        1. Only returns skills for the logged-in provider.
+        2. select_related('skill') joins the skill table to prevent N+1 queries.
+        """
+        return ProviderSkill.objects.filter(
+            provider_profile__profile=self.request.user.profile
+        ).select_related('skill')
 
-        user_profile = getattr(self.request.user.profile, "provider_profile")
-        if user_profile is None:
-            return None
-        qs = qs.filter(profile=user_profile, is_active=True, is_deleted=False)
-        return qs
-    
-    @method_decorator(cache_page(60 * 10))
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
-    
-    def create(self, request, *args, **kwargs):
-        user_profile_pk = kwargs.get("profile_pk")
-        if request.user.profile.pk != user_profile_pk:
-            raise PermissionDenied()
-        serializer = self.get_serializer(data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response({"status": "success", "data": serializer.validated_data}, status=status.HTTP_201_CREATED)
+    def perform_create(self, serializer):
+        """Auto-assign the provider profile from the authenticated user."""
+        serializer.save(provider_profile=self.request.user.profile.provider_profile)
 
-class SkillDetailView(RetrieveUpdateDestroyAPIView):
-    permission_classes = [permissions.IsAuthenticated, IsSkillOwner]
-
-    queryset = (
-        ProviderSkills.objects.select_related("category", "profile")
-    )
-    def get_serializer_class(self):
-        if self.request.method =='post':
-            return SkillSerializer
-        return SkillReadSerializer
-    
-    def destroy(self, request, *args, **kwargs):
-        skill_instance = self.get_object()
-        if not isinstance(skill_instance, ProviderSkills):
-            return Response({"status": "error", "message": "Invalid request. Not a valid skill instance"
-                }, status=status.HTTP_400_BAD_REQUEST
-            )
-        with transaction.atomic():
-            skill_instance.soft_delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
+    def perform_destroy(self, instance):
+        instance.soft_delete()

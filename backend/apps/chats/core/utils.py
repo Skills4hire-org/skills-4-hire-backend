@@ -7,11 +7,14 @@ Includes helpers for common operations like text sanitization, validation, etc.
 import re
 import logging
 from functools import wraps
-from django.core.mail import send_mail
-from django.template.loader import render_to_string
-from django.utils.html import escape, strip_tags
-from django.conf import settings
+from decimal import Decimal
 
+from django.utils.html import escape
+from rest_framework.exceptions import ValidationError
+
+from  ..services.conversations import NegotiationHistoryService, Negotiations
+from ...notification.services import send_general_notification
+from ...notification.events import NotificationEvents
 logger = logging.getLogger(__name__)
 
 
@@ -63,6 +66,41 @@ def validate_message_content(content):
 
     return True, None
 
+def validate_negotiation_notes(notes):
+    if notes and not isinstance(notes, str):
+        return  False, "No a valid str instance"
+
+    if notes and len(notes) < 5:
+        return False, "Provide a detailed characters 5 min"
+    if len(notes) > 1000:
+        return  False, "max length exceeded, 1000 chars"
+
+    return  True, notes.strip()
+
+
+def validate_negotiation_price(price):
+    if not price or not isinstance(price, Decimal):
+        return  False, "price is required and must be a valid float instance"
+    return  True, price
+
+def validate_status(status):
+    if status is None:
+        return  False, "status cannot be empty when negotiating"
+    if status not in Negotiations.Status.values:
+        return  False, "invalid field 'status'"
+    return  True, status.strip()
+
+
+def log_history(negotiation, sender, price, action):
+    history = NegotiationHistoryService(
+        negotiation=negotiation,
+        sender=sender,
+        price=price,
+        action=action
+    )
+    create_history = history.create_history()
+    return  create_history
+
 
 def paginate_queryset(queryset, request, paginator):
     """
@@ -81,42 +119,6 @@ def paginate_queryset(queryset, request, paginator):
         return page, paginator.get_paginated_response
     return queryset, None
 
-
-def get_or_none(model, **kwargs):
-    """
-    Get a single object or return None if not found.
-
-    Args:
-        model: Django model class
-        **kwargs: Query parameters
-
-    Returns:
-        Model instance or None
-    """
-    try:
-        return model.objects.get(**kwargs)
-    except model.DoesNotExist:
-        return None
-
-
-def log_action(action_type, user=None, details=None):
-    """
-    Log user actions for audit trail.
-
-    Args:
-        action_type (str): Type of action (e.g., 'message_sent', 'conversation_created')
-        user (User): User performing the action
-        details (dict): Additional action details
-    """
-    log_message = f"Action: {action_type}"
-
-    if user:
-        log_message += f" | User: {user.id}"
-
-    if details:
-        log_message += f" | Details: {details}"
-
-    logger.info(log_message)
 
 
 def timeit(func):
@@ -163,7 +165,6 @@ def get_client_ip(request):
         ip = request.META.get('REMOTE_ADDR')
     return ip
 
-
 def format_timestamp(timestamp):
     """
     Format timestamp for API responses.
@@ -177,7 +178,6 @@ def format_timestamp(timestamp):
     if timestamp:
         return timestamp.isoformat()
     return None
-
 
 def truncate_text(text, length=100):
     """
@@ -194,4 +194,32 @@ def truncate_text(text, length=100):
         return text[:length] + '...'
     return text
 
+def trigger_notification(notification_type, sender, receiver):
 
+    types = Negotiations.Status.values
+    if notification_type not in types:
+        raise ValidationError("type in valid")
+
+    message = ""
+    match notification_type:
+        case Negotiations.Status.PROPOSED.value:
+            message = f"{sender.full_name} Proposed an Offer"
+        case Negotiations.Status.COUNTERED.value:
+            message = f"{sender.full_name} countered your offer"
+        case Negotiations.Status.ACCEPTED.value:
+            message = f"{sender.full_name} accepted your offer"
+        case Negotiations.Status.REJECTED.value:
+            message = f'{sender.full_name} rejected your offer'
+        case _:
+            message = None
+
+    event = NotificationEvents.MESSAGE.value
+    try:
+        send_general_notification(
+            sender=sender,
+            receiver=receiver,
+            message=message,
+            event=event
+        )
+    except Exception as e:
+        logger.exception(f"Error sending notification: {e}")

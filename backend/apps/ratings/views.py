@@ -1,128 +1,137 @@
 import logging
+from sys import is_stack_trampoline_active
 
 from django.db import transaction
+from django.db.models import Q
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
+from drf_yasg.inspectors.field import serializer_field_to_basic_type
 
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 from rest_framework.exceptions import NotFound, PermissionDenied, ValidationError
+from uritemplate import partial
 
+from .core.paginations import ReviewRatingPagination
+from .core.permissions import IsCreatorOrReadOnly
 from .models import ProfileReview, ProfileRating
-from .serializers import ReviewSerializer, RatingSerializer
-from ..posts.permission import IsOwnerOrReadOnly
-from .utils.profiles import get_profile_by_id
+from .serializers import ReviewSerializer, RatingSerializer, RatingCreateSerializer, RatingDetailSerializer, \
+    ReviewCreateSerializer, ReviewDetailSerializer
+from ..core.utils.py import log_action, get_or_none
 
 logger = logging.getLogger(__name__)
 
 
-class ReviewViewSet(viewsets.ModelViewSet):
+class RatingViewSet(viewsets.ModelViewSet):
 
-    serializer_class = ReviewSerializer
-    permission_classes = [permissions.IsAuthenticated, IsOwnerOrReadOnly]
+    action = 'rating'
+    view =  ProfileRating
 
-    queryset = (
-        ProfileReview.objects.filter(is_active=True, is_deleted=False)
-        .select_related('reviewed_by', 'profile')
-    )
+    pagination_class = ReviewRatingPagination
+    permission_classes =  [IsCreatorOrReadOnly]
+    http_method_names = ['post', 'patch', 'get', 'delete']
+
+    def get_serializer_class(self):
+        if self.action in ("create", "partial_update"):
+            return RatingCreateSerializer
+        elif self.action == "retrieve":
+            return RatingDetailSerializer
+        return RatingSerializer
 
     def get_queryset(self):
-        """If `profile_id` is present in the URL, filter reviews for that profile."""
-        profile_id = self.kwargs.get('profile_id')
-        qs = self.queryset.all()
-        if profile_id:
-            profile = get_profile_by_id(profile_id)
-            if not profile.get('success'):
-                raise NotFound(detail=profile.get('detail') or 'Profile not found')
-            qs = qs.filter(profile=profile.get('profile'))
-        return qs.order_by('-created_at')
+        user = self.request.user
+        queryset = ProfileRating.objects.select_related(
+            "rate_by", "customer_profile", "provider_profile"
+        ).filter(
+            Q(customer_profile__profile__user=user)|
+            Q(provider_profile__profile__user=user)
+        ).order_by("-created_at").prefetch_related(
+            "customer_profile__profile", "provider_profile__profile")
 
-    @method_decorator(cache_page( 60 * 15 ))
+
+        if not queryset:
+            return ProfileRating.objects.none()
+        return queryset
+
+    def get_output_serializer_create(self, serializer):
+        return RatingSerializer(serializer)
+
+    def create(self, request, *args, **kwargs):
+
+        serializer = self.get_serializer(data=request.data, context={'request': request})
+        serializer.is_valid(raise_exception=True)
+
+        saved_serializer = serializer.save()
+        log_action(
+            action_type=self.action,
+            user=request.user,
+            details={'rating_pk': saved_serializer.pk}
+        )
+
+        output_serializer = self.get_output_serializer_create(saved_serializer)
+
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
+    @method_decorator(cache_page(60 * 5))
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
-    
-    @transaction.atomic
-    def create(self, request, *args, **kwargs):
-        profile_pk = self.kwargs.get('profile_id')
-        if not profile_pk:
-            raise ValidationError({'profile_id': 'Profile ID is required to create a review.'})
 
-        profile = get_profile_by_id(profile_pk)
-        if not profile.get('success'):
-            raise NotFound(detail=profile.get('detail') or 'Profile not found')
+    def get_object(self):
+        obj_pk = self.kwargs.get("pk", "")
+        if obj_pk is None:
+            raise NotFound("pk not found")
+        obj = get_or_none(self.view, pk=obj_pk, is_active=True)
+        if obj is None:
+            raise NotFound(f"{self.view} instance not found")
+        self.check_object_permissions(self.request, obj)
+        return obj
 
-        profile_instance = profile.get('profile')
+    def partial_update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if not instance.is_able_modify(request.user):
+            raise PermissionDenied()
 
-        if getattr(request.user, 'profile', None) == profile_instance:
-            raise ValidationError({'detail': 'You cannot review your own profile.'})
+        serializer = self.get_serializer(
+            instance, data=request.data,
+            partial=True, context={"request": request})
 
-        serializer = self.get_serializer(data=request.data, context={'request': request, 'profile': profile_instance})
         serializer.is_valid(raise_exception=True)
-        try:
-            with transaction.atomic():
-                serializer.save(profile=profile_instance, reviewed_by=request.user)
-        except Exception:
-            logger.exception('Saving review object failed')
-            raise
 
-        headers = self.get_success_headers(serializer.data)
-        return Response(serializer.data, status=status.HTTP_201_CREATED, headers=headers)
+        saved_instance = serializer.save()
+        return Response(data=self.get_output_serializer_create(saved_instance).data, status=status.HTTP_200_OK)
 
-    @transaction.atomic
-    def update(self, request, *args, **kwargs):
-        return super().update(request, *args, **kwargs)
-
-    def perform_update(self, serializer):
-        obj = self.get_object()
-        if not isinstance(obj, ProfileReview):
-            logger.error("provided object is not a ProfileReview instance")
-            raise ValidationError("object is not a review instance")
-        if not obj.can_edit(self.request.user):
-            logger.warning('Unauthorized edit attempt for review %s by %s', obj.review_id, self.request.user)
-            raise PermissionDenied('You do not have permission to edit this review.')
-        serializer.save()
-
-    @transaction.atomic
     def destroy(self, request, *args, **kwargs):
         instance = self.get_object()
-        if not isinstance(instance, ProfileReview):
-            logger.error("provided object is not a ProfileReview instance")
-            raise ValidationError("object is not a review instance")
-        if not instance.can_edit(request.user):
-            logger.warning('Unauthorized delete attempt for review %s by %s', instance.review_id, request.user)
-            raise PermissionDenied('You do not have permission to delete this review.')
+        if not instance.is_able_modify(request.user):
+            raise PermissionDenied()
         instance.soft_delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-        
 
-class RatingViewSet(ReviewViewSet):
-    serializer_class = RatingSerializer
+class ReviewViewSet(RatingViewSet):
+    action = "review"
+    view = ProfileReview
 
-    queryset = (
-        ProfileRating.objects.filter(
-            is_active=True, is_deleted=False
-        ).select_related("rate_by", "profile")
-    )
+    def get_serializer_class(self):
+        if self.action in ("create", "partial_update"):
+            return ReviewCreateSerializer
+        elif self.action == 'retrieve':
+            return ReviewDetailSerializer
+        return ReviewSerializer
 
-    def perform_update(self, serializer):
-        obj = self.get_object()
-        if not isinstance(obj, ProfileRating):
-            logger.error("provided object is not a ProfileRating instance")
-            raise ValidationError("object is not a rating instance")
-        if not obj.can_edit(self.request.user):
-            logger.warning('Unauthorized edit attempt for rating %s by %s', obj.review_id, self.request.user)
-            raise PermissionDenied('You do not have permission to edit this rating.')
-        serializer.save()
+    def get_output_serializer_create(self, serializer):
+        return ReviewSerializer(serializer)
 
-    @transaction.atomic
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        if not isinstance(instance, ProfileRating):
-            logger.error("provided object is not a ProfileRating instance")
-            raise ValidationError("object is not a rating instance")
-        if not instance.can_edit(request.user):
-            logger.warning('Unauthorized delete attempt for rating %s by %s', instance.review_id, request.user)
-            raise PermissionDenied('You do not have permission to delete this review.')
-        instance.soft_delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
+    def get_queryset(self):
+        user = self.request.user
+        queryset = ProfileReview.objects.select_related(
+            "reviewed_by", "customer_profile", "provider_profile"
+        ).filter(
+            Q(customer_profile__profile__user=user) |
+            Q(provider_profile__profile__user=user)
+        ).order_by("-created_at").prefetch_related(
+            "customer_profile__profile", "provider_profile__profile")
+
+        if not queryset:
+            return ProfileReview.objects.none()
+        return queryset

@@ -9,8 +9,8 @@ from .utils.posts import  (
 )
 from .services import  create_post, CommentService
 from apps.authentication.serializers import  UserReadSerializer
-from ..users.serializers import AddresSerializer
-from  ..users.base_model import Address
+from ..users.address.serializers import AddressCreateSerializer
+from  ..users.address.models import UserAddress
 
 
 from django.contrib.auth import get_user_model
@@ -78,7 +78,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
     attachment = PostAttachmentSerializer(many=True, required=False)
     post_tag = PostTagSerializer(many=True, required=False)
     duration = serializers.IntegerField(min_value=1, required=False)
-    address  = AddresSerializer()
+    address  = AddressCreateSerializer()
 
     class Meta:
         model = Post
@@ -164,7 +164,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
             PostAttachment.objects.bulk_create(save)
 
         if address:
-            address_instance, created = Address.objects.get_or_create(
+            address_instance, created = UserAddress.objects.get_or_create(
                 profile=user.profile, postal_code=address["postal_code"], **address)
             if created:
                 post_instance.address = address_instance
@@ -203,14 +203,14 @@ class PostCreateSerializer(serializers.ModelSerializer):
         if address:
             post_ad_instance = instance.address
             postal_code = address["postal_code"]
-            address_instance = Address.objects.get(
+            address_instance = UserAddress.objects.get(
                 profile=user.profile, address_id=post_ad_instance.address_id,
                 postal_code=postal_code)
             if address_instance:
                 for key, value in address.items():
                     setattr(address_instance, key, value)
             else:
-                new_address = Address.objects.create(profile=user.profile, **address)
+                new_address = UserAddress.objects.create(profile=user.profile, **address)
                 post_ad_instance = new_address
             post_ad_instance.save()
 

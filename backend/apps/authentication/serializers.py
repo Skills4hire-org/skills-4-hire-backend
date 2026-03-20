@@ -2,8 +2,8 @@ from phonenumber_field.serializerfields import PhoneNumberField
 from django.utils.translation import gettext_lazy as _
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password as _validate_password
-from django.db.models import Q
 from django.db import transaction
+from django.utils import  timezone
 
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework import serializers
@@ -11,9 +11,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken, BlacklistedToken, OutstandingToken
 
 from .helpers import validate_email, _get_user_by_email, _get_code_instance_or_none
-from .one_time_password import OneTimePassword
 import logging
-
 
 
 logger = logging.getLogger(__name__)
@@ -275,10 +273,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         
     def validate(self, attrs):
         password = attrs.get("password")
-        email = validate_email(attrs["email"])
+        email = attrs["email"]
         valid_email = email 
         if valid_email is None:
-            raise serializers.ValidationError(_("email returned none when verifing email address"))
+            raise serializers.ValidationError(_("email returned none when verifying email address"))
         try:
             user = User.objects.get(email=valid_email) 
         except User.DoesNotExist:
@@ -286,13 +284,16 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         if not self.user_can_authenticate(user):
             raise AuthenticationFailed(code="invalid_request", detail={"status": "Failed", "detail": _("account not verified")})
         if not user.check_password(password):
-            raise AuthenticationFailed(code="invalid_credentails", detail={"status": "failed", "detail": _("invalid_credentials")})
+            raise AuthenticationFailed(code="invalid_credentials", detail={"status": "failed", "detail": _("invalid_credentials")})
         self.user = user
         data = super().validate(attrs)
         data.update({"user_data": {
             "user_id": user.pk, "email": user.email,
             "name": getattr(user, "full_name") or ""
         }})
+        self.user.last_login = timezone.now()
+        self.user.save()
+
         return data
     
     @classmethod

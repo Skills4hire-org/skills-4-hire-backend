@@ -6,15 +6,10 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
-from ..users.serializers import (
-    validate_request, 
-    Service, 
-    ProviderProfileSerializer, 
-    BaseProfileReadSerializer
-)
+from ..users.services.models import Service
 from ..users.services.serializers import ServiceSerializer
-from ..users.base_model import Address
-from ..users.address.serializers import AddresSerializer
+from ..users.address.models import UserAddress
+from ..users.address.serializers import AddressCreateSerializer, AddressSerializer
 from .models import Bookings
 from .helpers import is_customer
 from .services import BookingService
@@ -27,8 +22,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-class BookingCreateSerialzer(serializers.ModelSerializer):
-    address = AddresSerializer(required=True)
+class BookingCreateSerializer(serializers.ModelSerializer):
+    address = AddressCreateSerializer(required=True)
     service = ServiceSerializer(required=False, many=True)
     class Meta:
         model = Bookings
@@ -44,7 +39,6 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
             "payment_remark"
         ]
     def validate(self, attrs):
-        validate_request(self.context.get("request"))
         if attrs.get("start_date") or attrs.get("end_date"):
             if attrs["start_date"] >= attrs["end_date"]:
                 raise serializers.ValidationError("'end_date' cannot be greater that the 'start_date'")
@@ -54,18 +48,17 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
 
     def validate_price(self, value):
         request = self.context.get("request")
-        validate_request(self.context.get("request"))
 
         wallet = WalletService.get_user_wallet(user=request.user)
 
         main_balance = getattr(wallet, "main_balance")
-        
+
         if main_balance is None:
             raise serializers.ValidationError("User wallet has no balance")
         if Decimal(value) > Decimal(main_balance):
             raise serializers.ValidationError("Insufficient Balance. Top up to continue")
         return value
-    
+
     def create(self, validated_data):
         address = validated_data.pop("address", None)
         services = validated_data.pop("service", None)
@@ -73,11 +66,11 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
         request = self.context.get("request")
         if not is_customer(request):
             raise serializers.ValidationError("User is not a customer")
-        
+
         with transaction.atomic():
             booking = Bookings.objects.create(customer=request.user, provider=provider, **validated_data)
             if address:
-                add_obj, created = Address.objects.get_or_create(profile=getattr(request.user, "profile"),                                                                            postal_code=address.get("postal_code"))
+                add_obj, created = UserAddress.objects.get_or_create(profile=getattr(request.user, "profile"),                                                                            postal_code=address.get("postal_code"))
                 if created:
                     for key, value in address.items():
                         if hasattr(add_obj, key):
@@ -97,10 +90,10 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
                     name__in=service_names,
                     profile=provider
                 )
-                
-                booking.service.set(available_services) 
+
+                booking.service.set(available_services)
         return booking
-    
+
     @transaction.atomic
     def update(self, instance: Bookings, validated_data):
         address = validated_data.pop("address", None)
@@ -108,7 +101,7 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
         if address:
             booking_address = instance.address
             if booking_address:
-                address_instance = Address.objects.get(
+                address_instance = UserAddress.objects.get(
                                         profile=instance.customer.profile,
                                         pk=booking_address.pk,
                                         is_active=True)
@@ -118,12 +111,12 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
                 booking_address = address_instance
                 booking_address.save()
             else:
-                new_address = Address.objects.create(profile=instance.customer.profile, **address)
+                new_address = UserAddress.objects.create(profile=instance.customer.profile, **address)
                 instance.address = new_address
                 instance.save()
         if service:
             service_names = [
-                s["name"] 
+                s["name"]
                 for s in service
             ]
             if instance.service.filter(name__in=service_names):
@@ -137,31 +130,30 @@ class BookingCreateSerialzer(serializers.ModelSerializer):
             setattr(instance, key, value)
         instance.save()
         return instance
-            
+
 class BookingStatusUpdateSerializer(serializers.Serializer):
     choices = getattr(Bookings.BookingStatus, "values")
     status = serializers.ChoiceField(choices=choices)
 
     def validate_status(self, value):
-        validate_request(self.context.get("request"))
         if value.upper() not in self.choices:
             raise serializers.ValidationError("Bad Request. status is not in active choices")
         return value
-    
+
     def update(self, instance, validated_data):
         status = validated_data.get("status", instance.booking_status)
         request = self.context.get("request")
         if not isinstance(instance, Bookings):
             raise serializers.ValidationError(_("Instance is not of type Bookings"))
-        
+
         customer = getattr(instance, "customer", None)
         service_provider = instance.provider
         if customer is None or service_provider is None:
             raise serializers.ValidationError(_("Invalid booking instance. Missing customer or provider information"))
-        
+
         if instance.booking_status != Bookings.BookingStatus.PENDING:
             raise serializers.ValidationError(_("Only pending bookings can be updated"))
-        
+
         if status.upper() == Bookings.BookingStatus.CANCELLED:
             if not BookingService.cancel_booking(instance, request.user):
                 raise serializers.ValidationError(_("Failed to cancel booking"))
@@ -172,16 +164,16 @@ class BookingStatusUpdateSerializer(serializers.Serializer):
                 raise serializers.ValidationError(_("Error occurred while accepting booking"))
         else:
             raise serializers.ValidationError(_("Bad Request. Invalid request"))
-        
+
         instance.booking_status = status.upper()
         instance.save()
         return instance
 
 class BookingOutSerializer(serializers.ModelSerializer):
     customer = UserReadSerializer(read_only=True)
-    provider = ProviderProfileSerializer(read_only=True)
+    # provider = ProviderProfileSerializer(read_only=True)
     service = ServiceSerializer(read_only=True)
-    address = AddresSerializer(read_only=True)
+    address = AddressSerializer(read_only=True)
     class Meta:
         model = Bookings
         fields = [

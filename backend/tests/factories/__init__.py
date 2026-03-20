@@ -16,7 +16,11 @@ from .post import (
     CommentFactory
 )
 
+from .chats import ConversationFactory, NegotiationFactory
+
 __all__ = [
+    "NegotiationFactory",
+    "ConversationFactory",
     "CommentFactory",
     "PostLikeFactory",
     "PostFactory",

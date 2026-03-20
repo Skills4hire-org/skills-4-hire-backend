@@ -3,8 +3,9 @@ from django.contrib.auth import get_user_model
 from django.forms import ValidationError
 from django.utils import timezone
 
-from ..users.provider_models import ProviderModel, Service
-from ..users.base_model import Address
+from ..users.provider_models import ProviderModel
+from ..users.services.models import Service
+from ..users.address.models import UserAddress
 from .helpers import user_in_booking
 
 import uuid
@@ -24,7 +25,7 @@ class Bookings(models.Model):
     provider = models.ForeignKey(ProviderModel, on_delete=models.CASCADE, related_name="bookings")  
     service = models.ManyToManyField(Service, blank=True)
     cancelled_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="booking_cancelled", null=True, blank=True)
-    address = models.ForeignKey(Address, on_delete=models.CASCADE, related_name="booking_address", blank=True, null=True)
+    address = models.ForeignKey(UserAddress, on_delete=models.CASCADE, related_name="booking_address", blank=True, null=True)
     accepted_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="booking_accpeted", blank=True,null=True)
 
     currency = models.CharField(max_length=20, default="NGN")

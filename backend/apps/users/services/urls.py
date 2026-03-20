@@ -1,8 +1,11 @@
-from django.urls import path
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
 
-from . import views
+from .views import ServiceViewSet
+
+router = DefaultRouter()
+router.register(r"services", ServiceViewSet, basename="service")
 
 service_urlpatterns = [
-    path("profile/<uuid:profile_pk>/services/", views.ServiceViewSet.as_view(), name="service"),
-    path("services/<uuid:pk>/", views.ServiceDetailView.as_view(), name="service")
+    path("", include(router.urls)),
 ]

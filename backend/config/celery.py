@@ -4,10 +4,10 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-setting_module = os.getenv("DJANGO_ENVIRON")
+setting_module = os.getenv("DJANGO_SETTINGS_MODULE")
 debug = os.getenv('DEBUG')
 
-if setting_module.endswith("prod") and debug is False:
+if setting_module.endswith("prod") and not debug:
     os.environ.setdefault("DJANGO_SETTINGS_MODULE", setting_module)
 else:
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', setting_module)

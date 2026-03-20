@@ -15,19 +15,21 @@ class TestSerializer(serializers.Serializer):
 
 @csrf_exempt
 @api_view(http_method_names=["POST"])
-@permission_classes([permissions.IsAuthenticated])
+@permission_classes([permissions.AllowAny])
 def test_websocket(request: Request):
     user = request.user
     user_pk  = str(user.pk)
     serializer = TestSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
 
+    if user_pk is None:
+        user_pk = 2093
     data = serializer.validated_data
     message = data["message"] if data else "Hello"
     try:
-        trigger_notification(user_pk=user_pk, event=message)
-    except Exception:
-        raise Exception("Failed to send notification")
+        trigger_notification(user_pk=user_pk, message=message)
+    except Exception as e:
+        raise Exception(f"Failed to send notification: {e}")
 
     return Response({"status": "success", "message": "Notification sent"},status=status.HTTP_200_OK)
 

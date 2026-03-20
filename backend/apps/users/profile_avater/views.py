@@ -1,37 +1,45 @@
-from rest_framework.generics import CreateAPIView, DestroyAPIView, UpdateAPIView
+
+from rest_framework import status, viewsets
 from rest_framework.response import Response
 from rest_framework import status, permissions
 from rest_framework.exceptions import PermissionDenied
 
-from .serializers import AvaterSerializer
+from .models import Avatar
+from .serializers import AvatarCreateSerializer, AvatarDetailSerializer
 from ..base_model import BaseProfile
-from .permissions import IsOwner
+from .permissions import IsAvatarOwnerOrReadOnly
 
-from django.shortcuts import get_object_or_404
 
-class AvaterManagementView(CreateAPIView, DestroyAPIView, UpdateAPIView):
-    serializer_class = AvaterSerializer
-    permission_classes = [permissions.IsAuthenticated, IsOwner]
+class AvatarViewSet(viewsets.ModelViewSet):
 
-    def get_object(self):
-        profile_pk = self.kwargs.get("profile_pk")
-        base_profile = get_object_or_404(BaseProfile, pk=profile_pk)
-        self.check_object_permissions(self.request, base_profile)
-        return base_profile
-    
+    http_method_names =  ['post', 'patch', 'delete']
+    permission_classes = [IsAvatarOwnerOrReadOnly]
+
+    def get_serializer_class(self):
+        if self.action in ("create", "patch"):
+            return AvatarCreateSerializer
+        return AvatarDetailSerializer
+
+    def get_queryset(self):
+        queryset = Avatar.objects\
+            .select_related("profile")\
+            .filter(profile__user=self.request.user)
+
+        if not queryset.exists():
+            return Avatar.objects.none()
+        return queryset
+
     def create(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data, context={"request": request})   
+        serializer = self.get_serializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
-        serializer.save()
-        return Response({"detail": "Profile photo saved", "status": "success"
-        }, status=status.HTTP_201_CREATED)
 
-    
-    def destroy(self, request, *args, **kwargs):
-        profile = self.get_object()
-        avater = profile.avater if hasattr(profile, "avater") else None
-        if avater:
-            avater.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        raise PermissionDenied()
+        user_avatar = serializer.save()
+        output_serializer = AvatarDetailSerializer(user_avatar).data
+        return Response(output_serializer, status=status.HTTP_201_CREATED)
+
+
+
+
+
+
     

@@ -12,7 +12,7 @@ from apps.notification.routings import websocket_urlpatterns
 
 load_dotenv()
 
-setting_module = os.getenv("DJANGO_ENVIRON")
+setting_module = os.getenv("DJANGO_SETTINGS_MODULE")
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE',  setting_module)
 

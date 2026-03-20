@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-setting_module = os.getenv("DJANGO_ENVIRON", "config.settings.prod")
+setting_module = os.getenv("DJANGO_SETTINGS_MODULE", "config.settings.prod")
 
 os.environ.setdefault('DJANGO_SETTINGS_MODULE', setting_module)
 

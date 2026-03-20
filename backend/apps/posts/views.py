@@ -136,7 +136,7 @@ class PostViewSet(viewsets.ModelViewSet):
         qs = get_offers_or_job_post(
             user=request.user,
             queryset=self.get_queryset(),
-            include_offers=True
+            include_offers=include_offers
         )
         return  return_paginated_view(self, qs)
 

@@ -5,15 +5,14 @@ import ssl
 
 from pygments.lexer import default
 
-DEBUG = env("DEBUG")
-
 ALLOWED_HOSTS = ["*"]
 
 DEBUG = env.bool("DEBUG")
+
 if DEBUG:
-    INSTALLED_APPS += ["debug_toolbar"]
+    INSTALLED_APPS += ["debug_toolbar", "silk"]
     MIDDLEWARE += ["debug_toolbar.middleware.DebugToolbarMiddleware"]
-    INSTALLED_APPS += ["silk"]
+
 
     MIDDLEWARE += ["silk.middleware.SilkyMiddleware"]
 
@@ -43,12 +42,19 @@ CORS_ALLOWED_ORIGINS = [
     "https://hoppscotch.io",
 ]
 
+# DATABASES = {
+#     "default": dj_database_url.config(
+#         default=env("DATABASE_URL"),
+#         ssl_require=True,
+#         conn_max_age=0
+#     )
+# }
+
 DATABASES = {
-    "default": dj_database_url.config(
-        default=env("DATABASE_URL"),
-        ssl_require=True,
-        conn_max_age=0
-    )
+    "default": {
+        "ENGINE": "django.db.backends.sqlite3",
+        "NAME": BASE_DIR / "database.sqlite3",
+    }
 }
 
 

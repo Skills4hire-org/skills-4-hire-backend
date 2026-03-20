@@ -1,41 +1,91 @@
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
-from ..base_model import Address
+from .models import UserAddress, UserModel
+from .services.address_services import AddressService
+# from ..serializers import BaseProfileReadSerializer
 
-class AddresSerializer(serializers.ModelSerializer):
+
+class AddressCreateSerializer(serializers.ModelSerializer):
+    user_profile_id = serializers.UUIDField(write_only=True, required=False)
     class Meta:
-        model = Address
+        model = UserAddress
         fields = [
-            "address_id", "profile",
-            "line1", "line2",
-            "city", "state",
-            "postal_code", "country",
-            "created_at"
+            "address_id", "user_profile_id",
+            "street_address", "apartment",
+            "city", "state", "country",
+            "postal_code", "is_default"
+
         ]
 
-        read_only_fields = [
-            "address_id", "profile",
-            "created_at"
-        ]
+    def validate_postal_code(self, value):
+        if not UserAddress().validate_postal_code(value.strip()):
+            raise serializers.ValidationError("postal code is not valid")
+        return value
 
-    def validate(self, data):
-        user = self.context.get("request")["user"]
-        if Address.objects.filter(profile=user.profile, postal_code=data["postal_code"]).exists():
-            raise serializers.ValidationError("This Address Already Exist in your Profile")
-        fields_to_capitalize = ("city", "state", "country")
-        for value in fields_to_capitalize:
-            data[value].title()
-        return  data
+    def validated(self, data):
+        user = self.context.get("request").user
+        user_base_profile = user.profile
+        if AddressService().address_already_exists(
+            user_base_profile, data['postal_code']
+        ):
+            raise serializers.ValidationError("Address with this postal code already exists in you profile")
+        for value in data.values():
+            if isinstance(value, str):
+                value.strip().title()
+        return data
 
     def create(self, validated_data):
-        request = self.context.get("request")
-        profile_pk = self.context.get("profile_pk")
+        user = self.context.get("request").user
 
-        user_profile = getattr(request.user, "profile")
-        if user_profile.pk != profile_pk:
-            raise PermissionDenied()
-        address = Address.objects.create(profile=user_profile, **validated_data)
+        if "user_profile_id" in  validated_data:
+            user_base_profile = UserModel.objects.get(email__iexact=user.email, is_active=True)
+            validated_data.pop("user_profile_id")
+        else:
+            user_base_profile = user.profile
+
+        try:
+            address = AddressService().create_address(
+                user_profile=user_base_profile,
+                validated_data=validated_data
+            )
+        except Exception as e:
+            raise serializers.ErrorDetail(string=str(e), code=400)
         return address
+
+    def update(self, instance: UserAddress, validated_data: dict):
+        user = self.context.get("request").user
+
+        if not instance.user_profile.user == user:
+            raise PermissionDenied()
+        validated_data.pop("user_profile_id")
+        for key, value in validated_data.items():
+            if hasattr(instance, key):
+                setattr(instance, key, value)
+        instance.save(update_fields=[validated_data.keys()])
+        return instance
+
+class AddressSerializer(serializers.ModelSerializer):
+    user_profile_id = serializers.UUIDField(read_only=True, source="user_profile.pk")
+    class Meta:
+        model = UserAddress
+        fields = [
+            "address_id", "user_profile_id",
+            "street_address", "apartment",
+            "city", "state", "country",
+            "postal_code", "is_default"
+        ]
+
+class AddressDetailSerializer(serializers.ModelSerializer):
+    # user_profile = BaseProfileReadSerializer()
+
+    class Meta:
+        model = UserAddress
+        fields = [
+            "address_id", "user_profile",
+            "street_address", "apartment",
+            "city", "state", "country",
+            "postal_code", "is_default"
+        ]
         
         

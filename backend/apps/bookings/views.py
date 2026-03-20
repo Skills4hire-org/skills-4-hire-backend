@@ -4,8 +4,8 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied
 
 
-from .serializers import (Bookings, BookingCreateSerialzer, BookingStatusUpdateSerializer,
-                        BookingOutSerializer)
+from .serializers import (Bookings, BookingCreateSerializer, BookingStatusUpdateSerializer,
+                          BookingOutSerializer)
 from .permissions import IsCustomer, IsCustomerOrProvider
 from .helpers import provider_profile
 from .paginations import CustomBookingPagination
@@ -28,7 +28,7 @@ class BookingViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ("list", "retrieve", "fetch_bookings"):
             return BookingOutSerializer
-        return BookingCreateSerialzer
+        return BookingCreateSerializer
     
     def get_queryset(self):
         """" A base queryset to fetch all booking associated to the request.user"""

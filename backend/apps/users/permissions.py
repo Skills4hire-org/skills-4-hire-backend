@@ -8,7 +8,10 @@ class IsProvider(BasePermission):
 
     """
     def has_permission(self, request, *args, **kwargs):
-        return request.user.active_role == CustomUser.RoleChoices.SERVICE_PROVIDER
+        user = request.user
+        if not user and not user.is_authenticated:
+            return False
+        return user.is_provider
 
 
 class IsSkillOwner(BasePermission):
@@ -24,10 +27,15 @@ class IsSkillOwner(BasePermission):
             return False
         return request.user.profile.provider_profile == obj.profile
 
-class IsBaseOrReadOnly(BasePermission):
+class IsProfileOwnerOrReadOnly(BasePermission):
+
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated
+
     def has_object_permission(self, request, view, obj):
         if request.method in SAFE_METHODS:
             return True
-        return getattr(obj, "profile") == getattr(request.user, "profile")
+        return obj.profile.user == request.user
+
     
         

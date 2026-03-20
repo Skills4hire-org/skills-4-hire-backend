@@ -1,64 +1,107 @@
 from django.db import models
 from django.contrib.auth import get_user_model
-from django.db.models import F
-from django.utils import timezone
+
 from django.core.validators import MinValueValidator, MaxValueValidator
+from rest_framework.exceptions import ValidationError
 
 from ..users.provider_models import ProviderModel
 
 import uuid
 import logging
 
+from ..users.customer_models import CustomerModel
+
 logger = logging.getLogger(__name__)
 UserModel = get_user_model()
 
 class ProfileReview(models.Model):
+
+    """ Profile review for skilled professionals and customers """
+
     review_id = models.UUIDField(
         max_length=20,
         primary_key=True,
         default=uuid.uuid4,
         db_index=True
     )
+    customer_profile = models.ForeignKey(
+        CustomerModel, on_delete=models.CASCADE,
+        related_name='reviews', null=True, blank=True)
+    provider_profile = models.ForeignKey(
+        ProviderModel, on_delete=models.CASCADE,
+        related_name="reviews", null=True, blank=True
+    )
 
-    profile = models.ForeignKey(ProviderModel, on_delete=models.CASCADE, related_name="reviews")
-    reviewed_by = models.ForeignKey(UserModel, on_delete=models.SET_NULL, related_name="reviews", null=True)
+    reviewed_by = models.ForeignKey(
+        UserModel, on_delete=models.SET_NULL,
+        related_name="reviews", null=True
+    )
 
-    review = models.TextField(null=True, blank=True)
+    review = models.TextField(null=True, blank=False)
 
     is_active = models.BooleanField(default=True)
-    is_deleted = models.BooleanField(default=False)
 
     # Timestamp 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    deleted_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
+        db_table = "ratings_review"
+        verbose_name = "Review"
+        verbose_name_plural = "Reviews"
+
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["is_active", "is_deleted"], name="active_deleted_idx"),
+            models.Index(fields=["is_active"], name="active_deleted_idx"),
+            models.Index(fields=["created_at"], name="d_idx"),
         ]
         constraints = [
-            models.UniqueConstraint(fields=["reviewed_by", "profile"], name="unique_review_profile")
+            models.UniqueConstraint(fields=["reviewed_by", "customer_profile"], name="unique_review_profile_customer"),
+            models.UniqueConstraint(fields=['reviewed_by', 'provider_profile'], name="unique_user_profile"),
         ]
     def __str__(self):
-        return f"Review {self.review_id} for Profile {self.profile.profile_id}"
+        return f"Review {self.review_id}  created: {self.created_at}"
 
+    def clean(self):
+        if self.customer_profile is not  None:
+            if self.reviewed_by == self.customer_profile.profile.user:
+                raise ValidationError("You cannot review for yourself")
+
+            if self.pk is None:
+                already_rated = ProfileReview.objects.filter(
+                    reviewed_by=self.reviewed_by,
+                    customer_profile=self.customer_profile
+                ).exists()
+
+                if already_rated:
+                    raise ValidationError("You already rated this profile")
+
+        elif self.provider_profile is not None:
+            if self.reviewed_by == self.provider_profile.profile.user:
+                raise ValidationError("You cannot review for your self.")
+
+            if self.pk is None:
+                already_rated = ProfileReview.objects.filter(
+                    reviewed_by=self.reviewed_by,
+                    provider_profile=self.provider_profile
+                ).exists()
+                if already_rated:
+                    raise ValidationError("You already reviewed this Profile")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def soft_delete(self):
-        if not hasattr(self, "is_active") or not hasattr(self, "is_deleted"):
-            logger.error(f"soft_delete called on ProfileReview {self.review_id} but required fields are missing.")
-            return
-        
-        self.is_active=~F("is_active")
-        self.is_deleted=~F("is_deleted")
-        self.deleted_at=F("deleted_at") if self.deleted_at else timezone.now()
-        self.save(update_fields=["is_active", "is_deleted", "deleted_at"])
+        if hasattr(self, "is_active"):
+            setattr(self, "is_active", False)
 
-    def can_edit(self, user):
+        self.save(update_fields=['is_active'])
+
+    def is_able_modify(self, user):
         if self.reviewed_by == user:
             return True
-        if user.is_admin:
+        if user.is_superuser or user.is_staff:
             return True
         return False
 
@@ -70,45 +113,81 @@ class ProfileRating(models.Model):
         db_index=True
     )
 
-    profile = models.ForeignKey(ProviderModel, on_delete=models.CASCADE, related_name="ratings")
-    rate_by = models.ForeignKey(UserModel, on_delete=models.SET_NULL, null=True, related_name="ratings")
+    customer_profile = models.ForeignKey(
+        CustomerModel, on_delete=models.CASCADE,
+        related_name='ratings', null=True, blank=True)
+
+    provider_profile = models.ForeignKey(
+        ProviderModel, on_delete=models.CASCADE,
+        related_name="ratings", null=True, blank=True
+    )
+    rate_by = models.ForeignKey(
+        UserModel, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name="ratings")
 
     rating = models.PositiveIntegerField(validators=[
         MinValueValidator(1),
         MaxValueValidator(5)
-    ])
+    ], blank=False)
 
     is_active = models.BooleanField(default=True)
-    is_deleted = models.BooleanField(default=False)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    deleted_at = models.DateTimeField(blank=True, null=True)
 
+    def __str__(self):
+        return f"Rating {self.rating_id} created: {self.created_at}"
+
+    def clean(self):
+        if self.customer_profile is not None:
+            if self.rate_by == self.customer_profile.profile.user:
+                raise ValidationError("You cannot rate for yourself")
+
+            if self.pk is None:
+                already_rated = ProfileReview.objects.filter(
+                    rate_by=self.rate_by,
+                    customer_profile=self.customer_profile
+                ).exists()
+
+                if already_rated:
+                    raise ValidationError("You already rated this profile")
+
+        elif self.provider_profile is not None:
+            if self.rate_by == self.provider_profile.profile.user:
+                raise ValidationError("You cannot rate for your self.")
+
+            if self.pk is None:
+                already_rated = ProfileRating.objects.filter(
+                    reviewed_by=self.rate_by,
+                    provider_profile=self.provider_profile
+                ).exists()
+                if already_rated:
+                    raise ValidationError("You already rated this Profile")
 
     def soft_delete(self):
-        if not hasattr(self, "is_active") or not hasattr(self, "is_deleted"):
-            logger.error(f"soft_delete called on ProfileReview {self.review_id} but required fields are missing.")
-            return
-        
-        self.is_active=~F("is_active")
-        self.is_deleted=~F("is_deleted")
-        self.deleted_at=F("deleted_at") if self.deleted_at else timezone.now()
-        self.save(update_fields=["is_active", "is_deleted", "deleted_at"])
-    
-    def can_edit(self, user):
+        if hasattr(self, "is_active"):
+            setattr(self, "is_active", False)
+        self.save(update_fields=["is_active"])
+
+    def is_able_modify(self, user):
         if self.rate_by == user:
             return True
-        if user.is_admin:
+        if user.is_superuser and user.is_staff:
             return True
         return False
     
     class Meta:
-        ordering = ["-created_at"]
+        db_table = "ratings_ratings"
+        verbose_name = "Rating"
+        verbose_name_plural = "Ratings"
 
-        constraints = [
-            models.UniqueConstraint(fields=("rate_by", "profile"), name="unique_rate_profile")
-        ]
         indexes = [
-            models.Index(fields=["is_active", "is_deleted"], name="active_delete_idx"),
+            models.Index(fields=['is_active'], name="ra_act_idx"),
+            models.Index(fields=['created_at'], name="dat_idx"),
+            models.Index(fields=['rate_by'], name='rated_by_idx')
         ]
+        constraints = [
+            models.UniqueConstraint(fields=['rate_by', "customer_profile"], name='rate_profile_unique_customer'),
+            models.UniqueConstraint(fields=['rate_by', "provider_profile"], name='rate_profile_unique_provider')
+        ]
+

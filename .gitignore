@@ -1,11 +1,24 @@
 
+# idea
+.idea
+
+# test client
+rest_client.http
+http-client.env.json
+
 # Django-specific files
-*.log
+*.logs
+logs
+.logs
 *.pot
 *.pyc
 __pycache__/
 local_settings.py
 db.sqlite3
+
+*database.sqlite3
+.database
+.sqlite3
 
 # Virtual Environment
 venv/

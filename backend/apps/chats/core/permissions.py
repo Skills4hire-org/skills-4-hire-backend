@@ -6,6 +6,8 @@ These permission classes provide role-based and object-level access control.
 
 from rest_framework.permissions import BasePermission, IsAuthenticated
 
+from ..models import Conversation, Negotiations
+
 
 class IsOwner(BasePermission):
     """
@@ -46,10 +48,9 @@ class IsParticipant(BasePermission):
 
         obj is expected to be a Conversation instance.
         """
-        if not hasattr(obj, 'participant_one'):
+        if not isinstance(obj, Conversation):
             return False
-        participants = (obj.participant_two, obj.participant_one)
-        return request.user in participants
+        return request.user == obj.participant_two or request.user == obj.participant_one
 
 
 class IsMessageSenderOrReadOnly(BasePermission):
@@ -60,6 +61,9 @@ class IsMessageSenderOrReadOnly(BasePermission):
     """
 
     message = 'You can only modify messages you sent'
+    def has_permission(self, request, view):
+
+        return request.user and request.user.is_authenticated
 
     def has_object_permission(self, request, view, obj):
         # Read permissions allowed to participants
@@ -116,3 +120,21 @@ class ConversationParticipantPermission(BasePermission):
                     conversation.participant_two == request.user)
 
         return False
+
+class NegotiationParticipantPermission(BasePermission):
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated
+
+    def has_object_permission(self, request, view, obj):
+        if not isinstance(obj, Negotiations):
+            return False
+        if obj.conversation is not None:
+            return obj.is_participants(request.user)
+
+        elif obj.job_post is not None:
+           return  obj.is_participants(request.user)
+        else:
+            return False
+
+
+

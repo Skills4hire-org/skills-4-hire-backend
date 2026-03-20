@@ -8,8 +8,9 @@ Message: Represents individual messages within a conversation
 from django.db import models
 from django.core.exceptions import ValidationError
 from django.conf import settings
+from django.utils import timezone
 
-from .core.utils import sanitize_message_content
+from apps.posts.models import Post
 
 import logging
 import uuid
@@ -196,7 +197,6 @@ class Conversation(models.Model):
         """
         return self.messages.first()
 
-
 class Message(models.Model):
     """
     Model representing a single message in a conversation.
@@ -207,6 +207,10 @@ class Message(models.Model):
     - Automatic timestamp tracking
     - Indexed for efficient queries
     """
+
+    objects = models.Manager()
+    active_objects = ActiveConversationManager()
+
     message_id = models.UUIDField(
         primary_key=True,
         unique=True,
@@ -242,7 +246,9 @@ class Message(models.Model):
         help_text='Message creation timestamp'
     )
 
-    # Track edits if needed
+    is_active = models.BooleanField(default=True)
+
+    # Track edits
     is_edited = models.BooleanField(
         default=False,
         help_text='Whether message has been edited'
@@ -278,9 +284,6 @@ class Message(models.Model):
 
     def save(self, *args, **kwargs):
         """Sanitize and save message."""
-        # Sanitize content
-        self.content = sanitize_message_content(self.content)
-
         # Validate sender is conversation participant
         if not self.conversation.has_participant(self.sender):
             raise ValidationError(
@@ -288,7 +291,7 @@ class Message(models.Model):
             )
 
         # Update conversation's updated_at
-        self.conversation.updated_at = self.created_at or models.functions.Now()
+        self.conversation.updated_at = self.created_at
         self.conversation.save(update_fields=['updated_at'])
 
         super().save(*args, **kwargs)
@@ -321,6 +324,18 @@ class Message(models.Model):
             self.save(update_fields=['is_read'])
             logger.debug(f"Message {self.message_id} marked as unread")
 
+    def soft_delete(self):
+        if self.is_actice:
+            self.is_active = False
+            self.save(update_fields=["is_active"])
+            logger.debug(f"Message {self.message_id} deleted")
+
+    def update_message_content(self):
+        if hasattr(self, "is_edited"):
+            setattr(self, "is_edited", True)
+            setattr(self, "edited_at", timezone.now())
+        self.save(update_fields=["is_edited", "edited_at"])
+
     @property
     def recipient(self):
         """Get the recipient of this message."""
@@ -339,43 +354,192 @@ class Message(models.Model):
 
 
 class Negotiations(models.Model):
-    negotiations_id = models.UUIDField(
+    negotiation_id = models.UUIDField(
         max_length=20, primary_key=True,
         db_index=True, default=uuid.uuid4,
         editable=False
     )
 
     class Status(models.TextChoices):
-        PENDING = 'PENDING'
+        PROPOSED = 'PROPOSED'
         COUNTERED = "COUNTERED"
         ACCEPTED = "ACCEPTED"
+        REJECTED = "REJECTED"
 
-    conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name="negotiations",db_index=True)
-    sender = models.ForeignKey(UserModel, on_delete=models.CASCADE, related_name="negotiations",db_index=True)
+    conversation = models.ForeignKey(
+        Conversation, on_delete=models.CASCADE,
+        related_name="negotiations", null=True, blank=True
+    )
+    sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="negotiations",db_index=True)
 
-    status = models.CharField(choices=Status.choices, max_length=20, default=Status.PENDING)
+    status = models.CharField(choices=Status.choices, max_length=20, default=Status.PROPOSED)
 
     price =  models.DecimalField(decimal_places=2, max_digits=10, blank=False, null=False)
+
+    final_price = models.DecimalField(decimal_places=2, max_digits=10, db_index=True, blank=True, null=True)
 
     job_post = models.ForeignKey(
         Post, on_delete=models.CASCADE,
         related_name="negotiations",
-        blank=True, null=True, db_index=True
+        blank=True, null=True
+    )
+    note = models.TextField(blank=True, null=True)
+
+    countered_at = models.DateTimeField(
+        null=True,
+        blank=True
     )
 
-    note = models.TextField(blank=True, null=True)
-    is_active =  models.BooleanField(default=True)
-
-    started_at = models.DateTimeField(auto_now_add=True)
-    ended_at = models.DateTimeField(blank=True,null=True)
+    accepted_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+    rejected_at = models.DateTimeField(
+        null=True,
+        blank=True
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name = "negotiation"
         db_table = "negotiationhistory"
         indexes = [
-            models.Index(fields=["is_active"],name="idx_is_active")
+            models.Index(fields=["conversation"], name="conversation_idx"),
+            models.Index(fields=["job_post"], name='job_post_idx'),
+            models.Index(fields=['status'], name="nego_status_idx"),
+            models.Index(fields=["countered_at"], name="countered_at_idx"),
+            models.Index(fields=["accepted_at"], name="accepted_at_idx"),
+            models.Index(fields=['price'], name="price_idx")
         ]
 
+
+
     def __str__(self):
-        return f"NegotiationHistory({self.negotiations_id}, {self.is_active}"
+        return f"Negotiation({self.negotiation_id}, {self.created_at}"
+
+
+    def clean(self):
+        if self.conversation:
+            # Only people in this conversation can negotiate if conversation
+            participants = (self.conversation.participant_one, self.conversation.participant_two)
+            if self.sender not  in participants:
+                raise ValidationError("You are not permitted to perform this action")
+
+        if self.job_post:
+            #Check is this is a valid job post
+            if self.job_post.post_type != Post.PostType.JOB:
+                raise ValidationError("This is not a valid job post that you can negotiate")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    def is_accepted(self):
+        if not hasattr(self, "accepted_at"):
+            raise ValidationError("required field is not found")
+        if self.accepted_at is not None:
+            return True
+        return False
+
+    def is_participants(self, user) -> bool:
+        if self.conversation is not None:
+            participants = (self.conversation.participant_two,
+                            self.conversation.participant_one,
+                            self.sender
+                        )
+
+        elif self.job_post is not None:
+            participants = (
+                self.sender, self.job_post.user)
+        else:
+            participants = ()
+
+        if user in participants:
+            return True
+
+        return False
+
+    def set_final_price(self, price):
+        if not hasattr(self, "final_price"):
+            raise ValidationError("Final price field is not set")
+        setattr(self, "final_price", price)
+        self.save(update_fields=["final_price"])
+
+    def reject(self):
+        if not hasattr(self, "accepted_at"):
+            return  False
+        setattr(self, "rejected_at", timezone.now())
+        self.save(update_fields=['rejected_at'])
+
+    def accept(self):
+        if not hasattr(self, "accepted_at"):
+            return  False
+        setattr(self, "accepted_at", timezone.now())
+        self.save(update_fields=['accepted_at'])
+
+    def counter(self):
+        if not hasattr(self, "countered_at"):
+            return  False
+        setattr(self, "countered_at", timezone.now())
+        self.save(update_fields=["countered_at"])
+
+    def bulk_update(self, data: dict):
+        for key, value in data.items():
+            if hasattr(self, key):
+                setattr(self, key, value)
+            else:
+                pass
+        self.save()
+
+    @property
+    def receipient(self):
+        if self.conversation is  not None:
+            if self.sender == self.conversation.participant_one:
+                return self.conversation.participant_two
+            return self.conversation.participant_one
+        elif self.job_post_id is not None:
+            if self.sender == self.job_post.user:
+                return self.sender
+            return self.job_post.user
+        return None
+
+class NegotiationHistory(models.Model):
+    history_id = models.UUIDField(
+        primary_key=True, unique=True,
+        default=uuid.uuid4, db_index=True
+    )
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.DO_NOTHING,
+        related_name="negotiation_history")
+
+    price = models.DecimalField(max_digits=10, decimal_places=2)
+
+    negotiation = models.ForeignKey(
+        Negotiations, on_delete=models.DO_NOTHING,
+        related_name="histories"
+    )
+    action = models.CharField(max_length=200)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f"NegotiationHistory({self.history_id}"
+
+    class Meta:
+        db_table = "negotiation_history"
+        indexes = [
+            models.Index(fields=["action"], name="action_idx"),
+            models.Index(fields=["negotiation"], name="nego_idx"),
+            models.Index(fields=['created_at'], name="idx_date"),
+
+        ]
+
+    def clean(self):
+        if self.action not in Negotiations.Status.values:
+            raise ValidationError("Invalid Action")
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
 

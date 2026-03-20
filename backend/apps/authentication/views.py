@@ -23,9 +23,8 @@ from .utils.template_helpers import (
 )
 
 from rest_framework.views import APIView
-from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, permissions
+from rest_framework import status, permissions,viewsets
 from rest_framework_simplejwt.views import TokenObtainPairView
 from rest_framework_simplejwt.tokens import RefreshToken
 
@@ -83,35 +82,36 @@ class RegistrationView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-class AccountVerificationView(APIView):
+class AccountVerificationViewSet(viewsets.ModelViewSet):
     http_method_names = ["post"]
     permission_classes = [permissions.AllowAny]
     serializer_class = AccountVerificationSerializer
 
-    def post(self, request, *args, **kwargs):
-        serializer = self.serializer_class(data=request.data)
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         code = validated_data["code"]
         try:
             code_instance = _get_code_instance_or_none(code)
             account_verifed = verify_account(code_instance=code_instance, user=code_instance.user)
-        except Exception:
+        except Exception as e:
             return Response({
-                "status": "failed", "detail": "account verification Faiiled"}, 
+                "status": "failed", "detail": f"account verification Failed : {e}"},
                 status=status.HTTP_400_BAD_REQUEST)
         if account_verifed:
             return Response({
-                "status": "success", "detail": "Account verification successfull"}, 
+                "status": "success", "detail": "Account verification successfully"},
                 status=status.HTTP_200_OK)
+        return None
 
-class ResendOtpView(APIView):
+class ResendOtpViewSet(viewsets.ModelViewSet):
     http_method_names = ["post"]
     permission_classes = [permissions.AllowAny]
     serializer_class = ResendOtpSerializer
 
-    def post(self, request, *args, **kwargs):
-        serializer = self.serializer_class(data=request.data)
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         email = validated_data["email"]
@@ -128,13 +128,13 @@ class ResendOtpView(APIView):
                 "detail": f"Error sending OTP: {exc}"
             }, status=status.HTTP_400_BAD_REQUEST)
 
-class PasswordResetRequestView(APIView):
+class PasswordResetRequestViewSet(viewsets.ModelViewSet):
     http_method_names = ["post"]
     permission_classes = [permissions.AllowAny]
     serializer_class = ResendOtpSerializer
 
-    def post(self, request, *args, **kwargs):
-        serializer = self.serializer_class(data=request.data)
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         valid_email = serializer.validated_data.get("email")
         try:
@@ -150,13 +150,13 @@ class PasswordResetRequestView(APIView):
             {"status": "success", "detail": {"message": "Password reset email sent..."}}, 
             status=status.HTTP_200_OK)
 
-class PasswordResetConfirmView(APIView):
+class PasswordResetConfirmViewSet(viewsets.ModelViewSet):
     http_method_names = ["post"]
     permission_classes = [permissions.AllowAny]
     serializer_class = PasswordResetConfirmSerializer
 
-    def post(self, request, *args, **kwargs):
-        serializer = self.serializer_class(data=request.data)
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
         code, password = validated_data["code"], validated_data["password"]
@@ -188,13 +188,13 @@ class LoginView(TokenObtainPairView):
 
 token_obtain_pair = LoginView.as_view()
 
-class LogOutView(APIView):
+class LogOutViewSet(viewsets.ModelViewSet):
     serializer_class = CustomLogoutSerializer 
     permission_classes = [permissions.IsAuthenticated]
     http_method_names = ["post"]
 
-    def post(self, request, *args, **kwargs):
-        serializer = self.serializer_class(data=request.data, context=request)
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         try:
             refresh_token = serializer.validated_data.get("refresh_token", None)
@@ -214,5 +214,4 @@ class LogOutView(APIView):
                     "exceptions": str(exc)
                 }
             }, status=status.HTTP_400_BAD_REQUEST)
-logout_view = LogOutView.as_view()
 

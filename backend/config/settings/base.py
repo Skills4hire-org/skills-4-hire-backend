@@ -2,7 +2,6 @@ import os
 from pathlib import Path
 import environ
 
-from django.utils import timezone
 from celery.schedules import crontab
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
@@ -37,7 +36,7 @@ RESTRICTED_PATHS = env("RESTRICTED_PATHS").split(",")
 AUTH_USER_MODEL = "authentication.CustomUser"
 
 # SETTING MODULE
-DJANGO_ENVIRON= env("DJANGO_ENVIRON")
+DJANGO_SETTINGS_MODULE=env("DJANGO_SETTINGS_MODULE")
 
 # Channels Config
 ASGI_APPLICATION = "config.asgi.application"
@@ -88,7 +87,6 @@ REST_FRAMEWORK = {
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ),
-    'PAGE_SIZE': env('DEFAULT_PAGE_SIZE', default=20, cast=int),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_THROTTLE_CLASSES': (
         'rest_framework.throttling.AnonRateThrottle',
@@ -98,6 +96,9 @@ REST_FRAMEWORK = {
         'anon': env('THROTTLE_RATE_ANON', default='100/hour'),
         'user': env('THROTTLE_RATE_USER', default='1000/hour'),
     },
+    'DEFAULT_PAGINATION_CLASS.': {
+        'PAGE_SIZE': env('DEFAULT_PAGE_SIZE', default=20, cast=int),
+    }
 }
 
 from datetime import timedelta
@@ -121,7 +122,7 @@ SIMPLE_JWT = {
     'SLIDING_TOKEN_REFRESH_EXP_CLAIM': 'refresh_exp',
     'AUTH_HEADER_TYPES': ('Bearer',),
     'AUTH_HEADER_NAME': 'HTTP_AUTHORIZATION',
-    'USER_ID_FIELD': 'id',
+    'USER_ID_FIELD': 'user_id',
     'USER_ID_CLAIM': 'user_id',
     'USER_AUTHENTICATION_RULE': 'rest_framework_simplejwt.authentication.default_user_authentication_rule',
 }

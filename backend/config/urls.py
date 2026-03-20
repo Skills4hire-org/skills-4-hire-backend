@@ -31,7 +31,7 @@ urlpatterns += [
 
 # Debug toolbar config
 DEBUG  = getattr(settings, "DEBUG")
-DJANGO_ENV = getattr(settings, "DJANGO_SETTINGS_MODULE", "config.settings.dev")
+DJANGO_ENV = getattr(settings, "DJANGO_SETTINGS_MODULE", "config.settings.base")
 
 if DEBUG and DJANGO_ENV != "config.settings.prod":
    from debug_toolbar.toolbar import  debug_toolbar_urls

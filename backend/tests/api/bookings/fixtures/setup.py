@@ -28,4 +28,5 @@ def setup_bookings_create():
 
 @pytest.fixture(autouse=True)
 def mock_email(monkeypatch):
-    monkeypatch.setattr("apps.authentication.services.tasks.send_email_on_quene.delay", lambda x: None)
+    pass
+    # monkeypatch.setattr("apps.authentication.services.tasks.send_email_on_quene", lambda x: None)

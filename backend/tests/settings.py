@@ -1,6 +1,8 @@
+
 from config.settings.base import *
 
-DEBUG = False 
+DEBUG = False
+DJANGO_SETTINGS_MODULE="backend.tests.settings"
 
 PASSWORD_HASHERS = [
     "django.contrib.auth.hashers.MD5PasswordHasher",
@@ -17,9 +19,10 @@ CACHES = {
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "NAME":":Memory",
     }
 }
+
 
 CELERY_TASK_ALWAYS_EAGER = True
 CELERY_TASK_EAGER_PROPAGATES = True
@@ -29,3 +32,5 @@ CHANNEL_LAYERS = {
             "BACKEND": "channels.layers.InMemoryChannelLayer"
         }
     }
+
+LOGGING = None

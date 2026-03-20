@@ -1,8 +1,13 @@
-from django.urls import path
+from django.urls import path, include
 
-from . import views
+from rest_framework.routers import DefaultRouter
+
+from .views import AddressViewSet
+
+address_router = DefaultRouter()
+
+address_router.register("address", AddressViewSet, basename='address')
 
 address_urlpatterns = [
-    path("profile/<uuid:profile_pk>/address", views.AddressView.as_view(), name="address"),
-    path("profile/<uuid:profile_pk>/address/<uuid:pk>/", views.AddressDetailView.as_view(), name="address-detail")
+    path("", include(address_router.urls))
 ]
