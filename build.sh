@@ -16,7 +16,7 @@ uv sync
 cd  backend
 
 echo "Running Migrations"
-uv run manage.py migrate
+uv run manage.py migrate --noinput
 
 echo "Collecting static files"
 uv run manage.py collectstatic --noinput
@@ -30,7 +30,7 @@ do
   sudo systemctl restart "$service"
 done
 
-echo " Deployment successfull..."
+echo " Deployment successfully..."
 
 
 
