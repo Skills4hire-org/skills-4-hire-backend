@@ -4,14 +4,14 @@ services:
     container_name: db-migrate
     env_file:
       - .env
-    command: ["uv", 'run', "backend.manage.py", "migrate", "--noinput"]
+    command: ["uv", 'run', "backend/manage.py", "migrate", "--noinput"]
 
   collect_static:
     build: .
     container_name: static-files
     env_file:
       - .env
-    command: ["uv", 'run', "backend.manage.py", "collectstatic", "--noinput"]
+    command: ["uv", 'run', "backend/manage.py", "collectstatic", "--noinput"]
 
   web:
     container_name: skills4Hire
