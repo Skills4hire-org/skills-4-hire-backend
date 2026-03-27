@@ -2,7 +2,7 @@
 FROM python:3.12-slim AS builder
 
 # project directory
-WORKDIR /app
+WORKDIR /app/backend
 
 # update apt
 RUN apt-get update && apt-get install curl -y
