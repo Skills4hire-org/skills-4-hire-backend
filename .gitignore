@@ -1,4 +1,8 @@
 
+# vscode 
+.vscode/
+*.code-workspace
+
 # idea
 .idea
 
