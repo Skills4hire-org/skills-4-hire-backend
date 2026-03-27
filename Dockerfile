@@ -13,7 +13,7 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-COPY ./pyproject.toml ./uv.lock ./build.sh  .
+COPY ./pyproject.toml ./uv.lock ./build.sh  ./
 
 RUN uv sync --frozen --no-cache --no-dev
 
