@@ -1,5 +1,6 @@
 
 from rest_framework import serializers
+from rest_framework.exceptions import PermissionDenied
 
 from .models import Post, PostAttachment, PostTag, Comment
 from .utils.posts import  (
@@ -19,8 +20,6 @@ from django.db.models import Prefetch
 from django.utils import  timezone
 
 User = get_user_model()
-
-
 
 class PostAttachmentSerializer(serializers.ModelSerializer):
     class Meta:
@@ -52,27 +51,26 @@ class PostAttachmentSerializer(serializers.ModelSerializer):
         return  url
 
 class PostTagSerializer(serializers.ModelSerializer):
-    service = serializers.CharField(max_length=200, required=True, write_only=True)
+    category_id = serializers.UUIDField(required=True, write_only=True)
     class Meta:
         model = PostTag
         fields = [
             "post_tag_id",
-            "service",
+            "category_id",
             "service_name",
             "post",
             "created_at"
         ]
-
         read_only_fields = [
             "post_tag_id", "service_name",
             "post", "created_at"
         ]
 
-        def validate_service(self, value):
+        def validate_cateory_id(self, value):
             found, _ = check_service_in_category(value.strip())
             if not found:
-                raise serializers.ValidationError(_("categroy  not Found"))
-            return  value.title
+                raise serializers.ValidationError(_("category  not Found"))
+            return  value
 
 class PostCreateSerializer(serializers.ModelSerializer):
     attachment = PostAttachmentSerializer(many=True, required=False)
@@ -112,22 +110,17 @@ class PostCreateSerializer(serializers.ModelSerializer):
         if valid_post_types is not None and post_type not in valid_post_types:
             raise serializers.ValidationError({"post_type": "Invalid post type."})
 
-        request = self.context.get("request")
-        user = getattr(request, "user", None)
+        user = self.context['request'].user
 
-        active_user_role = getattr(user, "active_role", None)
-        if active_user_role is None:
-            post_type = Post.PostType.GENERAL.value
-
-        if not can_make_post(user_role=active_user_role, post_type=post_type):
-            raise serializers.PermissionDenied()
+        if not can_make_post(user=user, post_type=post_type):
+            raise PermissionDenied()
 
         if not verify_post_with_amount(
-            user_role=active_user_role,
+            user=user,
             amount=amount,
             post_type=post_type
         ):
-            raise serializers.PermissionDenied(detail="Couldn't verify post with amount")
+            raise PermissionDenied(detail="Couldn't verify post with amount")
 
         return attrs
 
@@ -139,8 +132,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
         address = validated_data.pop("address", {})
         duration = validated_data.pop("duration", None)
 
-        request = self.context.get("request")
-        user = getattr(request, "user", None)
+        user = self.context['request'].user
 
         if duration:
              start_date, end_date = get_date(duration)
@@ -157,11 +149,9 @@ class PostCreateSerializer(serializers.ModelSerializer):
             )
         # Create related PostMedia records (if any)
         if post_attachments:
-            save = []
-            for attachment in post_attachments:
-                attachment_objs = PostAttachment(post=post_instance, **attachment)
-                save.append(attachment_objs)
-            PostAttachment.objects.bulk_create(save)
+            PostAttachment.objects.bulk_create(
+                [PostAttachment(post=post_instance, **data) for data in post_attachments]
+            )
 
         if address:
             address_instance, created = UserAddress.objects.get_or_create(
@@ -172,19 +162,22 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
         # Create related PostTag records (if any)
         if post_tags:
-            save = []
-            for post in post_tags:
-                found, category = check_service_in_category(post["service"])
-                if found:
-                    tag_objs = PostTag(post=post_instance, service_name=category)
-                else:
-                    tag_objs = PostTag(post=post_instance)
-                save.append(tag_objs)
-            if len(save) > 0:
-                PostTag.objects.bulk_create(save)
-            else:
-                from asyncio.log import  logger
-                logger.info("No Tags Created")
+            instances = []
+            for item in post_tags:
+                data = item.copy()
+
+                category_id = data.pop('category_id')
+
+                instance = PostTag(
+                    post=post_instance,
+                    service_name=check_service_in_category(category_id)[1],
+                    **data
+                )
+
+                instances.append(instance)
+
+            PostTag.objects.bulk_create(instances)
+
         return post_instance
     
 
@@ -209,6 +202,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
             if address_instance:
                 for key, value in address.items():
                     setattr(address_instance, key, value)
+                address_instance.save()
             else:
                 new_address = UserAddress.objects.create(profile=user.profile, **address)
                 post_ad_instance = new_address
@@ -222,9 +216,9 @@ class PostCreateSerializer(serializers.ModelSerializer):
         if post_tags:
             tags = instance.post_tag
             for post in post_tags:
-                found, category = check_service_in_category(post["service"])
+                found, category = check_service_in_category(post['category_id'])
                 if found:
-                    tags.get_or_create(service_name=category)
+                    tags.get_or_create(post=instance, service_name=category)
                 else:
                     pass
 
@@ -233,14 +227,58 @@ class PostCreateSerializer(serializers.ModelSerializer):
             start_date, end_date = get_date(duration)
             instance.start_date = start_date
             instance.end_date = end_date
+
         instance.save()
+
         return instance
 
 
-class CommentSerializer(serializers.ModelSerializer):
-    user = UserReadSerializer(read_only=True)
-    comment_counts = serializers.SerializerMethodField()
+class CommentCreateSerializer(serializers.ModelSerializer):
+    attachment = PostAttachmentSerializer(many=True, required=False)
+    class Meta:
+        model = Comment
+        fields = [
+            "message", "attachment"
+        ]
 
+    def validate_message(self, value):
+        value = value.strip()
+        if not value or len(value) < 3:
+            raise serializers.ValidationError({"message": "Comment message cannot be empty, or less than 3 chars."})
+        return value
+
+    def create(self, validated_data):
+        user = self.context['request'].user
+        post = self.context.get("post")
+
+        try:
+            comment_instance = CommentService(post=post, user=user)
+            comment = comment_instance.add_comment(**validated_data)
+
+            if "attachment" in validated_data:
+                comments_attachments = validated_data.get("attachments")
+                PostAttachment.objects.bulk_create([
+                    PostAttachment(comment=comment, **data)
+                    for data in comments_attachments
+                ])
+        except Exception as e:
+            raise Exception(e)
+
+        return comment
+
+    def update(self, instance, validated_data):
+        instance.message = validated_data.get("message", instance.message)
+        if "attachment" in validated_data:
+            instance_attachment = instance.attachment.all().delete()
+            PostAttachment.objects.bulk_create([
+                PostAttachment(comment=instance, **data)
+                for data in validated_data['attachment']
+            ])
+
+        return instance
+
+class CommentSerializer(serializers.ModelSerializer):
+    comment_counts = serializers.SerializerMethodField()
     class Meta:
         model = Comment
         fields = [
@@ -254,20 +292,6 @@ class CommentSerializer(serializers.ModelSerializer):
             "user",
             "message"
         ]
-        read_only_fields = [
-            "created_at", "is_active",
-            "is_edited", "user",
-            "comment_id", "user",
-            "comment_counts", "post", "parent"
-        ]
-
-
-    def validate_message(self, value):
-        value = value.strip()
-        if not value or len(value) < 3:
-            raise serializers.ValidationError({"message": "Comment message cannot be empty, or less than 3 chars."})
-        return value
-
     def get_comment_counts(self, obj):
         post = Post.objects.prefetch_related(Prefetch(
             lookup="comments", queryset=Comment.active_objects.filter(post=obj.post)
@@ -277,27 +301,6 @@ class CommentSerializer(serializers.ModelSerializer):
             return  0
         return count
 
-
-    
-    def create(self, validated_data):
-        request = self.context.get("request", None)
-        post = self.context.get("post")
-
-        user = getattr(request, "user")
-
-        try:
-            comment_instance = CommentService(post=post, user=user)
-            comment = comment_instance.add_comment(**validated_data)
-        except Exception as e:
-            raise Exception(e)
-        return comment
-
-    def update(self, instance, validated_data):
-        
-        instance.message = validated_data.get("message", instance.message)
-        instance.save()
-
-        return instance
 
 class RepostSerializer(serializers.ModelSerializer):
     class Meta:
@@ -342,7 +345,6 @@ class RepostSerializer(serializers.ModelSerializer):
             raise Exception(e)
         return repost
 
-
 class PostListSerializer(serializers.ModelSerializer):
     comments_counts = serializers.IntegerField(read_only=True)
     likes_count = serializers.IntegerField(read_only=True)
@@ -356,7 +358,6 @@ class PostListSerializer(serializers.ModelSerializer):
             "likes_count", "user", "post_id",
             "post_content",  "created_at", "updated_at"
         ]
-
 
 class PostDetailSerializer(serializers.ModelSerializer):
     attachment = PostAttachmentSerializer(many=True, read_only=True)
@@ -378,7 +379,7 @@ class PostDetailSerializer(serializers.ModelSerializer):
             "is_deleted", "is_pinned", "start_date",
             "end_date", "created_at", "updated_at",
             "attachment", "post_tag",
-            "role", "duration",
+            "duration",
         ]
     def get_duration(self, obj):
         start_date = obj.start_date
@@ -389,3 +390,16 @@ class PostDetailSerializer(serializers.ModelSerializer):
         return  f'{delta.days} days(s)'
 
 
+class CommentDetailSerializer(serializers.ModelSerializer):
+    attachment = PostAttachmentSerializer(read_only=True)
+    user = UserReadSerializer(read_only=True)
+    post = PostListSerializer(read_only=True)
+
+    class Meta:
+        model = Comment
+        fields = [
+            "comment_id", "user",
+            "post", "parent", "message",
+            "is_deleted", 'is_active', 'is_edited',
+            'created_at', 'attachment', 'updated_at'
+        ]

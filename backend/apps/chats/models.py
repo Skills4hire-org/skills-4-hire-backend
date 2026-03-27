@@ -371,11 +371,8 @@ class Negotiations(models.Model):
         related_name="negotiations", null=True, blank=True
     )
     sender = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="negotiations",db_index=True)
-
     status = models.CharField(choices=Status.choices, max_length=20, default=Status.PROPOSED)
-
     price =  models.DecimalField(decimal_places=2, max_digits=10, blank=False, null=False)
-
     final_price = models.DecimalField(decimal_places=2, max_digits=10, db_index=True, blank=True, null=True)
 
     job_post = models.ForeignKey(

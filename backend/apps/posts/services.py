@@ -13,11 +13,10 @@ UserModel = get_user_model()
 
 @transaction.atomic
 def create_post(user, start_date: datetime | None = None, end_date: datetime | None = None, **kwargs):
-    user_active_role =  getattr(user, "active_role")
     try:
         new_post = Post.objects.create(
             **kwargs,
-            user=user, role=user_active_role,
+            user=user,
             start_date=start_date, end_date=end_date
         )
     except Exception as e:
@@ -125,12 +124,6 @@ class CommentService:
 
     def create_nested_replies(self, **kwargs):
         return  self.add_comment(**kwargs)
-
-    def list_nested_comments(self, comments, base_comments):
-        qs = comments.filter(post=self.post, parent=base_comments).all().order_by("-created_at")
-        if qs is None:
-            return  self.list_comments(comments)
-        return  qs
 
 
 

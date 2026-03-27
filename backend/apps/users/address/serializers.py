@@ -23,7 +23,7 @@ class AddressCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("postal code is not valid")
         return value
 
-    def validated(self, data):
+    def validate(self, data):
         user = self.context.get("request").user
         user_base_profile = user.profile
         if AddressService().address_already_exists(

@@ -43,13 +43,6 @@ class Post(models.Model):
 
     post_content = models.TextField(blank=False, null=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="posts", blank=True, null=True)
-    role = models.CharField(
-        max_length=200, 
-        choices=User.RoleChoices, 
-        null=True, 
-        blank=True,
-        help_text="User role when creating the post instance"
-    )
 
     parent = models.ForeignKey(
         "self",
@@ -145,6 +138,8 @@ class PostTag(models.Model):
         ]
 
 
+
+
 class CommentManager(models.Manager):
     def get_queryset(self):
         return super().get_queryset().filter(is_active=True, is_deleted=False)
@@ -168,8 +163,7 @@ class Comment(models.Model):
 
     # content
     message = models.TextField(max_length=5000)
-
-    # booleanfields
+    # boolean fields
     is_active = models.BooleanField(default=True)
     is_deleted = models.BooleanField(default=False)
     is_edited = models.BooleanField(default=False)  
@@ -208,7 +202,6 @@ class Comment(models.Model):
         if user == self.user:
             return True
         return False
-    
 
 class PostAttachment(models.Model):
     " Post attachment list photo, file, videos"
@@ -229,19 +222,20 @@ class PostAttachment(models.Model):
     attachment_type = models.CharField(max_length=200, choices=Types.choices, default=None, null=True, blank=True)
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="attachment", blank=True, null=True)
     attachmentURL = models.URLField(max_length=200, null=True, blank=True)
+    comment = models.ForeignKey("Comment", on_delete=models.CASCADE, null=True, blank=True, related_name="attachment")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
         return f"PostAttachment({self.post.pk}, )"
-    
+
     class Meta:
         ordering = ['-created_at']
         indexes = [
-            models.Index(fields=["post"], name="post_idx")
+            models.Index(fields=["post"], name="post_id")
         ]
-    
+
 
 class PostLike(models.Model):
 

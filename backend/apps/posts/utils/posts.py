@@ -1,3 +1,5 @@
+import uuid
+
 from django.shortcuts import get_object_or_404
 from django.db import transaction
 from django.contrib.auth import  get_user_model
@@ -40,35 +42,36 @@ def validate_url(url: str) -> tuple[bool, str]:
         return False, str(e)
 
 
-def check_service_in_category(service_name: str):
-    service_name_local = service_name.title()
+def check_service_in_category(category_id: str):
+    if not isinstance(category_id, uuid.UUID):
+        raise ValueError("not a valid object")
     try:
-        category = Category.objects.filter(name__iexact=service_name_local).first()
+        category = Category.objects.get(pk=category_id)
     except Category.DoesNotExist:
-        return False, service_name_local
+        return False
     return  True, category
 
-def can_make_post(user_role: str, post_type: int) -> bool:
+def can_make_post(user: str, post_type: int) -> bool:
     allowed_services = {
         "users": [Post.PostType.GENERAL.value],
         "providers": [Post.PostType.GENERAL.value, Post.PostType.SERVICE.value],
         "customer": [Post.PostType.GENERAL.value, Post.PostType.JOB.value],
     }
-    if user_role == UserModel.RoleChoices.SERVICE_PROVIDER:
+    if user.is_provider:
         if post_type not in allowed_services["providers"]:
             return False
-    elif user_role == UserModel.RoleChoices.CUSTOMER:
+    elif user.is_customer:
         if post_type not in allowed_services["customer"]:
             return  False
-    elif user_role is None:
-        if post_type not in allowed_services["users"]:
+    else:
+        if post_type not in allowed_services['users']:
             return False
 
     return True
 
-def verify_post_with_amount(amount: float, user_role: str, post_type: str) -> bool:
+def verify_post_with_amount(amount: float, user: str, post_type: str) -> bool:
     if amount is not None:
-        if user_role != UserModel.RoleChoices.CUSTOMER:
+        if not user.is_customer:
             return  False
         if post_type != Post.PostType.JOB.value:
             return  False

@@ -12,7 +12,7 @@ from ..provider_models import ProviderModel
 VALID_CHOICES = ["CUSTOMER", "SERVICE_PROVIDER"]
 
 class OnboardingSerializer(serializers.Serializer):
-    service_to_perform = serializers.CharField(write_only=True) # customer or provider
+    service_to_perform = serializers.ChoiceField(choices=VALID_CHOICES, write_only=True, required=True) # customer or provider
 
     def validate_service_to_perform(self, value):
         if value.upper() not in VALID_CHOICES:
@@ -25,7 +25,7 @@ class OnboardingSerializer(serializers.Serializer):
         if already_has_a_profile(user):
             raise serializers.ValidationError("profile already exists")
 
-        service = validated_data.get("service_to_perform", "")
+        service = validated_data.get("service_to_perform", None)
         if service  is None:
             raise serializers.ValidationError("role to play is required")
 

@@ -1,198 +1,372 @@
 from django.db import transaction
-from django.shortcuts import get_object_or_404
 from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 
 from rest_framework import serializers
-from rest_framework.exceptions import PermissionDenied
+from rest_framework.exceptions import PermissionDenied, NotFound
 
-from ..users.services.models import Service
-from ..users.services.serializers import ServiceSerializer
+from ..core.utils.py import get_or_none
 from ..users.address.models import UserAddress
 from ..users.address.serializers import AddressCreateSerializer, AddressSerializer
-from .models import Bookings
+from .models import Bookings, BookingAttachments, PaymentRequestBooking
 from .helpers import is_customer
 from .services import BookingService
 from ..authentication.serializers import UserReadSerializer
 from apps.wallet.services import WalletService
 
+
 from decimal import Decimal
 import logging
 
+from ..users.provider_models import ProviderModel
+from ..users.serializers.profiles import ProviderProfileDetailSerializer
 
 logger = logging.getLogger(__name__)
 
+class BookingAttachmentSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BookingAttachments
+        fields = [
+            'attachment_type_booking', 'attachmentURL_booking',
+        ]
+
 class BookingCreateSerializer(serializers.ModelSerializer):
     address = AddressCreateSerializer(required=True)
-    service = ServiceSerializer(required=False, many=True)
+    provider_id = serializers.UUIDField(required=True)
+    attachments = BookingAttachmentSerializer(many=True, required=False)
+    idempotency_key = serializers.UUIDField(required=True)
+
     class Meta:
         model = Bookings
         fields = [
-            "address",
-            "service",
-            "price",
-            "notes",
-            "descriptions",
-            "start_date",
-            "end_date",
-            "currency",
-            "payment_remark"
+            'address',
+            "provider_id",
+            "price", "notes",
+            "descriptions", "start_date",
+            "end_date", "currency",
+            "requirements", 'attachments', 'idempotency_key'
         ]
+
     def validate(self, attrs):
         if attrs.get("start_date") or attrs.get("end_date"):
-            if attrs["start_date"] >= attrs["end_date"]:
-                raise serializers.ValidationError("'end_date' cannot be greater that the 'start_date'")
+
+            if attrs["end_date"] <= attrs["start_date"]:
+                raise serializers.ValidationError("'end_date' cannot be less than 'start_date'")
             elif attrs["start_date"].date() < timezone.now().date():
                 raise serializers.ValidationError("invalid start date. can't be less than today")
+
         return attrs
 
     def validate_price(self, value):
-        request = self.context.get("request")
+        request = self.context['request']
 
         wallet = WalletService.get_user_wallet(user=request.user)
-
-        main_balance = getattr(wallet, "main_balance")
-
+        main_balance = wallet.balance
         if main_balance is None:
             raise serializers.ValidationError("User wallet has no balance")
+
         if Decimal(value) > Decimal(main_balance):
             raise serializers.ValidationError("Insufficient Balance. Top up to continue")
+
         return value
 
     def create(self, validated_data):
-        address = validated_data.pop("address", None)
-        services = validated_data.pop("service", None)
-        provider = self.context.get("provider")
-        request = self.context.get("request")
+        request = self.context['request']
+
         if not is_customer(request):
             raise serializers.ValidationError("User is not a customer")
 
-        with transaction.atomic():
-            booking = Bookings.objects.create(customer=request.user, provider=provider, **validated_data)
-            if address:
-                add_obj, created = UserAddress.objects.get_or_create(profile=getattr(request.user, "profile"),                                                                            postal_code=address.get("postal_code"))
-                if created:
-                    for key, value in address.items():
-                        if hasattr(add_obj, key):
-                            setattr(add_obj, key, value)
-                    add_obj.save()
-                    booking.address = add_obj
-                    booking.save()
-                else:
-                    booking.address = add_obj
-                    booking.save()
-            if services:
-                service_names = [
-                    s["name"]
-                    for s in services
-                ]
-                available_services = Service.objects.filter(
-                    name__in=service_names,
-                    profile=provider
-                )
+        provider_pk = validated_data['provider_id']
+        provider_profile = get_or_none(ProviderModel, pk=provider_pk)
 
-                booking.service.set(available_services)
-        return booking
+        if provider_profile is None:
+            raise NotFound("profile not found for provider")
+
+        address = validated_data.pop("address", None)
+        attachment = validated_data.pop("attachments", None)
+        validated_data.pop("provider_id")
+
+        if address is not None:
+            postal_code = address.pop('postal_code')
+            address, created = UserAddress.objects.get_or_create(
+                user_profile=request.user.profile,
+                postal_code=postal_code,
+                **address
+            )
+
+        booking_instance = BookingService().create_booking(
+            customer=request.user, provider=provider_profile,
+            **validated_data
+        )
+
+        if attachment is not None:
+            BookingAttachments.objects.bulk_create([
+                BookingAttachments(booking=booking_instance, **data)
+                for data in attachment
+            ])
+
+       
+
+        booking_instance.address = address
+        booking_instance.save()
+
+        return booking_instance
 
     @transaction.atomic
     def update(self, instance: Bookings, validated_data):
         address = validated_data.pop("address", None)
-        service = validated_data.pop("service", None)
+        attachments = validated_data.pop("attachments", None)
+        user = self.context['request'].user
         if address:
-            booking_address = instance.address
-            if booking_address:
-                address_instance = UserAddress.objects.get(
-                                        profile=instance.customer.profile,
-                                        pk=booking_address.pk,
-                                        is_active=True)
-                for key, value in address.items():
-                    setattr(address_instance, key, value)
-                address_instance.save()
-                booking_address = address_instance
-                booking_address.save()
-            else:
-                new_address = UserAddress.objects.create(profile=instance.customer.profile, **address)
-                instance.address = new_address
-                instance.save()
-        if service:
-            service_names = [
-                s["name"]
-                for s in service
-            ]
-            if instance.service.filter(name__in=service_names):
-                updated_services = Service.objects.filter(name__in=service_names, profile=instance.provider)
-                instance.service.set(updated_services)
-            else :
-                new_services = Service.objects.filter(name__in=service_names, profile=instance.provider)
-                instance.service.set(new_services)
+            booking_address, _ = UserAddress.objects.get_or_create(profile=user.profile, postal_code=address['postal_code'])
+            instance.address = booking_address
 
-        for key, value in validated_data.items():
-            setattr(instance, key, value)
-        instance.save()
-        return instance
+        if attachments:
+            instance.attachments.all().delete()
+            BookingAttachments.objects.bulk_create([
+                BookingAttachments(booking=instance, **data)
+                for data in attachments
+            ])
 
-class BookingStatusUpdateSerializer(serializers.Serializer):
-    choices = getattr(Bookings.BookingStatus, "values")
-    status = serializers.ChoiceField(choices=choices)
+        validated_data.pop('idempotency_key')
+        validated_data.pop("provider_id")
+
+        updated_instance = super().update(instance, validated_data)
+        return updated_instance
+
+class AcceptRejectSerializer(serializers.Serializer):
+    choices = ['ACCEPT', 'REJECT']
+
+    status = serializers.ChoiceField(choices=choices, required=True)
+    idempotency_key = serializers.UUIDField(required=True)
+    booking_id = serializers.UUIDField(required=True)
 
     def validate_status(self, value):
         if value.upper() not in self.choices:
             raise serializers.ValidationError("Bad Request. status is not in active choices")
         return value
 
-    def update(self, instance, validated_data):
-        status = validated_data.get("status", instance.booking_status)
-        request = self.context.get("request")
-        if not isinstance(instance, Bookings):
-            raise serializers.ValidationError(_("Instance is not of type Bookings"))
+    def create(self, validated_data):
+        choice = validated_data['status']
+        idempotency_key = validated_data['idempotency_key']
+        booking_instance_pk = validated_data['booking_id']
 
-        customer = getattr(instance, "customer", None)
-        service_provider = instance.provider
-        if customer is None or service_provider is None:
-            raise serializers.ValidationError(_("Invalid booking instance. Missing customer or provider information"))
+        instance = get_or_none(Bookings, pk=booking_instance_pk,
+                               is_active=True, booking_status=Bookings.BookingStatus.FUNDED)
 
-        if instance.booking_status != Bookings.BookingStatus.PENDING:
-            raise serializers.ValidationError(_("Only pending bookings can be updated"))
+        if instance is None:
+            raise serializers.ValidationError("No booking found. Try requesting for a funded booking")
 
-        if status.upper() == Bookings.BookingStatus.CANCELLED:
-            if not BookingService.cancel_booking(instance, request.user):
-                raise serializers.ValidationError(_("Failed to cancel booking"))
-        elif status.upper() == Bookings.BookingStatus.COMPLETED:
-            if request.user != getattr(service_provider.profile, "user"):
+        user = self.context['request'].user
+
+        if not instance.is_participants(user):
+            raise PermissionDenied()
+
+        if choice == self.choices[0]:
+            # accept booking
+            if user != instance.provider.profile.user:
                 raise PermissionDenied()
-            if not BookingService.accept_booking(instance, request.user):
-                raise serializers.ValidationError(_("Error occurred while accepting booking"))
+            
+            booking = BookingService().accept_booking(instance, user)
+            if booking.booking_status != Bookings.BookingStatus.IN_PROGRESS:
+                raise serializers.ValidationError("Booking did not update")
+            
+        elif choice == self.choices[1]:
+            # reject/cancel booking
+            booking = BookingService().cancel_booking(
+                booking=instance, user=user, idempotency_key=idempotency_key)
+            
+            if booking.booking_status != Bookings.BookingStatus.CANCELLED:
+                raise serializers.ValidationError("Booking cancel not updated")
         else:
-            raise serializers.ValidationError(_("Bad Request. Invalid request"))
+            raise serializers.ValidationError("Future update coming")
 
-        instance.booking_status = status.upper()
-        instance.save()
-        return instance
+        return booking
 
-class BookingOutSerializer(serializers.ModelSerializer):
+class BookingSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = Bookings
+        fields =[
+            'booking_id', 'booking_status',
+            'customer', 'provider',
+            'cancelled_by', 'accepted_by',
+            'price', 'notes', 'requirements',
+            'is_active', 'start_date', 'end_date',
+            'created_at', 'cancelled_at', 'accepted_at',
+        ]
+
+class BookingDetailSerializer(serializers.ModelSerializer):
+
     customer = UserReadSerializer(read_only=True)
-    # provider = ProviderProfileSerializer(read_only=True)
-    service = ServiceSerializer(read_only=True)
-    address = AddressSerializer(read_only=True)
+    provider = ProviderProfileDetailSerializer(read_only=True)
+    cancelled_by = UserReadSerializer(read_only=True)
+    accepted_by = UserReadSerializer(read_only=True)
+
     class Meta:
         model = Bookings
         fields = [
-            "booking_id",
-            "booking_status",
-            "customer",
-            "provider",
-            "service",
-            "address",
-            'currency',
-            "price",
-            "notes",
-            "descriptions",
-            "payment_remark",
-            "is_active",
-            "start_date",
-            "end_date",
-            "created_at",
-            "cancelled_at"
+            'booking_id', 'booking_status',
+            'customer', 'provider',
+            'cancelled_by', 'accepted_by',
+            'price', 'notes', 'requirements',
+            'is_active', 'start_date', 'end_date',
+            'created_at', 'cancelled_at', 'accepted_at',
+            'descriptions', 'currency'
         ]
 
+class PaymentRequestSerializer(serializers.ModelSerializer):
 
+    attachments_payment_request = BookingAttachmentSerializer(many=True)
+    booking_id = serializers.UUIDField(required=True, write_only=True)
+
+    class Meta:
+        model = PaymentRequestBooking
+        fields = [
+            'booking_id', 'attachments_payment_request',
+            'amount', 'message', 'payment_type'
+        ]
+
+    def validate_message(self, value):
+        return value.strip()
+
+    def validate(self, data):
+
+        booking_pk = data['booking_id']
+
+        booking_instance = get_or_none(
+            Bookings, pk=booking_pk,
+            booking_status=Bookings.BookingStatus.IN_PROGRESS)
+
+        if hasattr(booking_instance, "booking_request"):
+            raise serializers.ValidationError("payment already requested. wait for customer response")
+
+        if booking_instance is None:
+            raise serializers.ValidationError("invalid request")
+
+        user = self.context['request'].user
+        if not booking_instance.is_participants(user):
+            raise PermissionDenied()
+
+        payment_instance = booking_instance.locked
+        if payment_instance.is_released:
+            raise serializers.ValidationError("payment already released and closed")
+
+        if payment_instance.amount < data['amount']:
+            raise serializers.ValidationError('invalid_digits_amounts')
+        return data
+
+    def create(self, validated_data):
+        attachments = validated_data.pop("attachments_payment_request", None)
+
+        user = self.context['request'].user
+
+        booking_instance = get_or_none(
+            Bookings, pk=validated_data['booking_id'],
+            booking_status=Bookings.BookingStatus.IN_PROGRESS
+        )
+
+        if booking_instance.provider.profile.user != user:
+            raise PermissionDenied()
+        
+        payment_type = validated_data['payment_type']
+        if payment_type == PaymentRequestBooking.PaymentType.FULL_TIME:
+            amount = booking_instance.locked.amount
+        else:
+            amount = validated_data['amount']
+
+        validated_data.pop("amount")
+
+        payment_request_instance = PaymentRequestBooking.objects.create(
+            provider=booking_instance.provider, customer=booking_instance.customer,
+            booking=booking_instance, amount=amount, **validated_data
+        )
+
+        if attachments:
+            BookingAttachments.objects.bulk_create([
+                BookingAttachments(payment_request=payment_request_instance, **data)
+                for data in attachments
+            ]
+            )
+
+        return payment_request_instance
+
+class ReviewPaymentRequestSerializer(serializers.ModelSerializer):
+    choices = ['ACCEPT', 'REJECT']
+    idempotency_key = serializers.UUIDField(write_only=True, required=True)
+    action = serializers.ChoiceField(choices=choices, required=True)
+    request_id = serializers.UUIDField(required=True, write_only=True)
+
+    class Meta:
+        model = PaymentRequestBooking
+        fields = [
+            'action', 'request_id',
+            'idempotency_key'
+        ]
+
+    def validate(self, data):
+        user = self.context['request'].user
+        request_instance = get_or_none(
+            PaymentRequestBooking, pk=data['request_id']
+        )
+        if request_instance is None:
+            raise serializers.ValidationError("payment request not found")
+
+        if user != request_instance.customer:
+            raise PermissionDenied()
+
+        if request_instance.status != PaymentRequestBooking.RequestStatus.PENDING:
+            raise serializers.ValidationError("You can only review pending request")
+
+        data['payment_request'] = request_instance
+        return data
+
+    def create(self, validated_data):
+
+        idempotency_key = validated_data['idempotency_key']
+        request_instance = validated_data['payment_request']
+        action = validated_data['action']
+
+        if action == self.choices[1]:
+            request_instance.status = PaymentRequestBooking.RequestStatus.REJECTED
+        else:
+            print("Here")
+            release = BookingService().release_funds(request_instance, idempotency_key)
+            request_instance.status = PaymentRequestBooking.RequestStatus.APPROVED
+
+        request_instance.reviewed_at = timezone.now()
+        request_instance.save()
+
+        return request_instance
+
+class RequestSerializer(serializers.ModelSerializer):
+
+    class Meta:
+        model = PaymentRequestBooking
+        
+        fields = [
+            'request_id', 'message',
+            'amount', 'booking',
+            'provider', 'customer',
+            'status', 'requested_at',
+            'reviewed_at'
+        ]
+
+class PaymentRequestDetailSerializer(serializers.ModelSerializer):
+    customer = UserReadSerializer(read_only=True)
+    provider = ProviderProfileDetailSerializer(read_only=True)
+    booking = BookingDetailSerializer(read_only=True)
+    attachments_payment_request = BookingAttachmentSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = PaymentRequestBooking
+
+        fields = [
+            'request_id', "booking",
+            'message', 'amount',
+            'payment_type', 'status',
+            'requested_at', 'updated_at',
+            'reviewed_at', 'customer', 'provider',
+            'attachments_payment_request'
+
+        ]

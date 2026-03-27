@@ -2,6 +2,7 @@ from config.settings.base import *
 import dj_database_url
 
 DEBUG = env("DEBUG", default=False)
+BASE_URL = env("BASE_URL_PROD")
 
 ALLOWED_HOSTS = env("ALLOWED_HOSTS").split(",")
 
@@ -20,7 +21,7 @@ CELERY_RESULT_BACKEND = env("PRODUCTION_REDIS_URL", default="redis://redis:6379/
 
 DATABASES = {
         'default': dj_database_url.config(
-            default=env("DATABASE_URL"),
+            default=env("DATABASE_URL_PROD"),
             ssl_require=True,
             conn_max_age=0
         )
