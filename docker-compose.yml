@@ -19,7 +19,7 @@ services:
       db_migrate:
         condition: service_completed_successfully
     build: .
-    command: ["gunicorn", "--workers", "3", "--bind", "0.0.0.0:8000", "backend/config.wsgi:application"]
+    command: ["uv", "run", "gunicorn", "--workers", "3", "--bind", "0.0.0.0:8000", "backend/config.wsgi:application"]
     env_file:
       - .env
     volumes:
@@ -33,7 +33,7 @@ services:
     volumes:
       - .:/app
     container_name: celery-worker
-    command: ["celery", "-A", "backend/config", "worker", "--loglevel=info"]
+    command: ["uv", "run", "celery", "-A", "backend/config", "worker", "--loglevel=info"]
     env_file:
       - .env
     restart: "unless-stopped"
@@ -44,7 +44,7 @@ services:
     restart: "unless-stopped"
     env_file:
       - .env
-    command: ["celery", "-A", "backend/config", "beat", "--loglevel=info"]
+    command: ["uv", "run", "celery", "-A", "backend/config", "beat", "--loglevel=info"]
     volumes:
       - .:/app
 

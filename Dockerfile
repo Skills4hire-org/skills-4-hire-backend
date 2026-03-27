@@ -17,7 +17,7 @@ COPY ./pyproject.toml ./uv.lock ./build.sh  ./
 
 RUN uv sync --frozen --no-cache --no-dev
 
-Run chmod +x build.sh
+RUN chmod +x build.sh
 
 COPY . .
 
