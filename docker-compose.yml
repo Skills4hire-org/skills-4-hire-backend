@@ -69,18 +69,12 @@ services:
     depends_on:
       - web
 
-  certbot:
-    volumes:
+certbot:
+  image: certbot/certbot
+  container_name: certbot
+  volumes:
     - ./certbot/conf:/etc/letsencrypt
     - ./certbot/www:/var/www/certbot
-    command: certonly --webroot --webroot-path=/var/www/certbot
-      --email skills4hireofficial@email.com
-      --agree-tos
-      --no-eff-email
-      -d skills4hireapp.com
-    image: certbot/certbot
-    container_name: certbot
-    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done"
-
+  entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done"
 volumes:
   .:
