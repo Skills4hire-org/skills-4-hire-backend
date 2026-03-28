@@ -274,7 +274,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     def user_can_authenticate(self, user):
         if hasattr(user, "is_active") and hasattr(user, "is_verified"):
-            return getattr(user, "is_active", True) and getattr(user, "is_verified", True)
+            return user.is_active and user.is_verified
         return False
         
     def validate(self, attrs):

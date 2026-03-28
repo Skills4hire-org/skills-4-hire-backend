@@ -1,6 +1,6 @@
 import uuid
 
-from .services.tasks import send_email_on_queue
+from .services.tasks import send_email_to_queue
 from .utils.helpers import verify_hashed_code
 from .one_time_password import OneTimePassword
 from .services.email_services import send_mail_base
@@ -47,7 +47,7 @@ def _send_email_to_user(context: dict):
     email = email
     context.update({"to_email": email, "subject": subject, "template_name": template_name})
     try:
-        send_mail_base(context)
+        send_email_to_queue.delay(context)
         logger.info(f"Email message queened for {email}")
         return {"success": True, "message": "Email sent to queue successfully"}
     except Exception as e:

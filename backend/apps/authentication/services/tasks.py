@@ -19,7 +19,7 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 @shared_task(autoretry_for=(Exception,), max_retries=3, retry_backoff=3)
-def send_email_on_queue(content: dict):
+def send_email_to_queue(content: dict):
     """
     Docstring for send_email_on_queue
     
@@ -48,7 +48,7 @@ def auto_delete_otp():
         with transaction.atomic():
             one_time_codes = OneTimePassword.objects.filter(
                 created_at__lt=timezone.now() - timezone.timedelta(minutes=expiry_minute)
-            ).update(is_active=False, is_deleted=True)
+            ).update(is_active=False, is_deleted=True, is_used=True)
         
         logger.info(f"Automatically deleted OTP codes from the database")    
     except IntegrityError as exc:
