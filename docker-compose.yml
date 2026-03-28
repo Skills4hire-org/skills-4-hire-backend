@@ -64,7 +64,6 @@ services:
       - "443:443"
     volumes:
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
-      - static_volume:/staticfiles
       - ./certbot/www:/var/www/certbot
       - ./certbot/conf:/etc/letsencrypt
     depends_on:
@@ -78,5 +77,4 @@ services:
       - ./certbot/conf:/etc/letsencrypt
 
 volumes:
-  static_volume:
   .:
