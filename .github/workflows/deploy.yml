@@ -3,33 +3,28 @@ name: Deploy to DigitalOcean
 on:
   push:
     branches:
-      - master 
+      - master
 
 jobs:
   deploy:
-    name: Build & Deploy
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Deploy to DigitalOcean Droplet
+      - name: SSH into server and deploy
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.DO_HOST }}
-          username: ${{ secrets.DO_USER }}
-          key: ${{ secrets.DO_SSH_KEY }}
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
           script: |
-            cd ~/projects/skills-4-hire
+            cd /home/ogenna/projects/skills-4-hire
 
             # Pull latest code
             git pull origin master
 
-            # Build and restart all services
             docker compose down
             docker compose up -d --build
 
