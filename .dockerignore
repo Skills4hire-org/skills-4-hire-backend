@@ -3,3 +3,44 @@ __pycache__/
 *.db
 
 .python-version
+
+# Certbot
+certbot/
+
+# Static files
+backend/staticfiles/
+
+# Git
+.git/
+.gitignore
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Test/dev files
+.pytest_cache/
+*.coverage
+htmlcov/
+
+# Nginx
+nginx/
+
+# Docker files
+docker-compose.yml
+docker-compose.*.yml
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
