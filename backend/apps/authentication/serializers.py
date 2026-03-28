@@ -280,17 +280,21 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         password = attrs.get("password")
         email = attrs["email"]
-        valid_email = email 
+        valid_email = validate_email(email)
+
         if valid_email is None:
             raise serializers.ValidationError(_("email returned none when verifying email address"))
         try:
             user = User.objects.get(email=valid_email) 
         except User.DoesNotExist:
             raise AuthenticationFailed(code="invalid_credentials", detail={"status": "Failed", "message": f"account not found for user {valid_email}"})
+        
         if not self.user_can_authenticate(user):
             raise AuthenticationFailed(code="invalid_request", detail={"status": "Failed", "detail": _("account not verified")})
+        
         if not user.check_password(password):
             raise AuthenticationFailed(code="invalid_credentials", detail={"status": "failed", "detail": _("invalid_credentials")})
+        
         self.user = user
         data = super().validate(attrs)
         data.update({"user_data": {
@@ -343,7 +347,6 @@ class CustomLogoutSerializer(serializers.Serializer):
                 BlacklistedToken(token=token) for token in outstanding_tokens
             )
         return attrs
-
 
 class UserReadSerializer(serializers.ModelSerializer):
     class Meta:

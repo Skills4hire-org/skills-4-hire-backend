@@ -7,10 +7,10 @@ from .drf_yasg import get_swagger_view
 
 # ADMIN view and health checks
 urlpatterns = [
-    path('admin/', admin.site.urls),
-    path("health/", health, name="health"),
-    path("docker/", check_docker_update, name="docker"),
-    path("email/", test_email, name='test')
+    path('aduser-skills4hire/', admin.site.urls),
+    # path("health/", health, name="health"),
+    # path("docker/", check_docker_update, name="docker"),
+    # path("email/", test_email, name='test')
 ]
 # Project Documentation
 urlpatterns += [
