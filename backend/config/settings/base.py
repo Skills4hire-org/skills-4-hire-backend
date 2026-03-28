@@ -19,10 +19,6 @@ DEBUG = ""
 
 ALLOWED_HOSTS = []
 
-RESEND_API_KEY = env("RESEND_API_KEY")
-RESEND_REQUEST_PATH = env("RESEND_REQUEST_PATH")
-FROM_EMAIL = env("FROM_EMAIL")
-
 # UTILS
 BASE_URL = env("BASE_URL")
 OTP_RETRIES_PER_DAY = env.int("OTP_RETRIES_PER_DAY")
@@ -31,6 +27,10 @@ APP_NAME = env("APP_NAME", default="Skills4Hire")
 OTP_EXPIRY = env.int("OTP_EXPIRY")
 RESTRICTED_PATHS = env("RESTRICTED_PATHS").split(",")
 
+ANYMAIL = {
+    "BREVO_API_KEY": env("BREVO_API_KEY"),
+}
+DEFAULT_FROM_EMAIL = env("FROM_EMAIL")
 
 # User model to user 
 AUTH_USER_MODEL = "authentication.CustomUser"
@@ -53,8 +53,6 @@ INSTALLED_APPS = [
 
     # third party apps
     'corsheaders',
-    'cloudinary',
-    'cloudinary_storage',
     "drf_yasg",
     "rest_framework",
     'django_celery_beat',
@@ -62,6 +60,7 @@ INSTALLED_APPS = [
     'django_filters',
     "django_countries",
     "channels",
+    'anymail',
 
     # local apps
     'apps.authentication.apps.AuthenticationConfig',
@@ -133,18 +132,6 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 
-CLOUDINARY = {
-        "CLOUD_NAME": env("CLOUD_NAME"),
-        "API_KEY": env("CLOUD_API_KEY"),
-        "API_SECRET": env("CLOUD_API_SECRET_KEY"),
-
-        'BASE_URL': f"https://res.cloudinary.com/{env('CLOUD_NAME')}/",
-        "AVATER_FOLDER": env("CLOUDINARY_PROFILE_FOLDERS"),
-        "SECURE": True
-    }
-
-DEFAULT_FILE_STORAGE = "cloudinary_storage.storage.MediaCloudinaryStorage"
-
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
@@ -179,6 +166,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
+EMAIL_BACKEND = 'anymail.backends.brevo.EmailBackend'
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators
@@ -245,10 +233,7 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(minute=1)
     }
 }
-CORS_ALLOWED_ORIGINS = env(
-    'CORS_ALLOWED_ORIGINS',
-    default='http://localhost:3000,http://localhost:8000',
-)
+CORS_ALLOWED_ORIGINS = env('CORS_ALLOWED_ORIGINS').split(",")
 
 CORS_ALLOW_CREDENTIALS = True
 

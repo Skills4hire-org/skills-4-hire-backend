@@ -3,6 +3,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 
 from ...models import Bookings
+from ....users.provider_models import ProviderModel
 
 from faker import Faker
 import random
@@ -12,24 +13,34 @@ class Command(BaseCommand):
 
     User = get_user_model()
     faker = Faker()
+    providers = ProviderModel
+
     def handle(self, *args, **options):
-        customers = (self.User.objects.filter(active_role=self.User.RoleChoices.CUSTOMER))
-        providers = (self.User.objects.filter(active_role=self.User.RoleChoices.SERVICE_PROVIDER))
+        customers = (self.User.objects.filter(is_customer=True))
+        providers = (self.providers.objects.filter(is_active=True))
+
         booking_status = getattr(Bookings.BookingStatus, "values")
-        n_bookings = 500
+
+        n_bookings = 5000
         bookings_list = []
-        self.stdout.write(self.style.NOTICE("Initailizing Task: Booking Population...."))
+
+        self.stdout.write(self.style.NOTICE("Executing Task: Booking Population...."))
+
         for i in range(n_bookings):
+
             self.stdout.write(self.style.NOTICE(f"Task Execution: {i + 1}.."))
+
             bookings = Bookings(
                 booking_status=random.choice(booking_status), customer=random.choice(customers), 
                 provider=random.choice(providers),
-                currency=self.faker.currency(), price=random.randint(1000, 10000), notes=self.faker.texts(), 
+                currency=self.faker.currency(), price=random.randint(1000, 10000),
+                notes=self.faker.texts(),
                 descriptions=self.faker.texts(), start_date=timezone.now(), 
-                end_date=timezone.now() + timezone.timedelta(days=13))             
+                end_date=timezone.now() + timezone.timedelta(days=13))
+
             bookings_list.append(bookings)
 
-            if len(bookings_list) == n_bookings:
+            if len(bookings_list) == 1000:
                 Bookings.objects.bulk_create(bookings_list)
         self.stdout.write(self.style.SUCCESS("Successfully Completed Task Execution"))
 

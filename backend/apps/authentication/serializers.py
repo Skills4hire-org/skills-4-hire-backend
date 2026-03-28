@@ -206,15 +206,19 @@ class AccountVerificationSerializer(serializers.Serializer):
         return value.strip()
     
     def validate(self, attrs):
-        code, email = attrs["email"], attrs["code"]
+        email, code = attrs["email"], attrs["code"]
+
         user = _get_user_by_email(email=email)
         if user is None:
             raise serializers.ValidationError(_("User not found"), code="user_not_found")
         code_instance = _get_code_instance_or_none(code, user=user)
-        if code_instance.is_expired():
-            raise serializers.ValidationError(_("Code Already expired"), code="expired")
+       
         if code_instance is None:
             raise serializers.ValidationError(_("OneTImePassword Not Found"), code="not_found")
+
+        if code_instance.is_expired():
+            raise serializers.ValidationError(_("Code Already expired"), code="expired")
+        
         if not code_instance.is_active or code_instance.is_used:
             raise serializers.ValidationError(_('code already expired'), code="invalid_code")
         return attrs
@@ -237,10 +241,12 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
 
     def validate_code(self, value):
         code_instance = _get_code_instance_or_none(value.strip())
-        if code_instance.is_expired():
-            raise serializers.ValidationError(_("code already expired"), code="expired")
         if code_instance is None:
             raise serializers.ValidationError(_("OneTimePassword object not found"))
+        
+        if code_instance.is_expired():
+            raise serializers.ValidationError(_("code already expired"), code="expired")
+        
         user = code_instance.user
         if not user.is_active or user.is_verified:
             raise serializers.ValidationError("Account not verified")
@@ -268,28 +274,34 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
     def user_can_authenticate(self, user):
         if hasattr(user, "is_active") and hasattr(user, "is_verified"):
-            return getattr(user, "is_active", True) and getattr(user, "is_verified", True)
+            return user.is_active and user.is_verified
         return False
         
     def validate(self, attrs):
         password = attrs.get("password")
         email = attrs["email"]
-        valid_email = email 
+        valid_email = validate_email(email)
+
         if valid_email is None:
             raise serializers.ValidationError(_("email returned none when verifying email address"))
         try:
             user = User.objects.get(email=valid_email) 
         except User.DoesNotExist:
             raise AuthenticationFailed(code="invalid_credentials", detail={"status": "Failed", "message": f"account not found for user {valid_email}"})
+        
         if not self.user_can_authenticate(user):
             raise AuthenticationFailed(code="invalid_request", detail={"status": "Failed", "detail": _("account not verified")})
+        
         if not user.check_password(password):
             raise AuthenticationFailed(code="invalid_credentials", detail={"status": "failed", "detail": _("invalid_credentials")})
+        
         self.user = user
         data = super().validate(attrs)
         data.update({"user_data": {
             "user_id": user.pk, "email": user.email,
-            "name": getattr(user, "full_name") or ""
+            "name": getattr(user, "full_name") or "",
+            'is_customer': user.is_customer,
+            'is_provider': user.is_provider
         }})
         self.user.last_login = timezone.now()
         self.user.save()
@@ -336,7 +348,6 @@ class CustomLogoutSerializer(serializers.Serializer):
             )
         return attrs
 
-
 class UserReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -344,7 +355,7 @@ class UserReadSerializer(serializers.ModelSerializer):
             "email", "first_name",
             "last_name",
             "is_provider", "is_customer",
-            "active_role", "phone",
+            "phone",
             "is_active", "is_verified",
             
         ]   

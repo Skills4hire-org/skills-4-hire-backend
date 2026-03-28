@@ -5,6 +5,7 @@ import uuid
 from decimal import Decimal
 
 from apps.users.provider_models import ProviderModel
+from ..bookings.models import Bookings
 
 User = get_user_model()
 
@@ -30,40 +31,39 @@ class Wallet(models.Model):
         ]
 
     @property
-    def main_balance(self):
-        overrall_balance = self.balance
-        locked_balance = self.locked_wallet.all().only("amount")
-        locked_amount = Decimal()
-        for data in locked_balance:
-            locked = data.amount
-            locked_amount += locked
-        
-        balance = overrall_balance - locked_amount
-        return balance
-        
-
+    def get_total_balance(self):
+        current_balance = self.balance
+        locked_amounts = self.locked_balance.filter(is_released=False).aggregate(
+            locked_total=models.Sum('amounts')
+        )
+        return current_balance + locked_amounts['locked_total']
 
 
 class LockedWallet(models.Model):
-    locked_wallet_id = models.UUIDField(max_length=20, primary_key=True, default=uuid.uuid4, unique=True)
-    wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name="locked_wallet")
-    amount = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    locked_id = models.UUIDField(
+        primary_key=True,unique=True,
+        editable=False, default=uuid.uuid4
+    )
+    booking = models.OneToOneField(Bookings, on_delete=models.CASCADE, related_name="locked")
+    user_wallet = models.ForeignKey(Wallet, on_delete=models.CASCADE, related_name='locked_balance')
 
-    provider = models.ForeignKey(ProviderModel, on_delete=models.CASCADE, related_name="locked_wallet", blank=True, null=True)
-    created_at = models.DateTimeField(auto_now_add=True)
+    is_released = models.BooleanField(default=False)
+    amount = models.DecimalField(max_digits=8, decimal_places=2)
+
+    locked_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Locked Wallet {self.locked_wallet_id} for Wallet {self.wallet.wallet_id}"
+        return f"Locked Wallet ({self.locked_at}"
 
     class Meta:
-        verbose_name = "locked_wallets"
-        constraints = [
-            models.UniqueConstraint(fields=("locked_wallet_id", "wallet"), name="unique_locked_wallet"),
-            models.UniqueConstraint(fields=("wallet", "provider"), name="unique_wallet_provider_lock")
-        ]
+        verbose_name = "Locked Amount"
         indexes = [
-            models.Index(fields=["locked_wallet_id",], name="locked_wallet_id"),
-            models.Index(fields=["wallet"], name="wallet_idx"),
-            models.Index(fields=["provider"], name="prov_idx")
+            models.Index(fields=('is_released',)),
+            models.Index(fields=('locked_at',)),
+            models.Index(fields=('user_wallet',)),
+            models.Index(fields=('amount',))
         ]
-    
+
+        constraints = [
+            models.UniqueConstraint(fields=("booking", 'user_wallet'), name='unique_wallet')
+        ]

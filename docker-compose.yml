@@ -1,0 +1,81 @@
+services:
+  db_migrate:
+    build: .
+    container_name: db-migrate
+    env_file:
+      - .env
+    command: ["uv", 'run', "backend/manage.py", "migrate", "--noinput"]
+
+  collect_static:
+    build: .
+    container_name: static-files
+    env_file:
+      - .env
+    command: ["uv", 'run', "backend/manage.py", "collectstatic", "--noinput"]
+
+  web:
+    container_name: skills4Hire
+    depends_on:
+      db_migrate:
+        condition: service_completed_successfully
+    build: .
+    command: ["uv", "run", "gunicorn", "--workers", "3", "--bind", "0.0.0.0:8000", "config.wsgi:application"]
+    env_file:
+      - .env
+    volumes:
+      - .:/app
+    restart: "always"
+    ports:
+      - "8000:8000"
+
+  celery-worker:
+    build: .
+    volumes:
+      - .:/app
+    container_name: celery-worker
+    command: ["uv", "run", "celery", "-A", "config", "worker", "--loglevel=info"]
+    env_file:
+      - .env
+    restart: "unless-stopped"
+
+  celery-beat:
+    build: .
+    container_name: celery-beat
+    restart: "unless-stopped"
+    env_file:
+      - .env
+    command: ["uv", "run", "celery", "-A", "config", "beat", "--loglevel=info"]
+    volumes:
+      - .:/app
+
+  asgi:
+    build: .
+    command: uv run uvicorn config.asgi:application --host 0.0.0.0 --port 8001
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+
+  nginx:
+    image: nginx:latest
+    container_name: nginx_server
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+    depends_on:
+      - web
+
+  certbot:
+    image: certbot/certbot
+    container_name: certbot
+    entrypoint: /bin/sh -c "trap exit TERM; while :; do certbot renew; sleep 12h & wait $${!}; done"
+    volumes:
+      - ./certbot/www:/var/www/certbot
+      - ./certbot/conf:/etc/letsencrypt
+
+volumes:
+  .:

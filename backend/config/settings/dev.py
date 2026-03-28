@@ -25,15 +25,15 @@ if DEBUG:
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": env("DEV_REDIS_URL"),
+        "LOCATION": "redis://localhost:6379",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient"
         }
     }
 }
 
-CELERY_BROKER_URL = env("DEV_REDIS_URL", default="redis://localhost:6379")
-CELERY_RESULT_BACKEND = env("DEV_REDIS_URL", default="redis://localhost:6379")
+CELERY_BROKER_URL = "redis://localhost:6379"
+CELERY_RESULT_BACKEND = "redis://localhost:6379"
 
 
 CORS_ALLOW_ALL_ORIGINS = False
@@ -64,7 +64,7 @@ CHANNEL_LAYERS = {
         "CONFIG": {
             "hosts": [
                 {
-                    "address": env("DEV_REDIS_URL"),
+                    "address": "redis://localhost:6379/",
                     "ssl_cert_reqs": None,
                 }
             ],

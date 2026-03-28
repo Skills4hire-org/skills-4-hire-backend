@@ -208,7 +208,6 @@ class ConversationSerializer(serializers.ModelSerializer):
             ).exclude(sender=user).count()
         return 0
 
-
 class ConversationDetailSerializer(serializers.ModelSerializer):
     """
     Detailed serializer for conversation information.
@@ -239,7 +238,6 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
         # Get last 20 messages
         messages = obj.messages.all()[:20]
         return MessageListSerializer(messages, many=True).data
-
 
 class ConversationCreateSerializer(serializers.ModelSerializer):
     """
@@ -431,7 +429,6 @@ class NegotiationCreateSerializer(serializers.ModelSerializer):
     def update(self, instance: Negotiations, validated_data):
         logger.debug(f"instance: {instance}, validated_data: {validated_data}")
         action = validated_data["status"]
-
         user = self.context.get("request").user
 
         if instance.status == Negotiations.Status.ACCEPTED:

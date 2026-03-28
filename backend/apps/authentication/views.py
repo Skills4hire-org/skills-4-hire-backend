@@ -19,7 +19,8 @@ from .helpers import (
 )
 from .utils.template_helpers import (
     genrate_context_for_otp, 
-    generate_context_for_password_reset
+    generate_context_for_password_reset,
+    genrate_context_for_resend_otp
 )
 
 from rest_framework.views import APIView
@@ -33,7 +34,7 @@ from django.db import transaction
 
 BASE_URL = getattr(settings, "BASE_URL")
 
-class RegistrationView(APIView):
+class RegistrationViewSet(viewsets.ModelViewSet):
     """
     Handles registration-related HTTP POST requests.
 
@@ -50,7 +51,7 @@ class RegistrationView(APIView):
 
     serializer_class = RegistrationsSerializer
 
-    def post(self, request, *args, **kwargs):
+    def create(self, request, *args, **kwargs):
         """
         Handles the POST request to register a new user.
 
@@ -66,7 +67,7 @@ class RegistrationView(APIView):
             Response: A Response object with a success or error message.
         """
 
-        serializer = self.serializer_class(data=request.data)
+        serializer = self.get_serializer(data=request.data)
 
         try:
             registrations_service = RegistrationsService(serializer)
@@ -117,12 +118,20 @@ class ResendOtpViewSet(viewsets.ModelViewSet):
         email = validated_data["email"]
         try:
             user = _get_user_by_email(email)
+            if user is None:
+                return Response({"user": "User not found"})
+            
             code = create_otp_for_user(user)
-            context = genrate_context_for_otp(code=code, email=user.email)
+            context = genrate_context_for_resend_otp(
+                code=code, email=user.email, 
+                full_name=user.full_name
+                )
             _send_email_to_user(context)
+
             return Response(
                 {"status": "success", "detail": "OTP code sent. check your email address"}, 
                 status=status.HTTP_200_OK)
+        
         except Exception as exc:
             return Response({
                 "detail": f"Error sending OTP: {exc}"
@@ -139,6 +148,7 @@ class PasswordResetRequestViewSet(viewsets.ModelViewSet):
         valid_email = serializer.validated_data.get("email")
         try:
             user = _get_user_by_email(valid_email)
+            
             code = create_otp_for_user(user)
             context = generate_context_for_password_reset(code, valid_email, name=user.full_name)
         except Exception:

@@ -1,8 +1,9 @@
 import uuid
 
-from .services.tasks import send_email_on_queue
+from .services.tasks import send_email_to_queue
 from .utils.helpers import verify_hashed_code
 from .one_time_password import OneTimePassword
+from .services.email_services import send_mail_base
 
 from rest_framework_simplejwt.tokens import OutstandingToken, BlacklistedToken
 from rest_framework.exceptions import ValidationError, NotFound
@@ -42,16 +43,16 @@ def _send_email_to_user(context: dict):
     
     if not User.objects.filter(email=email).exists():
         raise ValidationError("User docent exits in our database")
+    
     email = email
     context.update({"to_email": email, "subject": subject, "template_name": template_name})
     try:
-        send_email_on_queue.delay(context)
+        send_email_to_queue.delay(context)
         logger.info(f"Email message queened for {email}")
         return {"success": True, "message": "Email sent to queue successfully"}
     except Exception as e:
         logger.exception("Exception while sending email.", exc_info=True)
         raise
-
 
 def blacklist_outstanding_token(user):
     if user is None:
@@ -80,7 +81,7 @@ def validate_email(email):
 
 def _get_user_by_email(email: str):
     try:
-        user = User.objects.get(email__iexact=email, is_deleted=False, is_active=True)
+        user = User.objects.get(email=email, is_deleted=False)
         return user
     except User.DoesNotExist:
         return None
@@ -97,7 +98,7 @@ def _get_code_instance_or_none(code: str, user = None) -> OneTimePassword | None
         if user:
             code_instance = OneTimePassword.objects.get(raw_code=code, user=user, is_active=True, is_used=False)
         else:
-            code_instance = OneTimePassword.objects.get(raw=code, is_active=True, is_used=False)
+            code_instance = OneTimePassword.objects.get(raw_code=code, is_active=True, is_used=False)
         code_instance_valid = verify_hashed_code(code, code_instance.hash_code)
         if code_instance_valid:
             return code_instance
@@ -117,13 +118,13 @@ def verify_account(user, code_instance: OneTimePassword) -> bool:
             is_verified = True
         except Exception:
             is_verified = False
-    if code_instance:
-        try:
-            with transaction.atomic():
+
+        if code_instance:
+            try:
                 code_instance.is_used = True
                 code_instance.is_active = False
                 code_instance.save()
-        except Exception:
-            raise Exception("Error updating code instance")
-    
+            except Exception:
+                raise Exception("Error updating code instance")
+        
     return is_verified

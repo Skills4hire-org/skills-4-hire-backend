@@ -1,6 +1,6 @@
 from django.urls import path, include
 from .views import (
-    RegistrationView,
+    RegistrationViewSet,
     AccountVerificationViewSet,
     ResendOtpViewSet,
     PasswordResetRequestViewSet,
@@ -18,6 +18,7 @@ router.register("resend/otp", ResendOtpViewSet, basename="otp_resend")
 router.register("password/reset", PasswordResetRequestViewSet, basename="password_reset")
 router.register("password/reset/confirm", PasswordResetConfirmViewSet, basename="password_reset_confirm")
 router.register("logout", LogOutViewSet, basename="logout")
+router.register("register", RegistrationViewSet, basename='register')
 
 
 app_name = "authentication"
@@ -25,7 +26,6 @@ app_name = "authentication"
 refresh_view = TokenRefreshView.as_view()
 
 urlpatterns = [
-    path("register/", RegistrationView.as_view(), name="register-view"),
     path("login/", token_obtain_pair, name="token-obtain"),
     path("refresh/token/", refresh_view, name="refresh-token"),
     path("", include(router.urls)),

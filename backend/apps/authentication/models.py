@@ -51,6 +51,8 @@ class UserManager(BaseUserManager):
         """ Create and save a super user instane """
         extra_fields.setdefault("is_superuser", True)
         extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_active", True)
+        extra_fields.setdefault('is_verified', True)
 
         return self.create_user(email=email, password=password, **extra_fields)
 

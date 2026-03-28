@@ -19,7 +19,7 @@ from yaml import serialize
 from .models import Post, Comment, PostLike
 from .serializers import (
     PostCreateSerializer, PostDetailSerializer,
-    CommentSerializer, RepostSerializer, PostListSerializer
+    CommentSerializer, RepostSerializer, PostListSerializer, CommentCreateSerializer, CommentDetailSerializer
 )
 from .paginations import CustomPostPagination
 from .permission import IsOwnerOrReadOnly
@@ -222,15 +222,25 @@ class PostViewSet(viewsets.ModelViewSet):
         return  return_paginated_view(self, reposts)
 
 class CommentViewSet(viewsets.ModelViewSet):
-    serializer_class = CommentSerializer
     pagination_class = CustomPostPagination
 
-    permissions = [permissions.IsAuthenticated]
-    queryset = Comment.active_objects.select_related("user", "post", "parent").all()
+    def get_serializer_class(self):
+        if self.action in ('create', 'update', 'partial_update', 'create_replies'):
+            return CommentCreateSerializer
+        elif self.action == 'retrieve':
+            return CommentDetailSerializer
+        return CommentSerializer
+
+    permissions = [IsOwnerOrReadOnly]
 
     def get_queryset(self):
         """ return base queryset"""
-        return self.queryset
+        post_instance, _ = self.get_object()
+        queryset = (Comment.active_objects.filter(post=post_instance).
+                    select_related("post", "user", 'parent').prefetch_related('attachment')
+                    )
+
+        return queryset
 
     def get_object(self) -> bool | tuple[Any, Model | Any]:
         post_pk = self.kwargs.get("posts_pk")
@@ -297,14 +307,7 @@ class CommentViewSet(viewsets.ModelViewSet):
 
     @method_decorator(cache_page(60 * 5))
     def list(self, request, *args, **kwargs):
-        """List comments (cached for a short period)."""
-        queryset = self.filter_queryset(self.get_queryset())
-        post, _ = self.get_object()
-
-        service = CommentService(post=post, user=request.user)
-        list_q = service.list_comments(comments=queryset)
-
-        return  return_paginated_view(self, list_q)
+        return super().list(request, *args, **kwargs)
 
     @action(methods=["post"], detail=True, url_path="comments")
     def create_replies(self, request, *args, **kwargs):
@@ -341,10 +344,6 @@ class CommentViewSet(viewsets.ModelViewSet):
     @action(methods=['get'], detail=True, url_path="comments/list")
     def list_replies(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
-
         post, comment_base = self.get_object()
-
-        service = CommentService(post, request.user)
-        comments = service.list_nested_comments(queryset, comment_base)
-
-        return return_paginated_view(self, comments)
+        nested_comments = queryset.filter(parent=comment_base).all()
+        return return_paginated_view(self, nested_comments)

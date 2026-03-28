@@ -17,13 +17,7 @@ def check_request(request):
     return True
 
 def is_customer(request):
-    if check_request(request):
-        role = getattr(request.user, "active_role", None)   
-        if role is None:
-            raise ValidationError("Role is not set for user, Complete onboarding to continue")
-        if role == CustomUser.RoleChoices.CUSTOMER:
-            return True
-    return False
+    return request.user.is_customer
 
 def provider_profile(pk: UUID) -> ProviderModel:
     if pk is None:
@@ -39,16 +33,3 @@ def provider_profile(pk: UUID) -> ProviderModel:
         logger.exception(f"Error fetching base Profile: Error: {str(e)}")
         raise ValidationError("Failed to fetch provider profile")
     return provider_profile
-
-def user_in_booking(user, booking) -> bool:
-    return user in (
-        booking.customer,
-        booking.provider.profile.user
-    )
-
-def can_delete_booking(user, booking):
-    return (
-        booking.is_active == True
-        and booking.is_deleted == False
-        and booking.customer == user
-    )

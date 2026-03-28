@@ -2,7 +2,7 @@
 FROM python:3.12-slim AS builder
 
 # project directory
-WORKDIR /app
+WORKDIR /app/backend
 
 # update apt
 RUN apt-get update && apt-get install curl -y
@@ -13,18 +13,15 @@ COPY --from=ghcr.io/astral-sh/uv:latest /uv /uvx /bin/
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
-COPY ../pyproject.toml ./uv.lock ./build.sh  ./
+COPY ./pyproject.toml ./uv.lock ./build.sh  ./
 
 RUN uv sync --frozen --no-cache --no-dev
 
-Run chmod +x build.sh
+RUN chmod +x build.sh
 
 COPY . .
 
 EXPOSE 8000
-
-# entry point
-CMD ["uv", "run", "sh", "build.sh"]
 
 
 
