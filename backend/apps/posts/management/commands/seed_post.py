@@ -32,6 +32,7 @@ class Command(BaseCommand):
 
         for i in range(amount_of_posts):
             self.stdout.write(self.style.NOTICE(f"Creating Post: {i + 1}"))
+            
             post = Post(post_id=uuid.uuid4(), post_content=self.faker.text(max_nb_chars=20),
                         user=random.choice(self.users), post_type=random.choice(self.posts_types),
                         amount=random.randint(1000, 10000), start_date=self.faker.date_time(tzinfo=timezone.get_current_timezone()), 
