@@ -29,7 +29,6 @@ def send_mail_base(context: dict) :
         subject = context.get("subject")
         to_email = context.get("to_email")
         
-        print("content", context)
         send_mail(
             subject=subject,
             from_email="skills4hireofficial@gmail.com",

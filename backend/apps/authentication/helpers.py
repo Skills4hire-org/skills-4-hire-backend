@@ -48,6 +48,7 @@ def _send_email_to_user(context: dict):
     context.update({"to_email": email, "subject": subject, "template_name": template_name})
     try:
         send_email_to_queue.delay(context)
+        # send_mail_base(context=context)
         logger.info(f"Email message queened for {email}")
         return {"success": True, "message": "Email sent to queue successfully"}
     except Exception as e:

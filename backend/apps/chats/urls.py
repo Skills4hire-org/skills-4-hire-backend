@@ -7,6 +7,7 @@ from .views import (
     ConversationViewSet, NegotiationViewSet,
     MessageViewSet
 )
+from .endorsements.urls import endorsement_urlpatterns
 
 router = DefaultRouter()
 
@@ -15,9 +16,11 @@ router.register("negotiation", NegotiationViewSet, basename="negotiation")
 
 message_routers = NestedSimpleRouter(parent_router=router, parent_prefix="conversation", lookup="conversation")
 message_routers.register("messages", MessageViewSet, basename="messages")
+
 urlpatterns = [
     path("", include(router.urls)),
     path("", include(message_routers.urls))
 
 ]
 
+urlpatterns += endorsement_urlpatterns
