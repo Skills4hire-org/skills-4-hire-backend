@@ -3,8 +3,8 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.request import Request
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
 
 from .models import Service
 from .pagination import ServicePagination
@@ -44,7 +44,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
             .order_by("-created_at")
         )
 
-    def destroy(self, request: Request, *args, **kwargs) -> Response:
+    def destroy(self, request, *args, **kwargs) -> Response:
         instance: Service = self.get_object()  # also runs object-level permission check
         instance.deleted_at = timezone.now()
         instance.is_active = False
@@ -53,8 +53,10 @@ class ServiceViewSet(viewsets.ModelViewSet):
 
     @action(methods=['get'], detail=False)
     def auth_user_services(self, request, *args, **kwargs):
-        user_profile = request.user.profile.provider_profile
-
+        try:
+            user_profile = request.user.profile.provider_profile
+        except Exception as e:
+            raise ValidationError(f"Error: {e}")
         queryset = self.filter_queryset(self.get_queryset()).filter(profile=user_profile)
         if queryset is None:
             return Response({"empty": "no services "}, status=status.HTTP_200_OK)
