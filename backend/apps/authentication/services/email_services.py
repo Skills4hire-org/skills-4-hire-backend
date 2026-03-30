@@ -31,7 +31,7 @@ def send_mail_base(context: dict) :
         
         send_mail(
             subject=subject,
-            from_email="skills4hireofficial@gmail.com",
+            from_email="noreply@skills4hireapp.com",
             recipient_list=[to_email],
             fail_silently=False,
             message='',
@@ -43,6 +43,4 @@ def send_mail_base(context: dict) :
     except Exception as e:
         logger.exception(f"Error preparing email: {str(e)}")
         raise Exception(str(e))
-
-
 
