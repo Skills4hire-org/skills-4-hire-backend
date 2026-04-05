@@ -1,20 +1,26 @@
 from django.contrib import admin
 
-from .models import Wallet, LockedWallet
-from .transactions.models import Transactions
+from .models import Wallet, LockedWallet, WalletTransaction, WebhookEvent
 
-@admin.register(Transactions)
-class TransactionAdmin(admin.ModelAdmin):
+
+@admin.register(WalletTransaction)
+class WalletTransactionAdmin(admin.ModelAdmin):
     list_display = [
-        'booking', 'sender',
-        'receiver', 'amount',
-        'type', 'status', 'reference_key',
-        'is_active', 'transaction_date'
+        'amount', 'user',
+        "type", 'status', 'idempotency_key',
+        'reference_key', 'is_active', 'transaction_date',
+        'failed_at', 'completed_at', 'updated_at'
     ]
 
-    list_filter = [
-        'status', 'type', 'is_active',
-        'transaction_date'
+    list_select_related = ['user', 'wallet']
+
+
+@admin.register(WebhookEvent)
+class WebhookEventAdmin(admin.ModelAdmin):
+    list_display = [
+        'reference', 'event_type', 
+        'status', 'error', 'created_at',
+        'processed_at'
     ]
 
 

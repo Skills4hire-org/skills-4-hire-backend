@@ -23,9 +23,17 @@ ALLOWED_HOSTS = []
 BASE_URL = env("BASE_URL")
 OTP_RETRIES_PER_DAY = env.int("OTP_RETRIES_PER_DAY")
 MAX_OTP_LENGTH = env.int("MAX_OTP_LENGTH")
+
 APP_NAME = env("APP_NAME", default="Skills4Hire")
 OTP_EXPIRY = env.int("OTP_EXPIRY")
 RESTRICTED_PATHS = env("RESTRICTED_PATHS").split(",")
+
+SKILLS4HIRE_PERCENTAGE_FEE = env.int("SKILLS4HIRE_PERCENTAGE_FEE", default=0)
+
+PAYSTACK_SECRET_KEY = env("PAYSTACK_SECRET_KEY")
+PAYSTACK_BASE_URL = env("PAYSTACK_BASE_URL", default="https://api.paystack.co")
+PAYSTACK_CHANNELS = env("PAYSTACK_CHANNELS").split(",")
+
 
 ANYMAIL = {
     "BREVO_API_KEY": env("BREVO_API_KEY"),
@@ -56,6 +64,7 @@ INSTALLED_APPS = [
     "drf_yasg",
     "rest_framework",
     'django_celery_beat',
+    'django_celery_results',
     'rest_framework_simplejwt.token_blacklist',
     'django_filters',
     "django_countries",
@@ -214,6 +223,8 @@ STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Celery config
+# settings.py
+ 
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"

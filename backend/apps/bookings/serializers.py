@@ -8,15 +8,19 @@ from rest_framework.exceptions import PermissionDenied, NotFound
 from ..core.utils.py import get_or_none
 from ..users.address.models import UserAddress
 from ..users.address.serializers import AddressCreateSerializer, AddressSerializer
-from .models import Bookings, BookingAttachments, PaymentRequestBooking
+from .models import Bookings, BookingAttachments, PaymentRequestBooking,\
+BookingTransaction
+
 from .helpers import is_customer
 from .services import BookingService
 from ..authentication.serializers import UserReadSerializer
 from apps.wallet.services import WalletService
+from ..wallet.services import get_calculated_transaction
 
 
 from decimal import Decimal
 import logging
+
 
 from ..users.provider_models import ProviderModel
 from ..users.serializers.profiles import ProviderProfileDetailSerializer
@@ -104,8 +108,6 @@ class BookingCreateSerializer(serializers.ModelSerializer):
                 BookingAttachments(booking=booking_instance, **data)
                 for data in attachment
             ])
-
-       
 
         booking_instance.address = address
         booking_instance.save()
@@ -217,7 +219,7 @@ class BookingDetailSerializer(serializers.ModelSerializer):
 
 class PaymentRequestSerializer(serializers.ModelSerializer):
 
-    attachments_payment_request = BookingAttachmentSerializer(many=True)
+    attachments_payment_request = BookingAttachmentSerializer(many=True, required=True)
     booking_id = serializers.UUIDField(required=True, write_only=True)
 
     class Meta:
@@ -229,7 +231,7 @@ class PaymentRequestSerializer(serializers.ModelSerializer):
 
     def validate_message(self, value):
         return value.strip()
-
+    
     def validate(self, data):
 
         booking_pk = data['booking_id']
@@ -245,15 +247,33 @@ class PaymentRequestSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("invalid request")
 
         user = self.context['request'].user
+        
         if not booking_instance.is_participants(user):
             raise PermissionDenied()
 
         payment_instance = booking_instance.locked
+
+        provider_total_payout = get_calculated_transaction(booking=booking_instance)
+
         if payment_instance.is_released:
             raise serializers.ValidationError("payment already released and closed")
 
-        if payment_instance.amount < data['amount']:
+        if data['payment_type'] == PaymentRequestBooking.PaymentType.PART_TIME and \
+            data['amount'] > provider_total_payout / 2:
+
+            raise serializers.ValidationError("Part payment cannot be greater than half of the full payment")
+        
+        if data['payment_type'] == PaymentRequestBooking.PaymentType.FULL_TIME and \
+            data['amount'] != provider_total_payout:
+            
+            raise serializers.ValidationError('please request full payout on full payment')
+
+        if provider_total_payout < data['amount']:
             raise serializers.ValidationError('invalid_digits_amounts')
+        
+        data['booking_instance'] = booking_instance
+        data['locked_wallet'] = payment_instance
+
         return data
 
     def create(self, validated_data):
@@ -261,21 +281,25 @@ class PaymentRequestSerializer(serializers.ModelSerializer):
 
         user = self.context['request'].user
 
-        booking_instance = get_or_none(
-            Bookings, pk=validated_data['booking_id'],
-            booking_status=Bookings.BookingStatus.IN_PROGRESS
+        booking_instance =  validated_data['booking_instance']
+        locked_wallet = validated_data['locked_wallet']
+
+        latest_payout_request  = (
+            PaymentRequestBooking.objects.filter(booking=booking_instance)
+            .select_related("booking", "provider", "customer")
+            .order_by("-requested_at")
+            .first()
         )
+
+        if latest_payout_request is not None:
+            if latest_payout_request.requested_at + timezone.timedelta(hours=24) > timezone.now():
+                raise serializers.ValidationError("You may have to wait for another 24 hours \
+                                                before submitting another request for this booking")
 
         if booking_instance.provider.profile.user != user:
             raise PermissionDenied()
         
-        payment_type = validated_data['payment_type']
-        if payment_type == PaymentRequestBooking.PaymentType.FULL_TIME:
-            amount = booking_instance.locked.amount
-        else:
-            amount = validated_data['amount']
-
-        validated_data.pop("amount")
+        amount = validated_data.pop("amount")
 
         payment_request_instance = PaymentRequestBooking.objects.create(
             provider=booking_instance.provider, customer=booking_instance.customer,
@@ -293,6 +317,7 @@ class PaymentRequestSerializer(serializers.ModelSerializer):
 
 class ReviewPaymentRequestSerializer(serializers.ModelSerializer):
     choices = ['ACCEPT', 'REJECT']
+
     idempotency_key = serializers.UUIDField(write_only=True, required=True)
     action = serializers.ChoiceField(choices=choices, required=True)
     request_id = serializers.UUIDField(required=True, write_only=True)
@@ -306,9 +331,14 @@ class ReviewPaymentRequestSerializer(serializers.ModelSerializer):
 
     def validate(self, data):
         user = self.context['request'].user
-        request_instance = get_or_none(
-            PaymentRequestBooking, pk=data['request_id']
+
+        request_instance  = (
+            PaymentRequestBooking.objects.filter(pk=data['request_id'])
+            .select_related("booking", "provider", "customer")
+            .order_by("-requested_at")
+            .first()
         )
+
         if request_instance is None:
             raise serializers.ValidationError("payment request not found")
 
@@ -319,6 +349,7 @@ class ReviewPaymentRequestSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("You can only review pending request")
 
         data['payment_request'] = request_instance
+
         return data
 
     def create(self, validated_data):
@@ -330,7 +361,6 @@ class ReviewPaymentRequestSerializer(serializers.ModelSerializer):
         if action == self.choices[1]:
             request_instance.status = PaymentRequestBooking.RequestStatus.REJECTED
         else:
-            print("Here")
             release = BookingService().release_funds(request_instance, idempotency_key)
             request_instance.status = PaymentRequestBooking.RequestStatus.APPROVED
 
@@ -369,4 +399,12 @@ class PaymentRequestDetailSerializer(serializers.ModelSerializer):
             'reviewed_at', 'customer', 'provider',
             'attachments_payment_request'
 
+        ]
+
+
+class BookingTransactionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BookingTransaction
+        fields = [
+            "transaction_id"
         ]

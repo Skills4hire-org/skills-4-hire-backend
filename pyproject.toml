@@ -15,6 +15,7 @@ dependencies = [
     "django-anymail>=14.0",
     "django-autoslug>=1.9.9",
     "django-celery-beat>=2.9.0",
+    "django-celery-results>=2.6.0",
     "django-cloudinary-storage>=0.3.0",
     "django-cors-headers>=4.9.0",
     "django-countries>=8.2.0",

@@ -2,7 +2,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
-from .services import health, check_docker_update, test_email
+from .services import health, check_docker_update, test_email, get_banks
 from .drf_yasg import get_swagger_view
 
 # ADMIN view and health checks
@@ -11,6 +11,7 @@ urlpatterns = [
     # path("health/", health, name="health"),
     # path("docker/", check_docker_update, name="docker"),
     # path("email/", test_email, name='test')
+    path('banks/', get_banks, name='get_banks')
 ]
 # Project Documentation
 urlpatterns += [
@@ -26,7 +27,8 @@ urlpatterns += [
     path("api/v1/", include("apps.ratings.urls")),
     path("api/v1/", include("apps.bookings.urls")),
     path("api/v1/", include("apps.notification.urls")),
-    path("api/v1/", include("apps.chats.urls"))
+    path("api/v1/", include("apps.chats.urls")),
+    path("api/v1/", include('apps.wallet.urls'))
     # path("rest/auth/", include("rest_framework.urls"))
 ]
 
