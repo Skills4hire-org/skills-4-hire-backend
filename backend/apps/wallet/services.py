@@ -45,7 +45,6 @@ def refund_booking(booking, amount):
     locked_wallet.save(update_fields=['is_released'])
     return locked_wallet
 
-@transaction.atomic
 def get_calculated_transaction(booking: Bookings):
     """ return the calcucated balance to send to provider( ie minus platform transaction fee)"""
     locked_wallet = booking.locked

@@ -25,25 +25,28 @@ class BookingService:
         payout_type = payout_request_instance.payment_type
 
         booking = payout_request_instance.booking
+
         locked_wallet = booking.locked
 
         if locked_wallet.is_released:
             raise ValidationError("payment has already been released and closed")
-
+        
+        total_provider_funds = get_calculated_transaction(booking=booking)
+        if total_provider_funds < amount:
+                raise ValidationError("Payout amount is invalid")
+        
         try:
             with transaction.atomic():
-                total_provider_funds = get_calculated_transaction(booking=booking)
                 if payout_type == \
                     PaymentRequestBooking.PaymentType.PART_TIME:
-                    if total_provider_funds < amount:
-                        raise ValidationError("Payout amount is invalid")  
                     locked_wallet.mutable_amount -= amount
 
                     amount_to_transfer = amount
 
                 else:
                     amount_to_transfer = total_provider_funds
-
+                    locked_wallet.mutable_amount -= amount_to_transfer
+                    
                     locked_wallet.is_released = True
                     
                 locked_wallet.save()
@@ -73,8 +76,9 @@ class BookingService:
         booking = None
         transaction_status = False
         
-        try:
-            with transaction.atomic():
+        with transaction.atomic():
+            try:
+            
                 booking = Bookings.objects.create(customer=customer, provider=provider, 
                                                 **validated_data)
                 # deduct user wallet under the same atomicity, is either the booking is
@@ -95,16 +99,16 @@ class BookingService:
                 
                 transaction_status = True  # Mark as successful only if everything succeeds
                 
-        except Exception as e:
-            logger.exception(f"Failed to create booking: {e}", exc_info=True)
-            transaction_status = False
+            except Exception as e:
+                logger.exception(f"Failed to create booking: {e}", exc_info=True)
+                transaction_status = False
 
-        if booking:
-            transaction.on_commit(lambda: process_transaction(
-                booking_id=booking.pk, action=BookingTransaction.Type.ESCROW_HOLD, 
-                idempotency_key=idempotency_key, status=transaction_status
-            ))
-        
+            if booking:
+                process_transaction(
+                    booking_id=booking.pk, action=BookingTransaction.Type.ESCROW_HOLD, 
+                    idempotency_key=idempotency_key, status=transaction_status
+                )
+            
         return booking
 
     @staticmethod
@@ -114,9 +118,10 @@ class BookingService:
             raise ValidationError("Failed: 'booking' and 'user' should be valid instances")
 
         transaction_status = False
-        try:
-            with transaction.atomic():
-                booking = booking.cancel_booking(user=user)
+
+        with transaction.atomic():
+            try:
+                cancel = booking.cancel_booking(user=user)
 
                 amount_to_refund = booking.price
              
@@ -126,14 +131,14 @@ class BookingService:
                 if reverse_funds.is_released:
                     # create transaction
                     transaction_status = True
-        except Exception as e:
-            logger.exception(f"Failed to reverse booking: {e}", exc_info=True)
-            transaction_status = False
-        
-        transaction.on_commit(lambda: process_transaction(
-            booking_id=booking.pk, action=BookingTransaction.Type.REFUND,
-            idempotency_key=idempotency_key, status=transaction_status
-            ))
+            except Exception as e:
+                logger.exception(f"Failed to reverse booking: {e}", exc_info=True)
+                transaction_status = False
+            
+        transaction.on_commit( lambda: process_transaction(
+                booking_id=booking.pk, action=BookingTransaction.Type.REFUND,
+                idempotency_key=idempotency_key, status=transaction_status
+                ))
 
         message = f"Your booking has been cancelled by {user.full_name}."
         logger.info(f"Booking {booking.pk} cancelled by user {user.get_username()}.")

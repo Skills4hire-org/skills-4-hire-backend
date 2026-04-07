@@ -61,7 +61,7 @@ class BookingViewSet(viewsets.ModelViewSet):
                 data={
                     "status": "success",
                     'msg': "Found duplicate transaction",
-                    'data': BookingTransactionSerializer(transaction_ready_exists(user, idempotency)[1])
+                    'data': BookingTransactionSerializer(transaction_ready_exists(user, idempotency)[1]).data
                 }
             )
 

@@ -64,7 +64,7 @@ def process_deposit(wallet_transaction_id: uuid.UUID) -> dict:
     autoretry_for=[Exception,],
     retry_backoff=True
 )
-def verify_deposit_status(webhook_data: dict):
+def verify_deposit_status(self, webhook_data: dict):
     logger.info("Task Execution: Processing Task, Deposit verifications")
 
     payment_status = webhook_data.get("status")

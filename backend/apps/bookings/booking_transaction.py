@@ -1,5 +1,7 @@
 from .models import BookingTransaction, Bookings
 
+from rest_framework.exceptions import ValidationError
+
 from django.db import transaction
 from django.db.models import Q
 from uuid import UUID
@@ -8,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 def process_transaction(booking_id: UUID, action, idempotency_key, status: bool):
-
+    
     if action not in BookingTransaction.Type.values:
         raise ValueError("in valid action object")
     
@@ -20,7 +22,7 @@ def process_transaction(booking_id: UUID, action, idempotency_key, status: bool)
 
     except Bookings.DoesNotExist:
         logger.info("can find booking")
-        raise ValueError("booking not found")
+        raise ValidationError("booking not found")
 
     with transaction.atomic():
         try:
@@ -34,7 +36,7 @@ def process_transaction(booking_id: UUID, action, idempotency_key, status: bool)
                 booking_transaction.type = booking_transaction.Type.ESCROW_HOLD
             elif action == BookingTransaction.Type.REFUND:
                 booking_transaction.type = BookingTransaction.Type.REFUND
-            elif booking_transaction.type == BookingTransaction.Type.RELEASE:
+            elif action == BookingTransaction.Type.RELEASE:
                 booking_transaction.type = BookingTransaction.Type.RELEASE
             else:
                 raise ValueError()
@@ -54,8 +56,6 @@ def process_transaction(booking_id: UUID, action, idempotency_key, status: bool)
 
 def transaction_ready_exists(user, idempotency):
     existing = BookingTransaction.objects.filter(
-        Q(sender=user)|
-        Q(receiver=user.profile.provider_profile),
         idempotency_key=idempotency
     ).first()
     

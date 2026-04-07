@@ -87,7 +87,7 @@ class Bookings(models.Model):
             raise ValueError("Invalid Instance for amount")
         
         s4h_per = settings.SKILLS4HIRE_PERCENTAGE_FEE / 100
-        return s4h_per * amount
+        return Decimal(s4h_per) * amount
     
     def save(self, *args, **kwargs):
         self.clean()

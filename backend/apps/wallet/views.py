@@ -10,6 +10,8 @@ from .tasks import process_deposit, verify_deposit_status
 from .paystack.service import PaystackService
 
 from django.views.decorators.csrf import csrf_exempt
+from django.views.decorators.cache import cache_page
+from django.utils.decorators import method_decorator
 from django.utils import timezone
 
 import logging, json
@@ -37,6 +39,7 @@ class WalletViewSet(viewsets.GenericViewSet):
 
         return user_wallet
 
+    @method_decorator(cache_page(60 * 5))
     @action(methods=['get'], detail=False, url_path="wallet")
     def wallet(self, request, *args, **kwargs):
 
@@ -112,9 +115,9 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
         EVENT_HANDLERS = {
             "charge.success": verify_deposit_status
         }
-        service = PaystackService()
+        paystack_service = PaystackService()
 
-        if not service._verify_signature(request):
+        if not paystack_service._verify_signature(request):
             logger.info("Invalid signature for payment")
             return Response(status=status.HTTP_403_FORBIDDEN)
         
@@ -161,7 +164,7 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
                 return Response(status=200)
             
             handler.delay(data)
-            webhook_event.status       = WebhookEvent.Status.PROCESSED
+            webhook_event.status = WebhookEvent.Status.PROCESSED
             webhook_event.processed_at = timezone.now()
             webhook_event.save(update_fields=["status", "processed_at"])
 

@@ -26,10 +26,6 @@ class AddressCreateSerializer(serializers.ModelSerializer):
     def validate(self, data):
         user = self.context.get("request").user
         user_base_profile = user.profile
-        if AddressService().address_already_exists(
-            user_base_profile, data['postal_code']
-        ):
-            raise serializers.ValidationError("Address with this postal code already exists in you profile")
         for value in data.values():
             if isinstance(value, str):
                 value.strip().title()

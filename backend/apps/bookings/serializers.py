@@ -239,10 +239,7 @@ class PaymentRequestSerializer(serializers.ModelSerializer):
         booking_instance = get_or_none(
             Bookings, pk=booking_pk,
             booking_status=Bookings.BookingStatus.IN_PROGRESS)
-
-        if hasattr(booking_instance, "booking_request"):
-            raise serializers.ValidationError("payment already requested. wait for customer response")
-
+ 
         if booking_instance is None:
             raise serializers.ValidationError("invalid request")
 
@@ -281,8 +278,8 @@ class PaymentRequestSerializer(serializers.ModelSerializer):
 
         user = self.context['request'].user
 
-        booking_instance =  validated_data['booking_instance']
-        locked_wallet = validated_data['locked_wallet']
+        booking_instance =  validated_data.pop('booking_instance')
+        locked_wallet = validated_data.pop('locked_wallet')
 
         latest_payout_request  = (
             PaymentRequestBooking.objects.filter(booking=booking_instance)
@@ -292,9 +289,14 @@ class PaymentRequestSerializer(serializers.ModelSerializer):
         )
 
         if latest_payout_request is not None:
-            if latest_payout_request.requested_at + timezone.timedelta(hours=24) > timezone.now():
-                raise serializers.ValidationError("You may have to wait for another 24 hours \
-                                                before submitting another request for this booking")
+            duration = latest_payout_request.requested_at + timezone.timedelta(hours=24)
+            if duration > timezone.now():
+                next_payout = duration - timezone.now()
+                hours_left = next_payout.total_seconds() // 3600
+
+                raise serializers.ValidationError(
+                    f"Request under review. request will be open in {hours_left} hour(s)" 
+                )
 
         if booking_instance.provider.profile.user != user:
             raise PermissionDenied()
