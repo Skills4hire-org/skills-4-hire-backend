@@ -69,19 +69,13 @@ class RegistrationViewSet(viewsets.ModelViewSet):
 
         serializer = self.get_serializer(data=request.data)
 
-        try:
-            registrations_service = RegistrationsService(serializer)
-            registration_result = registrations_service.register_service()
-            return Response({
-                    "status": "success",
-                    "detail": "Registration successful. Verify your account using the OTP sent to your email"},
-                status=status.HTTP_201_CREATED,
-            )
-        except Exception as exc:
-            return Response(
-                {"detail": f"Registration failed: {str(exc)}"},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
+        registrations_service = RegistrationsService(serializer)
+        registration_result = registrations_service.register_service()
+        return Response({
+                "status": "success",
+                "detail": "Registration successful. Verify your account using the OTP sent to your email"},
+            status=status.HTTP_201_CREATED,
+        )
 
 class AccountVerificationViewSet(viewsets.ModelViewSet):
     http_method_names = ["post"]

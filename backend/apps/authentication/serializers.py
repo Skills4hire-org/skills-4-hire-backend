@@ -194,11 +194,7 @@ class AccountVerificationSerializer(serializers.Serializer):
 
     Both fields are write-only and required.
     """
-    email = serializers.EmailField(max_length=200, write_only=True, required=True)
     code = serializers.CharField(max_length=50, write_only=True, required=True)
-
-    def validate_email(self, value: str):
-        return validate_email(value)
         
     def validate_code(self, value):
         if not isinstance(value, str):
@@ -206,12 +202,9 @@ class AccountVerificationSerializer(serializers.Serializer):
         return value.strip()
     
     def validate(self, attrs):
-        email, code = attrs["email"], attrs["code"]
+        code = attrs["code"]
 
-        user = _get_user_by_email(email=email)
-        if user is None:
-            raise serializers.ValidationError(_("User not found"), code="user_not_found")
-        code_instance = _get_code_instance_or_none(code, user=user)
+        code_instance = _get_code_instance_or_none(code=code)
        
         if code_instance is None:
             raise serializers.ValidationError(_("OneTImePassword Not Found"), code="not_found")

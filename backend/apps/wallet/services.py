@@ -7,35 +7,48 @@ from django.db import transaction, DatabaseError
 from .models import User, Wallet, LockedWallet
 from ..bookings.models import Bookings
 
-def lock_booking(booking):
+from decimal import Decimal
+
+@transaction.atomic
+def lock_booking(booking, amount):
     if not isinstance(booking, Bookings):
         raise ValidationError("Not a valid booking instance")
 
-    amount = booking.price
+    amount = amount
+
     wallet_to_lock = booking.customer.wallet
     if wallet_to_lock is None:
         raise ValidationError("customer wallet cannot be empty")
 
-    if wallet_to_lock.balance < amount:
-        raise ValidationError("Insufficient funds")
-    lock = LockedWallet.objects.create(user_wallet=wallet_to_lock, booking=booking, amount=amount)
+    lock = LockedWallet.objects.create(user_wallet=wallet_to_lock, booking=booking, 
+                                       amount=amount, mutable_amount=amount - booking.platform_fee)
 
     if not lock.is_released:
         return lock
     raise ValidationError("Failed to lock booking payment")
 
-def refund_booking(booking):
+@transaction.atomic
+def refund_booking(booking, amount):
 
-    locked = booking.locked
-    if locked.is_released:
+    locked_wallet = booking.locked
+
+    if locked_wallet.is_released:
         raise ValidationError("payment already released")
-    amount = locked.amount
-    user = locked.booking.customer
+    
+    if locked_wallet.amount != amount:
+        raise ValidationError("Price mismatch. can't release inconsistent pricing")
+    
+    user_to_credit = locked_wallet.booking.customer
+    credit_wallet = WalletService().credit_user_wallet(user_to_credit, amount)
 
-    credit_wallet = WalletService().credit_user_wallet(user, amount)
-    locked.is_released = True
-    locked.save(update_fields=['is_released'])
-    return locked
+    locked_wallet.is_released = True
+    locked_wallet.save(update_fields=['is_released'])
+    return locked_wallet
+
+def get_calculated_transaction(booking: Bookings):
+    """ return the calcucated balance to send to provider( ie minus platform transaction fee)"""
+    locked_wallet = booking.locked
+    return locked_wallet.mutable_amount
 
 class WalletService:
 
@@ -43,8 +56,11 @@ class WalletService:
     def deduct_user_balance(user, amount):
 
         user_wallet = user.wallet
-        if not user_wallet:raise ValidationError("no wallet instance for user")
-        user_wallet.balance -= amount
+
+        if not user_wallet:
+            raise ValidationError("no wallet instance for user")
+        
+        user_wallet.balance -= Decimal(amount)
         user_wallet.save(update_fields=["balance"])
 
         return user_wallet
@@ -52,8 +68,11 @@ class WalletService:
     @staticmethod
     def credit_user_wallet(user, amount):
         user_wallet = user.wallet
-        if not user_wallet: raise ValidationError("no wallet instance for user")
-        user_wallet.balance += amount
+
+        if not user_wallet: 
+            raise ValidationError("no wallet instance for user")
+        
+        user_wallet.balance += Decimal(amount)
         user_wallet.save(update_fields=["balance"])
 
         return user_wallet

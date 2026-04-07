@@ -52,3 +52,24 @@ def test_email(request):
 
     return JsonResponse(data={'message':"Sent"})
     
+
+import requests
+
+def get_headers(api_key) -> dict[str, str]:
+    headers = {
+        "Authorization": f"Bearer {api_key}",
+        "Content-Type": "application/json"
+    }
+    return  headers
+
+@api_view(http_method_names=['GET'])
+@permission_classes(permission_classes=[permissions.AllowAny])
+def get_banks(request):
+    api_key = ""
+
+    headers = get_headers(api_key=api_key)
+    base_url = "https://api.paystack.co/bank"
+    response = requests.get(url=base_url, headers=headers)
+
+    result = response.json()
+    return JsonResponse(data=result)

@@ -21,10 +21,13 @@ class AddressService:
         if not isinstance(user_profile, BaseProfile):
             raise ValueError("Invalid base profile instance")
 
+        postal_code = validated_data.poo("postal_code")
         try:
-            address = UserAddress.objects.create(
+            address = UserAddress.objects.get_or_create(
                 user_profile=user_profile,
-                **validated_data
+                postal_code=postal_code,
+                defaults=validated_data
+                
             )
         except Exception as e:
             raise Exception(e)

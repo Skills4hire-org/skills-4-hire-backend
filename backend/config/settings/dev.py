@@ -25,15 +25,18 @@ if DEBUG:
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": "redis://localhost:6379",
+        "LOCATION": "redis://localhost:6379/0",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient"
         }
     }
 }
 
-CELERY_BROKER_URL = "redis://localhost:6379"
-CELERY_RESULT_BACKEND = "redis://localhost:6379"
+CELERY_RESULT_BACKEND = 'django-db'
+CELERY_BROKER_POOL_LIMIT = 1  # Limits the number of connections to the broker
+CELERY_REDIS_MAX_CONNECTIONS = 5 # Limits connections per worker
+CELERY_BROKER_URL = env("redis://localhost:6379/0", default="redis://redis:6379/0")
+# CELERY_RESULT_BACKEND = env("PRODUCTION_REDIS_URL", default="redis://redis:6379/1")
 
 
 CORS_ALLOW_ALL_ORIGINS = False

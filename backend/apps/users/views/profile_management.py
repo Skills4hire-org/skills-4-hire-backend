@@ -15,6 +15,7 @@ from ..serializers.profiles import ProviderProfileUpdateCreateSerializer, \
     ProviderProfileDetailSerializer, ProviderProfilePublicSerializer, CustomerProfilePublicSerializer, \
     CustomerCreateUpdateSerializer, CustomerProfileDetailSerializer
 from ..profile_services.paginations import ProfilePagination
+from ...authentication.serializers import UserReadSerializer
 
 
 class ProfileSearchView(viewsets.ModelViewSet):
@@ -104,9 +105,11 @@ class ProfileViewSet(viewsets.GenericViewSet):
 
         if user.is_provider:
             profile = user.profile.provider_profile
-        else:
+        elif user.is_customer:
             profile = user.profile.customer_profile
-
+        else:
+            return Response(data=UserReadSerializer(user).data, status=status.HTTP_200_OK)
+        
         if request.method == "GET":
             if user.is_provider:
                 serializer = ProviderProfileDetailSerializer(profile)

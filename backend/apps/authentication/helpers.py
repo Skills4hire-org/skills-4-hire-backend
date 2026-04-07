@@ -10,6 +10,7 @@ from rest_framework.exceptions import ValidationError, NotFound
 
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.conf import settings
 
 import logging
 import email_validator
@@ -47,8 +48,11 @@ def _send_email_to_user(context: dict):
     email = email
     context.update({"to_email": email, "subject": subject, "template_name": template_name})
     try:
-        send_email_to_queue.delay(context)
-        # send_mail_base(context=context)
+        if settings.DEBUG:
+            send_mail_base(context=context)
+        else:
+            send_email_to_queue.delay(context)
+            
         logger.info(f"Email message queened for {email}")
         return {"success": True, "message": "Email sent to queue successfully"}
     except Exception as e:

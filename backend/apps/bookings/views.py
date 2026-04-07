@@ -4,17 +4,20 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 
-from .models import PaymentRequestBooking
+from .models import PaymentRequestBooking, BookingTransaction
 from .serializers import (Bookings, BookingCreateSerializer,
                           BookingSerializer, AcceptRejectSerializer,
                           BookingDetailSerializer, PaymentRequestSerializer,
                           RequestSerializer, ReviewPaymentRequestSerializer, 
                           PaymentRequestDetailSerializer, RequestSerializer,
+                          BookingTransactionSerializer
 )
 
 from .permissions import IsCustomer, IsBookingParticipants, IsProvider, IsRequestReceiverOrSender
 from .paginations import CustomBookingPagination, CustomPaymentRequestPagination
 from .services import BookingService
+from .booking_transaction import transaction_ready_exists
+
 
 from django.db.models import Q
 from django.utils.decorators import  method_decorator
@@ -48,6 +51,20 @@ class BookingViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
+        idempotency = serializer.validated_data['idempotency_key']
+        user = request.user
+
+        if transaction_ready_exists(user, idempotency=idempotency)[0]:
+
+            return Response(
+                status=status.HTTP_200_OK,
+                data={
+                    "status": "success",
+                    'msg': "Found duplicate transaction",
+                    'data': BookingTransactionSerializer(transaction_ready_exists(user, idempotency)[1]).data
+                }
+            )
+
         saved_booking = serializer.save()
         output_serializer = BookingSerializer(saved_booking).data
         return Response(output_serializer, status=status.HTTP_200_OK)
@@ -74,8 +91,24 @@ class BookingViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        created_booking = serializer.save()
 
+        idempotency = serializer.validated_data['idempotency_key']
+        user = request.user
+
+        if transaction_ready_exists(user, idempotency=idempotency)[0]:
+    
+            logger.info("Dublicate Booking Found, returning the initial request")
+
+            return Response(
+                status=status.HTTP_200_OK,
+                data={
+                    "status": "success",
+                    'msg': "Duplicate Booking, Returning initial transaction",
+                    "data": BookingTransactionSerializer(transaction_ready_exists(user, idempotency)[1]).data
+                }
+            )
+        
+        created_booking = serializer.save()
         output_serializer = BookingSerializer(created_booking).data
         return Response(output_serializer, status=status.HTTP_201_CREATED)
 
@@ -151,5 +184,23 @@ class BookingPaymentRequestViewSet(
     def payment_request_review(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+
+        idempotency = serializer.validated_data['idempotency_key']
+
+        user = request.user
+
+        if transaction_ready_exists(user, idempotency=idempotency)[0]:
+    
+            logger.info("Dublicate Transaction Found, returning the initial request")
+
+            return Response(
+                status=status.HTTP_200_OK,
+                data={
+                    "status": "success",
+                    'msg': "Duplicate Transaction, Returning initial transaction",
+                    "data": BookingTransactionSerializer(transaction_ready_exists(user, idempotency)[1]).data
+                }
+            )
+
         output_serializer = serializer.save()
         return Response(RequestSerializer(output_serializer).data, status=status.HTTP_200_OK)
