@@ -4,6 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password as _validate_password
 from django.db import transaction
 from django.utils import  timezone
+from django.db.models import Sum, Count
 
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework import serializers
@@ -11,6 +12,7 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken, BlacklistedToken, OutstandingToken
 
 from .helpers import validate_email, _get_user_by_email, _get_code_instance_or_none
+from apps.users.serializers.profiles import BaseProfileListSerializer
 import logging
 
 
@@ -342,13 +344,55 @@ class CustomLogoutSerializer(serializers.Serializer):
         return attrs
 
 class UserReadSerializer(serializers.ModelSerializer):
+    profile = BaseProfileListSerializer(read_only=True)
+
+    avg_rating = serializers.SerializerMethodField()
+    total_reviews = serializers.SerializerMethodField()
+
     class Meta:
         model = User
         fields = [
-            "email", "first_name",
-            "last_name",
-            "is_provider", "is_customer",
-            "phone",
-            "is_active", "is_verified",
-            
+            "email", "first_name", "total_reviews",
+            "last_name", "is_provider", "is_customer",
+            "is_verified", "profile", "avg_rating", 
         ]   
+
+    def get_avg_rating(self, obj):
+        if not obj.is_provider:
+            return None
+        provider = getattr(obj.profile, "provider_profile")
+
+        if provider is None:
+            return 0
+        
+        rating = provider.ratings.filter(is_active=True).aggregate(
+            total_rating=Count("rating_id", distinct=True),
+            total_sum=Sum("rating")
+        )
+        if rating['total_sum']:
+            return rating['total_sum'] / rating['total_rating']
+        return 0
+    
+    def get_total_reviews(self, obj):
+
+        if not obj.is_provider:
+            return None
+        
+        provider = getattr(obj.profile, "provider_profile")
+        if provider is None:
+            return 0
+        
+        reviews = provider.reviews.filter(is_active=True).aggregate(
+            total_reviews=Count("review_id", distinct=True)
+        )
+        if reviews["total_reviews"]:
+            return reviews['total_reviews']
+        return 0
+
+
+
+
+
+
+
+

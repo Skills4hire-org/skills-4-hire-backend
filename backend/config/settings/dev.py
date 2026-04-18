@@ -1,24 +1,19 @@
 from config.settings.base import *
-import dj_database_url
-
-import ssl
-
-from pygments.lexer import default
 
 ALLOWED_HOSTS = ["*"]
 
 DEBUG = env.bool("DEBUG")
 
 if DEBUG:
-    INSTALLED_APPS += ["debug_toolbar", "silk"]
+    INSTALLED_APPS += ["debug_toolbar"]
     MIDDLEWARE += ["debug_toolbar.middleware.DebugToolbarMiddleware"]
 
 
-    MIDDLEWARE += ["silk.middleware.SilkyMiddleware"]
+    # MIDDLEWARE += ["silk.middleware.SilkyMiddleware"]
 
-    SILKY_PYTHON_PROFILER = True
-    SILKY_META = True
-    SILKY_ANALYZE_QUERIES = True
+    # SILKY_PYTHON_PROFILER = True
+    # SILKY_META = True
+    # SILKY_ANALYZE_QUERIES = True
 
     INTERNAL_IPS = [ "127.0.0.1", "localhost" ]
 

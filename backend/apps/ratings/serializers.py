@@ -1,52 +1,35 @@
 from django.db import transaction
 from rest_framework import serializers
-from rest_framework.exceptions import PermissionDenied
 
-from .core.validators import validate_data, validate_rating, validate_reviews, privileged_to_rate_or_review
+from .core.validators import validate_rating, validate_reviews
 from .models import ProfileReview, ProfileRating
 from .services.ratings import RatingService
 from .services.reviews import ReviewService
-
-import logging
-
-from .utils.profiles import customer_email_or_provider_email_or_none
 from ..authentication.serializers import UserReadSerializer
 from ..chats.core.utils import sanitize_message_content
 from ..core.utils.py import get_or_none
-from ..users.customer_models import CustomerModel
 from ..users.provider_models import ProviderModel
-# from ..users.serializers import CustomerProfileSerializer, ProviderProfileSerializer
 
+import uuid
+import logging
 
 logger = logging.getLogger(__name__)
 
-
 class ReviewCreateSerializer(serializers.ModelSerializer):
-    provider_profile_id = serializers.UUIDField(write_only=True, required=False)
-    customer_profile_id = serializers.UUIDField(write_only=True, required=False)
+    provider_id = serializers.UUIDField(write_only=True, required=False)
 
     class Meta:
         model = ProfileReview
         fields = [
-            "review_id",
-            "is_active",
-            "created_at",
-            "updated_at",
-            "review",
-            "provider_profile_id",
-            "customer_profile_id"
-        ]
-        read_only_fields = [
-            "review_id",
-            "is_active",
-            "created_at",
-            "updated_at"
+            "provider_id", 'review'
         ]
 
     def validate(self, data):
-        is_valid, message = validate_data(data)
-        if not is_valid:
-            raise serializers.ValidationError(message)
+        try:
+            isinstance(data['provider_id'], uuid.UUID)
+        except Exception as e:
+            raise serializers.ValidationError(e)
+
         return data
 
     def validate_review(self, value):
@@ -55,122 +38,94 @@ class ReviewCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(message)
         return sanitize_message_content(value)
 
-    @transaction.atomic
     def create(self, validated_data):
+        user = self.context['request'].user
 
-        current_user = self.context.get('request').user
+        provider = get_or_none(ProviderModel, pk=validated_data['provider_id'])
+        if provider is None:
+            raise serializers.ValidationError("User profile not found")
+        with transaction.atomic():
+            try:
+                review_service = ReviewService()
+                if review_service._dublicate_reviews(user, provider):
+                    raise serializers.ValidationError("review found for this user")
 
-        service = ReviewService(review=validated_data['review'], reviewed_by=current_user)
+                if review_service._cant_review_yourself(user, provider):
+                    raise serializers.ValidationError("You cannot review yourself.")
+                
+                validated_data.pop("provider_id")
+                validated_data.update({
+                    "provider_profile": provider,
+                    "reviewed_by": user
+                })
 
-        if "provider_profile_id" in validated_data:
-            pk = validated_data["provider_profile_id"]
-            validated_data.pop("provider_profile_id")
-
-            provider_profile = get_or_none(ProviderModel, pk=pk)
-            if not privileged_to_rate_or_review(current_user=current_user, user_profile=provider_profile):
-                raise PermissionDenied("You cannot review your self.")
-
-            rating = service.create_review(user_profile=provider_profile, validated_data=validated_data)
-        elif "customer_profile_id" in validated_data:
-            pk = validated_data["customer_profile_id"]
-            validated_data.pop("customer_profile_id")
-
-            customer_profile = get_or_none(CustomerModel, pk=pk)
-
-            if not privileged_to_rate_or_review(current_user=current_user, user_profile=customer_profile):
-                raise  PermissionDenied("You cannot review your self.")
-
-            rating = service.create_review(user_profile=customer_profile, validated_data=validated_data)
-        else:
-            raise serializers.ValidationError("Wrong profile")
-
-        return rating
+                review_instance = review_service.create_review(validated_data)
+            
+            except Exception as exc:
+                raise serializers.ValidationError(exc)
+            
+        return review_instance
 
     @transaction.atomic
     def update(self, instance: ProfileReview, validated_data):
-        current_user = self.context.get("request").user
-        review = validated_data.get("review", "")
-        if not instance.is_able_modify(current_user):
-            raise serializers.ValidationError("can not update this view")
+        return super().update(instance, validated_data)
 
-        instance.review = review
-        instance.save(update_fields=['review'])
-        return instance
-
+class ReviewUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProfileReview
+        fields = [
+            'review'
+        ]
+    def validate_review(self, value):
+        is_valid,message = validate_reviews(value)
+        if not is_valid:
+            raise serializers.ValidationError(message)
+        return sanitize_message_content(value)
 
 class ReviewDetailSerializer(serializers.ModelSerializer):
-    # customer_profile = CustomerProfileSerializer(read_only=True)
-    # provider_profile = ProviderProfileSerializer(read_only=True)
     reviewed_by = UserReadSerializer(read_only=True)
 
     class Meta:
         model = ProfileReview
         fields = [
             "review_id",
-            "customer_profile",
-            "provider_profile",
             "reviewed_by",
             "review",
             "is_active",
             "created_at",
-            "updated_at"
+            "updated_at",
         ]
 
 class ReviewSerializer(serializers.ModelSerializer):
-    customer_email = serializers.SerializerMethodField()
-    provider_email = serializers.SerializerMethodField()
-    reviewed_by = serializers.CharField(source="reviewed_by.email", read_only=True)
+    reviewed_by = UserReadSerializer(read_only=True)
+    total_reviews = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = ProfileReview
         fields = [
             "review_id",
-            "customer_email",
-            "provider_email",
             "reviewed_by",
             "review",
             "is_active",
             "created_at",
-            "updated_at"
+            "updated_at",
+            "total_reviews"
         ]
 
-    def get_customer_email(self, obj):
-        is_valid, email = customer_email_or_provider_email_or_none(obj, "customer")
-        if is_valid:
-            return email
-        return None
 
-    def get_provider_email(self, obj):
-        is_valid, email = customer_email_or_provider_email_or_none(obj, "provider")
-        if is_valid:
-            return email
-        return None
 
 class RatingCreateSerializer(serializers.ModelSerializer):
-    provider_profile_id = serializers.UUIDField(write_only=True, required=False)
-    customer_profile_id = serializers.UUIDField(write_only=True, required=False)
-
+    provider_id = serializers.UUIDField(write_only=True, required=True)
     class Meta:
         model = ProfileRating
         fields = [
-            "rating_id",
-            "is_active",
-            "created_at",
-            "updated_at",
-            "rating",
-            "provider_profile_id",
-            "customer_profile_id"
-        ]
-        read_only_fields = [
-            "rating_id",
-            "is_active",
-            "created_at",
-            "updated_at"
+            "provider_id", 'rating'
         ]
     def validate(self, data):
-        is_valid, message = validate_data(data)
-        if not is_valid:
-            raise serializers.ValidationError(message)
+        try:
+            isinstance(data['provider_id'], uuid.UUID)
+        except Exception as exc:
+            raise serializers.ValidationError(exc)
         return data
 
     def validate_rating(self, value):
@@ -180,49 +135,45 @@ class RatingCreateSerializer(serializers.ModelSerializer):
 
         return value
 
-    @transaction.atomic
     def create(self, validated_data):
+        current_user = self.context['request'].user
 
-        current_user = self.context.get('request').user
+        provider = get_or_none(ProviderModel, pk=validated_data['provider_id'])
+        if provider is None:
+            raise serializers.ValidationError("profile not found for provider")
+        validated_data.pop("provider_id")
+        try:
+            with transaction.atomic():
+                rating_service = RatingService()
+                if rating_service._duplicate_rating(current_user, provider):
+                    raise serializers.ValidationError("Duplicate rating. you alrady rated this profile")
+                
+                if ReviewService()._cant_review_yourself(current_user, provider):
+                    raise serializers.ValidationError("You cannot rate yourself")
+                
+                validated_data.update({
+                    "rate_by": current_user,
+                    "provider_profile": provider
+                })
 
-        service = RatingService(rating=validated_data['rating'], rate_by=current_user)
+                new_rating = rating_service.create(validated_data)
+        except Exception as exc:
+            raise serializers.ValidationError(exc)
+        
+        return new_rating
 
-        if "provider_profile_id" in validated_data:
-            pk=validated_data["provider_profile_id"]
-            validated_data.pop("provider_profile_id")
+class RatingUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProfileRating
+        fields = [
+            'rating'
+        ]
+    def validate_rating(self, value):
+        is_valid, message = validate_rating(value)
+        if not is_valid:
+            raise serializers.ValidationError(message)
 
-            provider_profile = get_or_none(ProviderModel, pk=pk)
-            if not privileged_to_rate_or_review(current_user=current_user, user_profile=provider_profile):
-                raise PermissionDenied("You cannot rate your self")
-
-            rating = service.create_rating(validated_data, provider_profile)
-
-        elif "customer_profile_id" in validated_data:
-            pk=validated_data["customer_profile_id"]
-            validated_data.pop("customer_profile_id")
-
-            customer_profile = get_or_none(CustomerModel, pk=pk)
-
-            if not privileged_to_rate_or_review(current_user=current_user, user_profile=customer_profile):
-                raise PermissionDenied("You cannot rate your self")
-
-            rating = service.create_rating(validated_data, customer_profile)
-
-        else:
-            raise serializers.ValidationError("Wrong profile")
-
-        return rating
-
-    @transaction.atomic
-    def update(self, instance: ProfileRating, validated_data):
-        current_user = self.context.get("request").user
-        rating = validated_data.get("rating", "")
-        if not instance.is_able_modify(current_user):
-            raise serializers.ValidationError("can not update this view")
-
-        instance.rating = rating
-        instance.save(update_fields=['rating'])
-        return  instance
+        return value
 
 class RatingDetailSerializer(serializers.ModelSerializer):
     # customer_profile = CustomerProfileSerializer(read_only=True)
@@ -241,32 +192,18 @@ class RatingDetailSerializer(serializers.ModelSerializer):
             "updated_at"
         ]
 
+
+
 class RatingSerializer(serializers.ModelSerializer):
-    provider_email = serializers.SerializerMethodField()
-    customer_email = serializers.SerializerMethodField()
-    rate_by = serializers.CharField(source="rate_by.email")
+    rate_by = UserReadSerializer(read_only=True)
 
     class Meta:
         model = ProfileRating
         fields = [
             "rating_id",
-            "customer_email",
-            "provider_email",
             "rate_by",
             "rating",
             "is_active",
             "created_at",
             "updated_at"
         ]
-
-    def get_provider_email(self, obj):
-        is_valid, email = customer_email_or_provider_email_or_none(obj, "provider")
-        if is_valid:
-            return email
-        return None
-
-    def get_customer_email(self, obj):
-        is_valid, email = customer_email_or_provider_email_or_none(obj, "customer")
-        if is_valid:
-            return email
-        return None

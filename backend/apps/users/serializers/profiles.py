@@ -68,19 +68,14 @@ class BaseProfileCreateSerializer(serializers.ModelSerializer):
         return instance
 
 class BaseProfileListSerializer(serializers.ModelSerializer):
-    base_profile_id = serializers.SerializerMethodField()
+    avater = AvatarDetailSerializer(read_only=True)
 
     class Meta:
         model = BaseProfile
         fields = [
-            "user", 'base_profile_id',
             "gender", "display_name",
-            "country", "city", "created_at",
-            "updated_at"
+            "country", "city", "created_at", "avater"
         ]
-
-    def get_base_profile_id(self, obj):
-        return obj.profile_id
 
 class ProviderProfileUpdateCreateSerializer(serializers.ModelSerializer):
 

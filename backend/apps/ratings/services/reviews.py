@@ -1,33 +1,40 @@
 from rest_framework.exceptions import ValidationError
 
-from .ratings import RatingService
+from django.db.models import Q
+
 from ..models import ProfileReview
+
+import logging
+logger = logging.getLogger(__name__)
 
 class ReviewService:
 
+    def _dublicate_reviews(self, user, provider) -> bool:
+        if ProfileReview.objects.filter(
+            Q(reviewed_by=user, provider_profile=provider) |
+            Q(provider_profile__profile__user=user, reviewed_by__profile__provider_profile=provider),
+            is_active=True
+        ).exists():
+            
+            return True
+        return False
 
-    def __init__(self, review, reviewed_by):
-        self.review = review
-        self.reviewed_by = reviewed_by
+    def _cant_review_yourself(self, user, provider):
+        if user == provider.profile.user:
+            return True
+        return False
+            
 
-    def create_review(self, user_profile, validated_data):
-        customer_pofile, provider_profile = RatingService()._validate_user_profile(user_profile)
+    def create_review(self, validated_data):
 
-        if customer_pofile is None and provider_profile is None:
-            raise ValueError("no_profile_found")
-        validated_data.pop("review")
         try:
-            instance = ProfileReview(review=self.review, reviewed_by=self.reviewed_by, **validated_data)
-
-            if customer_pofile:
-                instance.customer_profile = customer_pofile
-            elif provider_profile:
-                instance.provider_profile = provider_profile
-            else:
-                instance.save()
-            instance.save()
+            review_instance = ProfileReview.objects.create(
+                **validated_data
+            )
+            return review_instance
+        
         except Exception as e:
+            logger.error(e)
             raise ValidationError(f"error creating review {e}")
-        return instance
 
 

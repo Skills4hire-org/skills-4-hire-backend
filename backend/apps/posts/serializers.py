@@ -232,7 +232,6 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
         return instance
 
-
 class CommentCreateSerializer(serializers.ModelSerializer):
     attachment = PostAttachmentSerializer(many=True, required=False)
     class Meta:
@@ -278,28 +277,43 @@ class CommentCreateSerializer(serializers.ModelSerializer):
         return instance
 
 class CommentSerializer(serializers.ModelSerializer):
-    comment_counts = serializers.SerializerMethodField()
+    attachment = PostAttachmentSerializer(read_only=True, many=True)
+    user = UserReadSerializer(read_only=True)
     class Meta:
         model = Comment
         fields = [
-            "comment_counts",
-            "post",
-            "comment_id",
-            "created_at",
-            "updated_at",
-            "is_active",
-            "is_edited",
-            "user",
-            "message"
+            "comment_id", "created_at", 
+            "updated_at", "is_active", "is_edited",
+            "user", "message", "user", "attachment"
         ]
-    def get_comment_counts(self, obj):
-        post = Post.objects.prefetch_related(Prefetch(
-            lookup="comments", queryset=Comment.active_objects.filter(post=obj.post)
-        )).get(post_id=obj.post.pk)
-        count = post.comments.count()
-        if count == 0:
-            return  0
-        return count
+
+    
+class PostDetailSerializer(serializers.ModelSerializer):
+    attachment = PostAttachmentSerializer(many=True, read_only=True)
+    post_tag = PostTagSerializer(many=True, read_only=True)
+    user = UserReadSerializer(read_only=True)
+    duration = serializers.SerializerMethodField()
+    resposted_by = UserReadSerializer(read_only=True)
+
+    class Meta:
+        model = Post
+        fields = [
+            "user", "post_id", "post_content",
+            "post_type", "amount", "is_active",
+            "is_pinned", "start_date",
+            "end_date", "created_at", "updated_at",
+            "attachment", "post_tag",
+            "duration", "attachment", "is_reposted", "resposted_by",
+            "post_tag", "repost_quote"
+        ]
+
+    def get_duration(self, obj):
+        start_date = obj.start_date
+        end_date = obj.end_date
+        if start_date is None or end_date is None:
+            return None
+        delta = end_date - start_date
+        return  f'{delta.days} days(s)'
 
 
 class RepostSerializer(serializers.ModelSerializer):
@@ -349,45 +363,20 @@ class PostListSerializer(serializers.ModelSerializer):
     comments_counts = serializers.IntegerField(read_only=True)
     likes_count = serializers.IntegerField(read_only=True)
     reposts_count = serializers.IntegerField(read_only=True)
-
+    attachment = PostAttachmentSerializer(many=True, read_only=True)
+    post_tag = PostTagSerializer(many=True, read_only=True)
     user = UserReadSerializer(read_only=True)
+    respoted_by = UserReadSerializer(read_only=True)
+
     class Meta:
         model = Post
         fields = [
             "reposts_count", "comments_counts",
             "likes_count", "user", "post_id",
-            "post_content",  "created_at", "updated_at"
+            "post_content",  "created_at", "updated_at",
+            "post_type", "attachment", "post_tag", 
+            "is_resposted", 'resposted_by'
         ]
-
-class PostDetailSerializer(serializers.ModelSerializer):
-    attachment = PostAttachmentSerializer(many=True, read_only=True)
-    post_tag = PostTagSerializer(many=True, read_only=True)
-    user = UserReadSerializer(read_only=True)
-
-    comments_counts = serializers.IntegerField(read_only=True)
-    likes_count = serializers.IntegerField(read_only=True)
-    reposts_count = serializers.IntegerField(read_only=True)
-
-    duration = serializers.SerializerMethodField()
-
-    class Meta:
-        model = Post
-        fields = [
-            "comments_counts", "likes_count", "reposts_count",
-            "user", "post_id", "post_content",
-            "post_type", "amount", "is_active",
-            "is_deleted", "is_pinned", "start_date",
-            "end_date", "created_at", "updated_at",
-            "attachment", "post_tag",
-            "duration",
-        ]
-    def get_duration(self, obj):
-        start_date = obj.start_date
-        end_date = obj.end_date
-        if start_date is None or end_date is None:
-            return None
-        delta = end_date - start_date
-        return  f'{delta.days} days(s)'
 
 
 class CommentDetailSerializer(serializers.ModelSerializer):
@@ -400,6 +389,6 @@ class CommentDetailSerializer(serializers.ModelSerializer):
         fields = [
             "comment_id", "user",
             "post", "parent", "message",
-            "is_deleted", 'is_active', 'is_edited',
+            'is_active', 'is_edited',
             'created_at', 'attachment', 'updated_at'
         ]
