@@ -366,7 +366,7 @@ class PostListSerializer(serializers.ModelSerializer):
     attachment = PostAttachmentSerializer(many=True, read_only=True)
     post_tag = PostTagSerializer(many=True, read_only=True)
     user = UserReadSerializer(read_only=True)
-    respoted_by = UserReadSerializer(read_only=True)
+    resposted_by = UserReadSerializer(read_only=True)
 
     class Meta:
         model = Post
