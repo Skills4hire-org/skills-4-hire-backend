@@ -375,7 +375,7 @@ class PostListSerializer(serializers.ModelSerializer):
             "likes_count", "user", "post_id",
             "post_content",  "created_at", "updated_at",
             "post_type", "attachment", "post_tag", 
-            "is_resposted", 'resposted_by'
+            "is_reposted", 'resposted_by'
         ]
 
 
