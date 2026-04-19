@@ -112,8 +112,6 @@ class ReviewSerializer(serializers.ModelSerializer):
             "total_reviews"
         ]
 
-
-
 class RatingCreateSerializer(serializers.ModelSerializer):
     provider_id = serializers.UUIDField(write_only=True, required=True)
     class Meta:
@@ -176,23 +174,17 @@ class RatingUpdateSerializer(serializers.ModelSerializer):
         return value
 
 class RatingDetailSerializer(serializers.ModelSerializer):
-    # customer_profile = CustomerProfileSerializer(read_only=True)
-    # provider_profile = ProviderProfileSerializer(read_only=True)
     rate_by = UserReadSerializer(read_only=True)
     class Meta:
         model = ProfileRating
         fields = [
             "rating_id",
-            "customer_profile",
-            "provider_profile",
             "rate_by",
             "rating",
             "is_active",
             "created_at",
             "updated_at"
         ]
-
-
 
 class RatingSerializer(serializers.ModelSerializer):
     rate_by = UserReadSerializer(read_only=True)
