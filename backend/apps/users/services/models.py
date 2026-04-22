@@ -6,11 +6,37 @@ from django.core.exceptions import ValidationError
 from ..provider_models import ProviderModel
 
 
+class ServiceCategory(models.Model):
+
+    service_category_id = models.UUIDField(
+        primary_key=True, default=uuid.uuid4, 
+        editable=False, unique=True, db_index=True
+    )
+
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+    def clean(self):
+        if self.name:
+            self.name = self.name.strip().title()
+        super().clean()
+    
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+        
 class Service(models.Model):
     service_id = models.UUIDField(
         primary_key=True,
         default=uuid.uuid4,
         editable=False,
+    )
+    category = models.ForeignKey(
+        ServiceCategory, on_delete=models.SET_NULL, null=True, related_name="services"
     )
     profile = models.ForeignKey(
         ProviderModel,
@@ -23,7 +49,7 @@ class Service(models.Model):
     max_charge = models.DecimalField(max_digits=12, decimal_places=2, null=True)
 
     is_default = models.BooleanField(default=False)
-    is_primary = models.BooleanField(default=False)
+    is_verified = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

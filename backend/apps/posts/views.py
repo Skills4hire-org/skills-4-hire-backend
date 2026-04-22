@@ -53,7 +53,11 @@ class PostViewSet(viewsets.ModelViewSet):
     )
     pagination_class = CustomPostPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
-    filterset_fields = ['post_type', 'user', "post_tag__service_name__name"]
+    filterset_fields = {
+        "post_type": ["icontains"],
+        "user__profile__display_name": ["icontains"],
+        "amount": ["gte", 'lte'],
+    }
     search_fields = ['post_content', "post_tag"]
     ordering_fields = ['created_at', 'updated_at']
 

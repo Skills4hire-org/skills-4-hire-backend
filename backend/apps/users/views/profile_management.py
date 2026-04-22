@@ -39,7 +39,7 @@ class ProfileSearchView(viewsets.ModelViewSet):
 
         return profile
 
-    @method_decorator(cache_page(60 * 60))
+    @method_decorator(cache_page(60 * 5))
     def list(self, request, *args, **kwargs):
         query_params = request.query_params.get("search", None)
         if query_params is None:
@@ -67,7 +67,7 @@ class ProfileSearchView(viewsets.ModelViewSet):
             return self.get_paginated_response(page)
         return Response(combined, status=status.HTTP_200_OK)
 
-    @method_decorator(cache_page(60 * 20))
+    @method_decorator(cache_page(60 * 5))
     def retrieve(self, request, *args, **kwargs):
         profile = self.get_object()
         if isinstance(profile, ProviderModel):
@@ -98,6 +98,7 @@ class ProfileViewSet(viewsets.GenericViewSet):
         else:
             raise ValueError("Invalid user obj")
 
+    @method_decorator(cache_page(60 * 5))
     @action(methods=['get', 'patch'], detail=False, url_path="me")
     def me(self, request, *args, **kwargs):
         user = request.user

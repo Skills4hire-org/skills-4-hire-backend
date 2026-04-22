@@ -1,5 +1,6 @@
 
 from django.db import transaction
+from django.db.models import Count, Sum
 
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -13,6 +14,8 @@ from ..profile_services.customer_profile import CustomerService
 from ..profile_services.provider_profile import ProviderProfileServices
 from ..profile_services.utils import get_profile_avatar
 from ..provider_models import ProviderModel
+from ..address.serializers import AddressDetailSerializer
+from ..services.models import ServiceAttachment
 
 def save_base_profile_with_serializer(base_profile, validated_data, request):
     serializer = BaseProfileCreateSerializer(
@@ -68,13 +71,13 @@ class BaseProfileCreateSerializer(serializers.ModelSerializer):
         return instance
 
 class BaseProfileListSerializer(serializers.ModelSerializer):
-    avater = AvatarDetailSerializer(read_only=True)
-
+    avatar = AvatarDetailSerializer(read_only=True)
+    addresses = AddressDetailSerializer(many=True, read_only=True)
     class Meta:
         model = BaseProfile
         fields = [
-            "gender", "display_name",
-            "country", "city", "created_at", "avater"
+            "gender", "display_name", "addresses",
+            "country", "city", "created_at", "avatar"
         ]
 
 class ProviderProfileUpdateCreateSerializer(serializers.ModelSerializer):
@@ -131,38 +134,87 @@ class ProviderProfileUpdateCreateSerializer(serializers.ModelSerializer):
         return updated_profile
 
 class ProviderProfileDetailSerializer(serializers.ModelSerializer):
-
         profile = BaseProfileListSerializer(read_only=True)
-        profile_avatar = serializers.SerializerMethodField()
+        endorsement_count = serializers.SerializerMethodField()
+        posts = serializers.SerializerMethodField()
+        comments = serializers.SerializerMethodField()
+        images  = serializers.SerializerMethodField()
 
         class Meta:
             model = ProviderModel
             fields = [
                 "provider_id", "professional_title",
                 "headline", "overview", "profile",
-                "experience_level", "availability",
-                "min_charge", "max_charge", "hourly_pay",
-                "years_of_experience", "open_to_full_time",
-                "jobs_done", "is_featured", "is_top_rated",
-                'is_active', "created_at", "updated_at", "profile_avatar"
-
+                "min_charge", "max_charge",
+                "created_at", "endorsement_count", "posts",
+                'comments', 'images'
             ]
 
-        def get_profile_avatar(self, obj):
-            avatar = get_profile_avatar(profile=obj)
-            if avatar is None:
+        def get_images(self, obj):
+            from ..services.serializers import ServiceAttachmentSerializer
+            images = ServiceAttachment.objects.filter(service__profile=obj, is_active=True)
+            return ServiceAttachmentSerializer(images, many=True).data
+
+        def get_comments(self, obj):
+            from ...posts.serializers import CommentSerializer
+            user = obj.profile.user
+            user_comments = user.comments.filter(is_active=True, is_deleted=False)
+            if len(user_comments) < 1:
                 return None
-            return AvatarDetailSerializer(avatar).data
+            
+            serializer = CommentSerializer(user_comments, many=True)
+            return serializer.data
+
+        def get_posts(self, obj):
+            from ...posts.serializers import PostListSerializer
+            user = obj.profile.user
+            user_posts = user.posts.filter(is_active=True, is_deleted=False)
+            user_shares = user.shares.filter(is_reposted=True, is_active=True, is_deleted=False)
+
+            combined_objs = user_posts | user_shares
+
+            if len(combined_objs) < 1:
+                return None
+            serializer = PostListSerializer(combined_objs, many=True)
+            return serializer.data
+
+        def get_endorsement_count(self, obj):
+            endorsement = obj.receiver_endorse.filter(is_active=True)
+            if len(endorsement) < 1:
+                return 0
+            
+            total_endorsement = endorsement.aggregate(total=Count("provider"))
+            return total_endorsement['total']
 
 class ProviderProfilePublicSerializer(serializers.ModelSerializer):
+    profile = BaseProfileListSerializer(read_only=True)
+    avg_rating = serializers.SerializerMethodField()
+    total_reviews = serializers.SerializerMethodField()
+
     class Meta:
         model = ProviderModel
         fields = [
-            "provider_id", "professional_title",
-            "headline", "overview", "experience_level",
-            "availability", "min_charge", "max_charge", "hourly_pay",
-            "years_of_experience", "open_to_full_time", "is_top_rated",
+            "provider_id", "profile", "professional_title",
+            "avg_rating", "total_reviews"
         ]
+
+    def get_avg_rating(self, obj):
+        profile = obj.ratings.filter(is_active=True)
+        if len(profile) < 1:
+            return 0
+        total_and_sum = profile.aggregate(total_rating=Count("rating_id", distinct=True),
+                                        sum=Sum("rating"))
+        if total_and_sum['total_rating'] < 1:
+            return 0
+        
+        return total_and_sum["sum"] / total_and_sum['total_rating']
+    
+    def get_total_reviews(self, obj):
+        profile_reviews = obj.reviews.filter(is_active=True)
+        if len(profile_reviews) < 1:
+            return 0
+        total_reviews= profile_reviews.aggregate(total=Count("review_id", distinct=True))
+        return total_reviews['total']
 
 class CustomerCreateUpdateSerializer(serializers.ModelSerializer):
 

@@ -49,7 +49,7 @@ class RegistrationsSerializer(serializers.Serializer):
     password = serializers.CharField(write_only=True, max_length=50)
     
     confirm_password = serializers.CharField(max_length=50, write_only=True)
-
+    referral_code = serializers.CharField(max_length=20, write_only=True, required=False, allow_blank=True)
 
 
     def to_representation(self, instance):
@@ -175,15 +175,27 @@ class RegistrationsSerializer(serializers.Serializer):
 
         try:
             confirm_password = validated_data.pop("confirm_password")
+            referral_code = validated_data.pop("referral_code", None)
+
             with transaction.atomic():
                 user = User.objects.create_user(**validated_data)
-
             logging.info(_(f"A new user instance created: {user}"))
 
+            if referral_code is not None:
+                    from ..referral.services.referral_services import ReferralService
+
+                    code = referral_code
+                    logger.info("saving user to referral")
+                    referral_service = ReferralService()
+                    new_referral = referral_service.attach_referral(user, code)
+
+                    if not new_referral['status']:
+                        logger.error(f"failed to create referral due {new_referral['message']}")
+                        raise serializers.ValidationError(f"Failed to save referral: {new_referral['message']}")
             return user
-        except Exception:
-            logging.error(_(f"user creation failed:"))
-            raise serializers.ValidationError("User creation Failed!")
+        except Exception as exc :
+            logging.error(_(f"user creation failed: {exc}"))
+            raise serializers.ValidationError(f"User creation Failed: {exc}")
 
     
 class AccountVerificationSerializer(serializers.Serializer):
