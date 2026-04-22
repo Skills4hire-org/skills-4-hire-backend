@@ -62,10 +62,9 @@ class AvatarDetailSerializer(serializers.ModelSerializer):
     class Meta:
         model = Avatar
         fields = [
-            "avatar_id", "profile",
-            "description", 'avatar',
+            "avatar_id","description", 'avatar',
             "avatar_public_id", "is_active",
-            'created_at', 'updated_at'
+            'created_at'
         ]
 
 

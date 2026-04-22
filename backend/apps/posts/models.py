@@ -52,6 +52,7 @@ class Post(models.Model):
         related_name="reposts",
         db_index=True
     )
+    
     reposted_by = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name="shares")
 
     repost_quote = models.TextField(blank=True,null=True)

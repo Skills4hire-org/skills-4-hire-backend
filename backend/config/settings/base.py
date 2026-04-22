@@ -24,6 +24,8 @@ BASE_URL = env("BASE_URL")
 OTP_RETRIES_PER_DAY = env.int("OTP_RETRIES_PER_DAY")
 MAX_OTP_LENGTH = env.int("MAX_OTP_LENGTH")
 
+REFERRAL_COMMISION = env.int("REFERRAL_COMMISION")
+
 APP_NAME = env("APP_NAME", default="Skills4Hire")
 OTP_EXPIRY = env.int("OTP_EXPIRY")
 RESTRICTED_PATHS = env("RESTRICTED_PATHS").split(",")
@@ -80,6 +82,7 @@ INSTALLED_APPS = [
     "apps.wallet.apps.WalletConfig",
     "apps.notification.apps.NotificationConfig",
     'apps.chats.apps.ChatsConfig',
+    'apps.referral.apps.ReferralConfig',
 
 ]
 
@@ -90,11 +93,11 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
-    'DEFAULT_FILTER_BACKENDS': (
-        'django_filters.rest_framework.DjangoFilterBackend',
-        'rest_framework.filters.SearchFilter',
-        'rest_framework.filters.OrderingFilter',
-    ),
+    # 'DEFAULT_FILTER_BACKENDS': (
+    #     'django_filters.rest_framework.DjangoFilterBackend',
+    #     'rest_framework.filters.SearchFilter',
+    #     'rest_framework.filters.OrderingFilter',
+    # ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_THROTTLE_CLASSES': (
         'rest_framework.throttling.AnonRateThrottle',

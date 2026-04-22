@@ -4,6 +4,7 @@ from django.db.models import Count
 
 from rest_framework import viewsets, status
 from rest_framework.response import Response
+from rest_framework.decorators import action
 
 from .core.paginations import RatingPagination, ReviewPagination
 from .core.permissions import (
@@ -22,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 class RatingViewSet(viewsets.ModelViewSet):
-    action = 'rating'
+    view_action = 'rating'
     view =  ProfileRating
 
     pagination_class = RatingPagination
@@ -32,6 +33,18 @@ class RatingViewSet(viewsets.ModelViewSet):
         if self.action == "create":
             return [CanRateOrReview()]
         return [CanModifyRatingOrReadOnly()]
+
+    @action(methods=['GET'], detail=False, url_path=f"cusotmer")
+    def customer_rating(self, request, *args, **kwargs):
+        
+        try:
+            queryset = self.get_queryset()
+            customer_queryset = queryset.filter(rate_by=request.user)
+
+            serializer = self.get_output_serializer_create(customer_queryset, True)
+            return Response(status=status.HTTP_200_OK,data={"status": True, "data": serializer.data})
+        except Exception as e:
+            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'statud': False, "details": str(e)})
 
     def get_serializer_class(self):
         if self.action in ("create"):
@@ -50,6 +63,9 @@ class RatingViewSet(viewsets.ModelViewSet):
             .annotate(total_ratings=Count("rating_id", distinct=True))\
             .filter(is_active=True)
             
+        if self.request.user.is_customer:
+            return queryset
+
         if "profile" in self.request.query_params:
             provider_id = self.request.query_params.get("profile")
 
@@ -62,9 +78,8 @@ class RatingViewSet(viewsets.ModelViewSet):
             except Exception:
                 return ProfileRating.objects.none()
 
-
-    def get_output_serializer_create(self, serializer):
-        return RatingSerializer(serializer)
+    def get_output_serializer_create(self, serializer, many=False):
+        return RatingSerializer(serializer, many=many)
 
     def create(self, request, *args, **kwargs):
 
@@ -73,7 +88,7 @@ class RatingViewSet(viewsets.ModelViewSet):
 
         saved_serializer = serializer.save()
         log_action(
-            action_type=self.action,
+            action_type=self.view_action,
             user=request.user,
             details={'rating_pk': saved_serializer.pk}
         )
@@ -103,7 +118,7 @@ class RatingViewSet(viewsets.ModelViewSet):
 
 
 class ReviewViewSet(RatingViewSet):
-    action = "review"
+    view_action = "review"
     view = ProfileReview
     pagination_class = ReviewPagination
 
@@ -134,6 +149,9 @@ class ReviewViewSet(RatingViewSet):
             .prefetch_related("provider_profile__profile")\
             .annotate(total_reviews=Count("review_id", distinct=True))\
             .filter(is_active=True)
+        
+        if self.request.user.is_customer:
+            return queryset
 
         if "profile" in self.request.query_params:
             provider_pk = self.request.query_params.get("profile")

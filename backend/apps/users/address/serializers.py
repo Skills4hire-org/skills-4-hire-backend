@@ -73,12 +73,10 @@ class AddressSerializer(serializers.ModelSerializer):
         ]
 
 class AddressDetailSerializer(serializers.ModelSerializer):
-    # user_profile = BaseProfileReadSerializer()
-
     class Meta:
         model = UserAddress
         fields = [
-            "address_id", "user_profile",
+            "address_id", 'created_at',
             "street_address", "apartment",
             "city", "state", "country",
             "postal_code", "is_default"

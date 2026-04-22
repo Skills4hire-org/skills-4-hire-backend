@@ -1,5 +1,6 @@
 from django.db import  models
 from django.contrib.auth import  get_user_model
+from django.utils import timezone
 
 from ..base_model import BaseProfile
 
@@ -30,6 +31,8 @@ class UserAddress(models.Model):
     postal_code = models.CharField(max_length=20)
     country = models.CharField(max_length=100)
     is_default = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         verbose_name_plural = "User Addresses"

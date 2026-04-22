@@ -34,8 +34,8 @@ class ProviderModel(models.Model):
     profile = models.OneToOneField(BaseProfile, on_delete=models.CASCADE,
                                    related_name="provider_profile", db_index=True                             )
     professional_title = models.CharField(max_length=250, blank=False, null=True)
-    headline = models.CharField(max_length=255, blank=True)
-    overview = models.TextField(blank=True)
+    headline = models.CharField(max_length=255, blank=True, null=True)
+    overview = models.TextField(blank=True, null=True)
 
     experience_level  = models.CharField(max_length=20, choices=ExperienceLevel.choices, default=ExperienceLevel.ENTRY)
     availability = models.CharField(max_length=20, choices=AvailabilityStatus.choices,default=AvailabilityStatus.PARTIALLY)
@@ -57,7 +57,6 @@ class ProviderModel(models.Model):
 
     jobs_done = models.PositiveIntegerField(default=0, blank=True, null=True)
     is_top_rated = models.BooleanField(default=False, db_index=True)
-
 
     is_active = models.BooleanField(default=True, db_index=True)
 
