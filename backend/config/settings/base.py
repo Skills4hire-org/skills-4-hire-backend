@@ -25,6 +25,7 @@ OTP_RETRIES_PER_DAY = env.int("OTP_RETRIES_PER_DAY")
 MAX_OTP_LENGTH = env.int("MAX_OTP_LENGTH")
 
 REFERRAL_COMMISION = env.int("REFERRAL_COMMISION")
+CONVERSATION_TRESHOLD = env.int("CONVERSATION_TRESHOLD")
 
 APP_NAME = env("APP_NAME", default="Skills4Hire")
 OTP_EXPIRY = env.int("OTP_EXPIRY")
@@ -242,9 +243,13 @@ CELERY_BEAT_SCHEDULE = {
         "task": "apps.authentication.services.tasks.clean_up_expired_jwt",
         "schedule": crontab(hour=0, minute=0)
     },
-    "auto_update_roles": {
-        "task": "apps.users.tasks.auto_update_role",
-        "schedule": crontab(minute=1)
+    # "auto_update_roles": {
+    #     "task": "apps.users.tasks.auto_update_role",
+    #     "schedule": crontab(minute=1)
+    # },
+    "auto_update_pending_referrals": {
+        "task": "apps.referral.tasks.process_referral_conversion_task",
+        "schedule": crontab(hour=0, minute=0) # run daily at midnight
     }
 }
 CORS_ALLOWED_ORIGINS = env('CORS_ALLOWED_ORIGINS').split(",")

@@ -30,7 +30,14 @@ class ProfileReview(models.Model):
         UserModel, on_delete=models.SET_NULL,
         related_name="reviews", null=True
     )
-    review = models.TextField(null=True, blank=False, max_length=1000)
+
+    ratings = models.PositiveIntegerField(validators=[
+        MinValueValidator(1),
+        MaxValueValidator(5)
+    ], blank=True, null=True)
+
+    reviews = models.TextField(null=True, blank=True, max_length=1000)
+
     is_active = models.BooleanField(default=True)
 
     # Timestamp 
@@ -62,54 +69,3 @@ class ProfileReview(models.Model):
             setattr(self, "is_active", False)
 
         self.save(update_fields=['is_active'])
-
-
-class ProfileRating(models.Model):
-    rating_id = models.UUIDField(
-        primary_key=True,
-        default=uuid.uuid4,
-        max_length=20,
-        db_index=True
-    )
-
-    provider_profile = models.ForeignKey(
-        ProviderModel, on_delete=models.CASCADE,
-        related_name="ratings", null=True, blank=True
-    )
-    rate_by = models.ForeignKey(
-        UserModel, on_delete=models.SET_NULL,
-        null=True, blank=True, related_name="ratings")
-
-    rating = models.PositiveIntegerField(validators=[
-        MinValueValidator(1),
-        MaxValueValidator(5)
-    ], blank=False)
-
-    is_active = models.BooleanField(default=True)
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
-
-    def __str__(self):
-        return f"Rating {self.rating_id} created: {self.created_at}"
-
-
-    def soft_delete(self):
-        if hasattr(self, "is_active"):
-            setattr(self, "is_active", False)
-        self.save(update_fields=["is_active"])
-    
-    class Meta:
-        db_table = "ratings_ratings"
-        verbose_name = "Rating"
-        verbose_name_plural = "Ratings"
-
-        indexes = [
-            models.Index(fields=['is_active'], name="ra_act_idx"),
-            models.Index(fields=['created_at'], name="dat_idx"),
-            models.Index(fields=['rate_by'], name='rated_by_idx')
-        ]
-        constraints = [
-            models.UniqueConstraint(fields=['rate_by', "provider_profile"], name='rate_profile_unique_provider')
-        ]
-

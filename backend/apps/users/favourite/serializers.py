@@ -47,7 +47,6 @@ class FavouriteAddSerializer(serializers.ModelSerializer):
     def update(self, instance: Favourite, validated_data):
         try:
             provider = validated_data['provider']
-            print(validated_data)
             instance.providers.remove(provider)
         except Exception as exc:
             raise serializers.ValidationError(str(exc))

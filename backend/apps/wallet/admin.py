@@ -1,6 +1,16 @@
 from django.contrib import admin
 
-from .models import Wallet, LockedWallet, WalletTransaction, WebhookEvent
+from .models import Wallet, LockedWallet, WalletTransaction, WebhookEvent, BankAccount
+
+
+
+@admin.register(BankAccount)
+class BankAccountAdmin(admin.ModelAdmin):
+    list_display = [
+        'account_name', "bank_code", "recipient_code", 
+        "created_at", 'user__profile__display_name',
+        "bank_name"
+        ]
 
 
 @admin.register(WalletTransaction)
@@ -28,7 +38,7 @@ class WebhookEventAdmin(admin.ModelAdmin):
 class WalletAdmin(admin.ModelAdmin):
     list_display = [
         'balance', 'is_active', 
-        'created_at', 'user'
+        'created_at', 'user__profile__display_name'
     ]
     list_editable = ['is_active']
 

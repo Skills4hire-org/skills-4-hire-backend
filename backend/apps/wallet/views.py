@@ -4,10 +4,11 @@ from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .serializers import WalletDetailSerializer, DepositSerializer,\
-      WalletTransactionDetailSerializer
+      WalletTransactionDetailSerializer, WithDrawalSerializer
 from .models import Wallet, WalletTransaction, WebhookEvent
-from .tasks import process_deposit, verify_deposit_status
+from .tasks import process_deposit, verify_deposit_status, process_withdrawal_verifications
 from .paystack.service import PaystackService
+from ..referral.tasks import process_transfer_verification
 
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.cache import cache_page
@@ -47,7 +48,6 @@ class WalletViewSet(viewsets.GenericViewSet):
         serialize_wallet = self.get_serializer(u_wallet)
         return Response(serialize_wallet.data, status=status.HTTP_200_OK)
     
-
 class WalletTransactionViewSet(viewsets.GenericViewSet):
 
     http_method_names = ['post']
@@ -60,7 +60,40 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
     def get_serializer_class(self):
         if self.action == 'deposit':
             return DepositSerializer
+        if self.action == 'withdraw':
+            return WithDrawalSerializer
+
         return None
+    
+    @action(methods=['post'], detail=False, url_path="withdraw")
+    def withdraw(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        validated_data = serializer.validated_data
+        idempotency_key = validated_data['idempotency_key']
+
+        existing_transaction = WalletTransaction.objects.filter(
+            user=request.user, idempotency_key=idempotency_key
+        ).first()
+
+        if existing_transaction:
+            logger.info("Duplicate Transaction found for this request")
+            return Response({
+                "status":"failed",
+                'message': "Duplicated transaction, returning existing transaction",
+                'data': WalletTransactionDetailSerializer(existing_transaction).data
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        processed_transaction  = serializer.save()
+
+        out_serializer = WalletTransactionDetailSerializer(processed_transaction).data
+        return Response({
+            "status": True,
+            "details": "Tranasction in process",
+            "data": out_serializer
+        })
+
 
     @action(methods=['post'], detail=False, url_path="deposit")
     def deposit(self, request, *args, **kwargs):
@@ -111,7 +144,6 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
 
     @action(methods=["POST"], detail=False, url_path="paystack-webhook")
     def webhook(self, request, *args, **kwargs):
-
         EVENT_HANDLERS = {
             "charge.success": verify_deposit_status
         }
@@ -153,7 +185,17 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
             webhook_event.status = WebhookEvent.Status.PROCESSING
             webhook_event.save(update_fields=['status'])
 
+            reason = data['reason']
+
+            if event != "charge.success":
+                if reason.startswith("Referral-WithDrawal"):
+                    # handles transfer verification for referral withdrawal
+                    EVENT_HANDLERS[event] = process_transfer_verification
+                else:
+                    EVENT_HANDLERS[event] = process_withdrawal_verifications
+ 
             handler = EVENT_HANDLERS.get(event)
+            
             if handler is None:
 
                 logger.info("Paystack webhook: no handler for event type '%s'", event)

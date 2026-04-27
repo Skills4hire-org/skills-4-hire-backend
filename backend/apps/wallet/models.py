@@ -1,5 +1,6 @@
 from django.db import models
 from django.contrib.auth import get_user_model
+from django.utils.translation import gettext_lazy as _
 
 import uuid
 from decimal import Decimal
@@ -127,8 +128,9 @@ class WalletTransaction(models.Model):
         default=Status.PENDING
         )
     
-    idempotency_key = models.CharField(max_length=50, null=False, blank=False)
+    idempotency_key = models.UUIDField(max_length=50, null=False, blank=False)
     reference_key = models.CharField(max_length=50, null=False, blank=True)
+    transfer_code = models.CharField(max_length=50, null=True)
 
     metadata = models.JSONField(default=dict, blank=True)
     is_active = models.BooleanField(default=True)
@@ -181,3 +183,39 @@ class WebhookEvent(models.Model):
 
     def __str__(self):
         return f"{self.event_type} | {self.reference} | {self.status}"
+
+class BankAccount(models.Model):
+ 
+    bank_account_id = models.UUIDField(
+        primary_key=True, unique=True, db_index=True,
+        editable=False, default=uuid.uuid4
+    )
+
+    user = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        related_name="bank_accounts",
+    )
+    account_name = models.CharField(max_length=255)
+    account_number = models.CharField(max_length=10, null=False, blank=False)
+    bank_code = models.CharField(max_length=10, null=False, blank=False)
+    bank_name = models.CharField(max_length=255, blank=True, null=True)
+    bank_id = models.CharField(max_length=255, null=True)
+
+    recipient_code = models.CharField(max_length=100, blank=True, null=True)
+
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = _("bank account")
+        unique_together = [("user", "account_number", "bank_code")]
+        indexes = [
+            models.Index(fields=["user", "is_active"]),
+        ]
+
+    def __str__(self):
+        return f"{self.account_name} — {self.account_number} ({self.bank_code})"
+
+
+

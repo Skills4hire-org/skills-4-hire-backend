@@ -14,6 +14,7 @@ User = get_user_model()
 
 
 class Bookings(models.Model):
+    
     class BookingStatus(models.TextChoices):
         PENDING = "Pending"
         FUNDED = 'Funded'

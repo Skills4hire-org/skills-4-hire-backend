@@ -10,7 +10,7 @@ import  validators
 import requests
 
 from datetime import  datetime, timedelta
-from ..models import Post, Category
+from ..models import Post
 
 logger = logging.getLogger(__name__)
 UserModel = get_user_model()
@@ -40,16 +40,6 @@ def validate_url(url: str) -> tuple[bool, str]:
         return False, "Not Valid url"
     except requests.RequestException as e:
         return False, str(e)
-
-
-def check_service_in_category(category_id: str):
-    if not isinstance(category_id, uuid.UUID):
-        raise ValueError("not a valid object")
-    try:
-        category = Category.objects.get(pk=category_id)
-    except Category.DoesNotExist:
-        return False
-    return  True, category
 
 def can_make_post(user: str, post_type: int) -> bool:
     allowed_services = {

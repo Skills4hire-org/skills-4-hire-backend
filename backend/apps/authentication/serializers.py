@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password as _validate_password
 from django.db import transaction
 from django.utils import  timezone
-from django.db.models import Sum, Count
+from django.db.models import Avg, Count
 
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework import serializers
@@ -182,22 +182,17 @@ class RegistrationsSerializer(serializers.Serializer):
             logging.info(_(f"A new user instance created: {user}"))
 
             if referral_code is not None:
-                    from ..referral.services.referral_services import ReferralService
+                    from ..referral.tasks import process_referral_attchement
 
                     code = referral_code
                     logger.info("saving user to referral")
-                    referral_service = ReferralService()
-                    new_referral = referral_service.attach_referral(user, code)
-
-                    if not new_referral['status']:
-                        logger.error(f"failed to create referral due {new_referral['message']}")
-                        raise serializers.ValidationError(f"Failed to save referral: {new_referral['message']}")
+                    process_referral_attchement.delay(referred_user=user, code_str=code)
+                   
             return user
         except Exception as exc :
             logging.error(_(f"user creation failed: {exc}"))
             raise serializers.ValidationError(f"User creation Failed: {exc}")
 
-    
 class AccountVerificationSerializer(serializers.Serializer):
     """
     Serializer for verifying a user's account using an email address and a verification code.
@@ -240,7 +235,6 @@ class ResendOtpSerializer(serializers.Serializer):
             raise serializers.ValidationError(_('User not found'), code="email_invalid")
         return valid_email
 
-
 class PasswordResetConfirmSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=50, write_only=True, required=True)
     password = serializers.CharField(write_only=True, max_length=200)
@@ -275,7 +269,6 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         if password.strip() != confirm_password.strip():
             raise serializers.ValidationError(_("Password Mismatch. Please provide a matching password"))
         return attrs
-
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
@@ -370,6 +363,7 @@ class UserReadSerializer(serializers.ModelSerializer):
         ]   
 
     def get_avg_rating(self, obj):
+
         if not obj.is_provider:
             return None
         provider = getattr(obj.profile, "provider_profile")
@@ -377,13 +371,9 @@ class UserReadSerializer(serializers.ModelSerializer):
         if provider is None:
             return 0
         
-        rating = provider.ratings.filter(is_active=True).aggregate(
-            total_rating=Count("rating_id", distinct=True),
-            total_sum=Sum("rating")
-        )
-        if rating['total_sum']:
-            return rating['total_sum'] / rating['total_rating']
-        return 0
+        rating = provider.reviews.filter(is_active=True)\
+                                .aggregate(avg=Avg("ratings"))
+        return rating['avg']
     
     def get_total_reviews(self, obj):
 
@@ -394,17 +384,8 @@ class UserReadSerializer(serializers.ModelSerializer):
         if provider is None:
             return 0
         
-        reviews = provider.reviews.filter(is_active=True).aggregate(
-            total_reviews=Count("review_id", distinct=True)
-        )
+        reviews = provider.reviews.filter(is_active=True)\
+                        .aggregate(total_reviews=Count("reviews"))
         if reviews["total_reviews"]:
             return reviews['total_reviews']
         return 0
-
-
-
-
-
-
-
-

@@ -33,8 +33,8 @@ def send_email_to_queue(content: dict):
         raise
 
 
-@shared_task
-def auto_delete_otp():
+@shared_task(bind=True, max_retries=3)
+def auto_delete_otp(self):
     """
     Deletes expired One-Time Password (OTP) records from the database.
 
@@ -51,15 +51,12 @@ def auto_delete_otp():
             ).update(is_active=False, is_deleted=True, is_used=True)
         
         logger.info(f"Automatically deleted OTP codes from the database")    
-    except IntegrityError as exc:
-        logger.error("Database error while auto deleting OTP",  exc_info=True)
-        raise ValidationError("Database error while auto deleting OTP.") 
-    except ValueError as exc:
-        logger.error("Invalid error occurred", exc_info=True)
-        raise ValidationError("Error auto deleting OTP code.", exc)
+    except Exception as exc:
+        logger.error("Delete otp task failed: "+ exc)
+        raise self.retry(exc=exc, countdown=60 * 5) 
 
-@shared_task    
-def clean_up_expired_jwt():
+@shared_task(bind=True, max_retries=3)  
+def clean_up_expired_jwt(self):
     logger.debug("Running Tasks.... Clean up expired jwts refresh tokens")
 
     try:
@@ -71,10 +68,7 @@ def clean_up_expired_jwt():
         expired_outstainding_tokens.delete()
 
         logger.info(f"Automatically deleted Exired outstanding jwt")    
-    except IntegrityError as exc:
-        logger.error("Database error while auto deleting outstanding jwt",  exc_info=True)
-        raise ValidationError("Database error while auto deleting JWT.") 
-    except ValueError as exc:
-        logger.error("Invalid error occurred", exc_info=True)
-        raise ValidationError("Error auto deleting JWT token.", exc)
+    except Exception as exc:
+        logger.error("Cleand up jwt task failed")
+        raise self.retry(exc=exc, countdown=60 * 5) 
 

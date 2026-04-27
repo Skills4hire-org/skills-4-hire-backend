@@ -6,121 +6,20 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 from rest_framework.decorators import action
 
-from .core.paginations import RatingPagination, ReviewPagination
+from .core.paginations import  ReviewPagination
 from .core.permissions import (
-    CanModifyReviewOrReadOnly, CanRateOrReview, CanModifyRatingOrReadOnly
+    CanModifyReviewOrReadOnly, CanRateOrReview
 )
-from .models import ProfileReview, ProfileRating
+from .models import ProfileReview
 from .serializers import (
-    ReviewSerializer, RatingSerializer, RatingCreateSerializer, 
-    RatingDetailSerializer, ReviewUpdateSerializer,
+    ReviewUpdateSerializer,
     ReviewCreateSerializer, ReviewDetailSerializer, 
-    RatingUpdateSerializer
 )
-from ..core.utils.py import log_action
-
 logger = logging.getLogger(__name__)
 
-
-class RatingViewSet(viewsets.ModelViewSet):
-    view_action = 'rating'
-    view =  ProfileRating
-
-    pagination_class = RatingPagination
-    http_method_names = ['post', 'patch', 'get', 'delete']
-
-    def get_permissions(self):
-        if self.action == "create":
-            return [CanRateOrReview()]
-        return [CanModifyRatingOrReadOnly()]
-
-    @action(methods=['GET'], detail=False, url_path=f"cusotmer")
-    def customer_rating(self, request, *args, **kwargs):
-        
-        try:
-            queryset = self.get_queryset()
-            customer_queryset = queryset.filter(rate_by=request.user)
-
-            serializer = self.get_output_serializer_create(customer_queryset, True)
-            return Response(status=status.HTTP_200_OK,data={"status": True, "data": serializer.data})
-        except Exception as e:
-            return Response(status=status.HTTP_500_INTERNAL_SERVER_ERROR, data={'statud': False, "details": str(e)})
-
-    def get_serializer_class(self):
-        if self.action in ("create"):
-            return RatingCreateSerializer
-        elif self.action == "partial_update":
-            return RatingUpdateSerializer
-        elif self.action == "retrieve":
-            return RatingDetailSerializer
-        return RatingSerializer
-
-    def get_queryset(self):
-        user = self.request.user
-        queryset = ProfileRating.objects\
-            .select_related("rate_by", "provider_profile")\
-            .prefetch_related("provider_profile__profile")\
-            .annotate(total_ratings=Count("rating_id", distinct=True))\
-            .filter(is_active=True)
-            
-        if self.request.user.is_customer:
-            return queryset
-
-        if "profile" in self.request.query_params:
-            provider_id = self.request.query_params.get("profile")
-
-            queryset.filter(provider_profile__pk=provider_id)
-            return queryset
-        else:
-            try:
-                current_user_rating = queryset.filter(provider_profile=user.profile.provider_profile)
-                return current_user_rating
-            except Exception:
-                return ProfileRating.objects.none()
-
-    def get_output_serializer_create(self, serializer, many=False):
-        return RatingSerializer(serializer, many=many)
-
-    def create(self, request, *args, **kwargs):
-
-        serializer = self.get_serializer(data=request.data, context={'request': request})
-        serializer.is_valid(raise_exception=True)
-
-        saved_serializer = serializer.save()
-        log_action(
-            action_type=self.view_action,
-            user=request.user,
-            details={'rating_pk': saved_serializer.pk}
-        )
-
-        output_serializer = self.get_output_serializer_create(saved_serializer)
-        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
-
-    # @method_decorator(cache_page(60 * 5))
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
-
-    def partial_update(self, request, *args, **kwargs):
-        instance = self.get_object()
-        serializer = self.get_serializer(
-            instance, data=request.data,
-            partial=True, context={"request": request})
-
-        serializer.is_valid(raise_exception=True)
-
-        saved_instance = serializer.save()
-        return Response(data=self.get_output_serializer_create(saved_instance).data, status=status.HTTP_200_OK)
-
-    def destroy(self, request, *args, **kwargs):
-        instance = self.get_object()
-        instance.soft_delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-
-
-class ReviewViewSet(RatingViewSet):
-    view_action = "review"
-    view = ProfileReview
+class ReviewViewSet(viewsets.ModelViewSet):
     pagination_class = ReviewPagination
+    http_method_names = ['post', 'get', 'patch']
 
     def get_permissions(self):
         if self.action == "create":
@@ -134,10 +33,10 @@ class ReviewViewSet(RatingViewSet):
             return ReviewUpdateSerializer
         elif self.action == 'retrieve':
             return ReviewDetailSerializer
-        return ReviewSerializer
+        return ReviewDetailSerializer
 
     def get_output_serializer_create(self, serializer):
-        return ReviewSerializer(serializer)
+        return ReviewDetailSerializer(serializer)
 
     def get_queryset(self):
         """" A queryset that filters by passing user 'profile' as query_params 
@@ -147,22 +46,15 @@ class ReviewViewSet(RatingViewSet):
         queryset = ProfileReview.objects\
             .select_related("reviewed_by", "provider_profile")\
             .prefetch_related("provider_profile__profile")\
-            .annotate(total_reviews=Count("review_id", distinct=True))\
             .filter(is_active=True)
         
         if self.request.user.is_customer:
-            return queryset
-
-        if "profile" in self.request.query_params:
-            provider_pk = self.request.query_params.get("profile")
-            queryset.filter(provider_profile__pk=provider_pk)
-            return queryset
-        
+            queryset = queryset.filter(
+                reviewed_by=user
+            )
         else:
-            try:
-                current_user_reviews = queryset.filter(provider_profile__profile__user=user)
-                return current_user_reviews
-            except Exception:
-                return ProfileReview.objects.none()
+            queryset = queryset.filter(provider_profile__profile__user=user)
+        
+        return queryset
         
         

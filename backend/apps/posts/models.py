@@ -3,11 +3,10 @@ import logging
 from django.db import models
 from django.contrib.auth import get_user_model
 
-
 import uuid
 
 from ..users.address.models import UserAddress
-from ..users.skills.models import Category
+from ..users.skills.models import Skill
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +40,7 @@ class Post(models.Model):
 
     post_title = models.CharField(max_length=500, blank=False,null=True)
 
+    tags = models.ManyToManyField(Skill, related_name="tags", blank=True)
     post_content = models.TextField(blank=False, null=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="posts", blank=True, null=True)
 
@@ -111,32 +111,32 @@ class Post(models.Model):
         return f"Posts('{self.user.full_name}', {self.is_active})"
     
     
-class PostTag(models.Model):
-    post_tag_id = models.UUIDField(
-        max_length=20,
-        primary_key=True,
-        unique=True,
-        default=uuid.uuid4,
-        db_index=True
-    )
+# class PostTag(models.Model):
+#     post_tag_id = models.UUIDField(
+#         max_length=20,
+#         primary_key=True,
+#         unique=True,
+#         default=uuid.uuid4,
+#         db_index=True
+#     )
 
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="post_tag")
-    service_name = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="post_tag", null=True, blank=True)
-
-
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+#     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="post_tag")
+#     service_name = models.ForeignKey(Category, on_delete=models.CASCADE, related_name="post_tag", null=True, blank=True)
 
 
-    def __str__(self):
-        return f"PostTag({self.post.pk},)"
+#     created_at = models.DateTimeField(auto_now_add=True)
+#     updated_at = models.DateTimeField(auto_now=True)
 
-    class Meta:
-        constraints = [
-            models.UniqueConstraint(
-                fields=["post", "service_name"], name="unique_post_tag"
-            )
-        ]
+
+#     def __str__(self):
+#         return f"PostTag({self.post.pk},)"
+
+#     class Meta:
+#         constraints = [
+#             models.UniqueConstraint(
+#                 fields=["post", "service_name"], name="unique_post_tag"
+#             )
+#         ]
 
 
 class CommentManager(models.Manager):

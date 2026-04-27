@@ -1,6 +1,6 @@
 
 from django.db import transaction
-from django.db.models import Count, Sum
+from django.db.models import Avg, Count
 
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -16,6 +16,7 @@ from ..profile_services.utils import get_profile_avatar
 from ..provider_models import ProviderModel
 from ..address.serializers import AddressDetailSerializer
 from ..services.models import ServiceAttachment
+from ..skills.serializers import ProviderSkillListSerializer
 
 def save_base_profile_with_serializer(base_profile, validated_data, request):
     serializer = BaseProfileCreateSerializer(
@@ -139,6 +140,7 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
         posts = serializers.SerializerMethodField()
         comments = serializers.SerializerMethodField()
         images  = serializers.SerializerMethodField()
+        provider_skills = ProviderSkillListSerializer(many=True)
 
         class Meta:
             model = ProviderModel
@@ -147,7 +149,7 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
                 "headline", "overview", "profile",
                 "min_charge", "max_charge",
                 "created_at", "endorsement_count", "posts",
-                'comments', 'images'
+                'comments', 'images', "provider_skills"
             ]
 
         def get_images(self, obj):
@@ -190,30 +192,28 @@ class ProviderProfilePublicSerializer(serializers.ModelSerializer):
     profile = BaseProfileListSerializer(read_only=True)
     avg_rating = serializers.SerializerMethodField()
     total_reviews = serializers.SerializerMethodField()
+    provider_skills = ProviderSkillListSerializer(read_only=True,  many=True)
 
     class Meta:
         model = ProviderModel
         fields = [
             "provider_id", "profile", "professional_title",
-            "avg_rating", "total_reviews"
+            "avg_rating", "total_reviews", "provider_skills"
         ]
 
-    def get_avg_rating(self, obj):
-        profile = obj.ratings.filter(is_active=True)
-        if len(profile) < 1:
-            return 0
-        total_and_sum = profile.aggregate(total_rating=Count("rating_id", distinct=True),
-                                        sum=Sum("rating"))
-        if total_and_sum['total_rating'] < 1:
-            return 0
+    def get_avg_rating(self, obj: ProviderModel):
         
-        return total_and_sum["sum"] / total_and_sum['total_rating']
-    
+        profile_reviews = obj.reviews.filter(is_active=True)
+        if len(profile_reviews) < 1:
+            return 0
+        avg_rating = profile_reviews.aggregate(avg=Avg("ratings"))
+        return avg_rating['avg']
+        
     def get_total_reviews(self, obj):
         profile_reviews = obj.reviews.filter(is_active=True)
         if len(profile_reviews) < 1:
             return 0
-        total_reviews= profile_reviews.aggregate(total=Count("review_id", distinct=True))
+        total_reviews= profile_reviews.aggregate(total=Count("reviews"))
         return total_reviews['total']
 
 class CustomerCreateUpdateSerializer(serializers.ModelSerializer):

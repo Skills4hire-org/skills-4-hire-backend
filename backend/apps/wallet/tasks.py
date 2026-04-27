@@ -4,6 +4,7 @@ from django.utils import timezone
 
 from .models import WalletTransaction
 from .paystack.service import PaystackService
+from .transactions.services import WalletTransactionService
 from .services import WalletService
 
 import uuid
@@ -11,7 +12,7 @@ import logging
 
 
 MAX_RETRIES = 5
-BASE_RETRY_DELAY = 60  # seconds
+BASE_RETRY_DELAY = 60
 logger = logging.getLogger(__name__)
 
 def process_deposit(wallet_transaction_id: uuid.UUID) -> dict:
@@ -57,13 +58,7 @@ def process_deposit(wallet_transaction_id: uuid.UUID) -> dict:
             "Unexpected error processing withdrawal %s: %s", wallet_transaction.pk, exc
         )
 
-@shared_task(
-    bind=True,
-    max_retries=3,
-    default_retry_delay=300,
-    autoretry_for=[Exception,],
-    retry_backoff=True
-)
+@shared_task(bind=True, max_retries=3, default_retry_delay=300, autoretry_for=[Exception,], retry_backoff=True)
 def verify_deposit_status(self, webhook_data: dict):
     logger.info("Task Execution: Processing Task, Deposit verifications")
 
@@ -131,18 +126,132 @@ def verify_deposit_status(self, webhook_data: dict):
     return "Deposit veified"
 
 
+def process_withdrawal(transaction_id, recipient_code):
 
+    logger.info(
+        "Withdrawal processing Started for %s with code %s", 
+        transaction_id, recipient_code)
+    
+    try:
+        with transaction.atomic():
+            try:
+                withdrawal_transaction = (
+                    WalletTransaction.objects.select_for_update(nowait=True)
+                    .select_related("user", "wallet")
+                    .get(transaction_id=transaction_id)
+                )
+            except WalletTransaction.DoesNotExist:
+                logger.info("Transaction not found with transction id %s", transaction_id)
+                return {"status": False, "message": "transction_not found"}
+
+            transction_status = withdrawal_transaction.status
+
+            if transction_status == WalletTransaction.Status.COMPLETED:
+                logger.info("Transction with id %s alreary completed", transaction_id)
+                return { "status": False, "message": "transction already completed"}
+            
+            if transction_status == WalletTransaction.Status.FAILED:
+                logger.info("Transaction with id %s already failed", transaction_id)
+                return { "status": False, "message": "transaction_alredy_failed"}
+            
+            withdrawal_transaction.status = WalletTransaction.Status.PROCESSING
+            withdrawal_transaction.save(update_fields=['status', "updated_at"])
+
+        paystack_service = PaystackService()
+
+        amount = withdrawal_transaction.amount
+        reference_key = withdrawal_transaction.reference_key
+
+        transfer_response = paystack_service.initiate_transfer(
+            amount=amount, reference=reference_key, recipient_code=recipient_code,
+            reason="Withdrawal"
+        )
+
+        data = transfer_response['data']
+
+        transfer_status = data['status']
+        transfer_code = data['transfer_code']
+
+        with transaction.atomic():
+            withdrawal = (
+                WalletTransaction.objects.select_for_update()
+                .get(transaction_id=transaction_id)
+            )
+
+            withdrawal.transfer_code = transfer_code
+            withdrawal.status = WalletTransaction.Status.PROCESSING
+
+            withdrawal.save(update_fields=['transfer_code', 'updated_at', 'status'])
+        
+        return {"status": True, "message": "withdrawal processed"}
+    
+    except Exception as exc:
+        raise
+
+@shared_task(bind=True, max_retries=MAX_RETRIES, autoretry_for=(Exception, ), reject_on_worker_lost=True)
+def process_withdrawal_task(self, transaction_id, recipient_code):
+    try:
+        process_withdrawal(transaction_id, recipient_code)
+    except Exception as exc:
+
+        if self.request.retries >= MAX_RETRIES:
+            logger.info(
+                "Retries reached limit, restoring user balance"
+            )
+
+            withdrawal = WalletTransaction.objects.get(transaction_id=transaction_id)
+            transaction_service = WalletTransactionService()
+            transaction_service.process_failed_withdrawal(withdrawal)
+
+
+        return self.retry(exc=exc, countdown=60 * 3)
     
 
+@shared_task(bind=True, max_retries=MAX_RETRIES, reject_on_worker_lost=True)
+def process_withdrawal_verifications(self, webhook_data):
+    
+    logger.info(
+        "processing withdrawal verifications: transaction statu: %s", 
+        webhook_data['status']
+    )
+
+    reference_key = webhook_data['reference']
+    try:
+        with transaction.atomic():
+
+            withdrawal_transaction = (
+                WalletTransaction.objects.select_for_update(nowait=True)
+                .select_related("user", "wallet")
+                .get(reference_key=reference_key)
+            )
+
+            transaction_status = withdrawal_transaction.status
+
+            if transaction_status != WalletTransaction.Status.PROCESSING:
+                logger.info("wallet transction is not processing. Current status: %s", transaction_status)
+                return {"status": False, "message": "transaction is not processing. current "+ transaction_status}
+
+            
+            transfer_status = webhook_data['status']
+            transaction_service = WalletTransactionService()
+
+            if transfer_status in ('success', ):
+                transaction_service.process_completed_withdrawal(withdrawal_transaction)
+            elif transfer_status in ("failed", "reversed"):
+                transaction_service.process_failed_withdrawal(withdrawal_transaction)
+            
+            else:
+                withdrawal_transaction.status = WalletTransaction.Status.PROCESSING
+
+            withdrawal_transaction.save(update_fields=['status', 'updated_at'])
+        return {"status": True, "message": "transaction_processed"}
+    
+    except Exception as exc:
+
+        logger.info("retrying tasks on exceptions")
+        return self.retry(exc=exc, countdown=60 * 3)
 
 
 
 
-
-
-
-
-
-
-
-
+            

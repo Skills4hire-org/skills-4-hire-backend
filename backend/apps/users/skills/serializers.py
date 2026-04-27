@@ -8,7 +8,7 @@ class CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Category
         fields = [
-            "category_id", "name", "icon",
+            "category_id", "name",
             "description", "created_at", "updated_at"
         ]
 
@@ -19,20 +19,23 @@ class SkillSerializer(serializers.ModelSerializer):
     class Meta:
         model = Skill
         fields = [
-            "skill_id", "name", "category", "is_featured",
+            "skill_id", "name", "category",
             "is_active", "created_at", "updated_at"
         ]
 
 class ProviderSkillCreateSerializer(serializers.ModelSerializer):
-
+    skill_id = serializers.PrimaryKeyRelatedField(
+        queryset=Skill.active_objects.all(),
+        source="skill"
+    )
     class Meta:
         model = ProviderSkill
         fields = [
-            "provider_skill_id", "skill",
-            "proficiency", "years_used",
-            "is_primary", "sort_order",
-            "level_of_experience", "description"
+            "skill_id", "proficiency", 
+            "years_used", 'is_primary',
+            "description"
         ]
+
         validators = [
             validators.UniqueTogetherValidator(
                 queryset=ProviderSkill.objects.all(),
@@ -40,21 +43,31 @@ class ProviderSkillCreateSerializer(serializers.ModelSerializer):
                 message="This skill is already attached to your profile."
             )
         ]
+
     def validate_years_used(self, value):
-        if value > 50:  # Realistic business logic check
+        if value > 50:
             raise serializers.ValidationError("Years of experience seems unrealistic.")
         return value
 
     def validate(self, attrs):
+        is_primary = attrs.get("is_primary", False)
 
-        if attrs.get('is_primary'):
-            provider = self.context['request'].user.profile.provider_profile
+        if is_primary:
+            user = self.context['request'].user
+
             primary_count = ProviderSkill.objects.filter(
-                provider_profile=provider, is_primary=True
+                provider_profile=user.profile.provider_porfile, is_primary=True
             ).count()
+
             if primary_count >= 5 and not self.instance: # only on create
                 raise serializers.ValidationError({"is_primary": "You can only have 5 primary skills."})
         return attrs
+    
+    def create(self, validated_data):
+        user = self.request.user
+        validated_data['provider_profile'] = user.profile.provider_profile
+
+        return super().create(validated_data)
 
 class ProviderSkillListSerializer(serializers.ModelSerializer):
     skill = SkillSerializer(read_only=True)
@@ -80,10 +93,7 @@ class ProviderSkillDetailSerializer(serializers.ModelSerializer):
             "skill",
             "proficiency",
             "years_used",
-            "level_of_experience",
             "description",
             "is_primary",
-            "sort_order",
             "created_at",
-            "updated_at",
         ]

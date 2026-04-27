@@ -2,9 +2,9 @@
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
-from .models import Post, PostAttachment, PostTag, Comment
+from .models import Post, PostAttachment, Comment
 from .utils.posts import  (
-    validate_url, check_service_in_category,
+    validate_url,
     can_make_post, verify_post_with_amount,
     get_date
 )
@@ -12,11 +12,11 @@ from .services import  create_post, CommentService
 from apps.authentication.serializers import  UserReadSerializer
 from ..users.address.serializers import AddressCreateSerializer
 from  ..users.address.models import UserAddress
+from ..users.skills.serializers import SkillSerializer, Skill
 
 
 from django.contrib.auth import get_user_model
-from django.utils.text import gettext_lazy as _
-from django.db.models import Prefetch
+from django.utils.translation import gettext_lazy as _
 from django.utils import  timezone
 
 User = get_user_model()
@@ -50,33 +50,15 @@ class PostAttachmentSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(_(f"{url}"))
         return  url
 
-class PostTagSerializer(serializers.ModelSerializer):
-    category_id = serializers.UUIDField(required=True, write_only=True)
-    class Meta:
-        model = PostTag
-        fields = [
-            "post_tag_id",
-            "category_id",
-            "service_name",
-            "post",
-            "created_at"
-        ]
-        read_only_fields = [
-            "post_tag_id", "service_name",
-            "post", "created_at"
-        ]
-
-        def validate_cateory_id(self, value):
-            found, _ = check_service_in_category(value.strip())
-            if not found:
-                raise serializers.ValidationError(_("category  not Found"))
-            return  value
-
 class PostCreateSerializer(serializers.ModelSerializer):
     attachment = PostAttachmentSerializer(many=True, required=False)
-    post_tag = PostTagSerializer(many=True, required=False)
     duration = serializers.IntegerField(min_value=1, required=False)
     address  = AddressCreateSerializer()
+    tags = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Skill.active_objects.all(),
+        source="tag"
+    )
 
     class Meta:
         model = Post
@@ -88,7 +70,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
             "amount",
             "duration",
             "attachment",
-            "post_tag"
+            "tags"
         ]
 
     def validate_duration(self, value):
@@ -128,7 +110,6 @@ class PostCreateSerializer(serializers.ModelSerializer):
         """Create a Post and its nested PostMedia and ServiceTag records."""
 
         post_attachments = validated_data.pop("attachment", [])
-        post_tags = validated_data.pop("post_tag", [])
         address = validated_data.pop("address", {})
         duration = validated_data.pop("duration", None)
 
@@ -160,26 +141,6 @@ class PostCreateSerializer(serializers.ModelSerializer):
                 post_instance.address = address_instance
             post_instance.address = address_instance
 
-        # Create related PostTag records (if any)
-        if post_tags:
-            instances = []
-            for item in post_tags:
-                data = item.copy()
-
-                category_id = data.pop('category_id')
-
-                instance = PostTag(
-                    post=post_instance,
-                    service_name=check_service_in_category(category_id)[1],
-                    **data
-                )
-
-                instances.append(instance)
-
-            PostTag.objects.bulk_create(instances)
-
-        return post_instance
-    
 
     def update(self, instance, validated_data):
         """Update Post instance. Nested PostAttachment and PostTag are not updated here."""
@@ -191,7 +152,6 @@ class PostCreateSerializer(serializers.ModelSerializer):
 
         address = validated_data.pop("address", {})
         attachments = validated_data.pop("attachment", [])
-        post_tags = validated_data.pop("post_tag", [])
 
         if address:
             post_ad_instance = instance.address
@@ -212,15 +172,6 @@ class PostCreateSerializer(serializers.ModelSerializer):
             attachment = instance.attachment
             for data in attachments:
                 attachment.get_or_create(post=instance, **data)
-
-        if post_tags:
-            tags = instance.post_tag
-            for post in post_tags:
-                found, category = check_service_in_category(post['category_id'])
-                if found:
-                    tags.get_or_create(post=instance, service_name=category)
-                else:
-                    pass
 
         duration = validated_data.get("duration", None)
         if duration:
@@ -287,10 +238,9 @@ class CommentSerializer(serializers.ModelSerializer):
             "user", "message", "user", "attachment"
         ]
 
-    
 class PostDetailSerializer(serializers.ModelSerializer):
     attachment = PostAttachmentSerializer(many=True, read_only=True)
-    post_tag = PostTagSerializer(many=True, read_only=True)
+    tags = SkillSerializer(read_only=True, many=True)
     user = UserReadSerializer(read_only=True)
     duration = serializers.SerializerMethodField()
     resposted_by = UserReadSerializer(read_only=True)
@@ -302,9 +252,9 @@ class PostDetailSerializer(serializers.ModelSerializer):
             "post_type", "amount", "is_active",
             "is_pinned", "start_date",
             "end_date", "created_at", "updated_at",
-            "attachment", "post_tag",
+            "attachment",
             "duration", "attachment", "is_reposted", "resposted_by",
-            "post_tag", "repost_quote"
+            "tags", "repost_quote"
         ]
 
     def get_duration(self, obj):
@@ -364,7 +314,7 @@ class PostListSerializer(serializers.ModelSerializer):
     likes_count = serializers.IntegerField(read_only=True)
     reposts_count = serializers.IntegerField(read_only=True)
     attachment = PostAttachmentSerializer(many=True, read_only=True)
-    post_tag = PostTagSerializer(many=True, read_only=True)
+    tags = SkillSerializer(read_only=True, many=True)
     user = UserReadSerializer(read_only=True)
     resposted_by = UserReadSerializer(read_only=True)
 
@@ -374,7 +324,7 @@ class PostListSerializer(serializers.ModelSerializer):
             "reposts_count", "comments_counts",
             "likes_count", "user", "post_id",
             "post_content",  "created_at", "updated_at",
-            "post_type", "attachment", "post_tag", 
+            "post_type", "attachment", "tags", 
             "is_reposted", 'resposted_by'
         ]
 

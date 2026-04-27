@@ -1,4 +1,4 @@
-from rest_framework import generics, permissions, filters
+from rest_framework import generics, permissions, filters, viewsets
 
 from .models import Category, Skill
 from .serializers import SkillSerializer, CategorySerializer, ProviderSkillCreateSerializer, \
@@ -7,43 +7,45 @@ from .pagination import StandardPagination
 
 from django_filters.rest_framework import DjangoFilterBackend
 
-from ..permissions import IsProvider
+from .permissions import SkillsOwnerPermissions
 from ..provider_models import ProviderSkill
 
 
 
 class CategoryListView(generics.ListAPIView):
     """GET /api/v1/providers/categories/"""
+
     serializer_class = CategorySerializer
     permission_classes = [permissions.IsAuthenticated]
     queryset = Category.active_manager.all()
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ['name']
+    ordering_fields = ['-name']
 
 class SkillListView(generics.ListAPIView):
+
     """GET /api/v1/providers/skills/?search=python&category=1"""
+
     serializer_class = SkillSerializer
     permission_classes = [permissions.IsAuthenticated]
     queryset = Skill.active_objects.select_related("category")
     filter_backends = [filters.SearchFilter, DjangoFilterBackend, filters.OrderingFilter]
     search_fields = ["name"]
     ordering_fields = ["name"]
-    filterset_fields = ["category__name"]
+    filterset_fields = ["category__name", 'name']
     pagination_class = StandardPagination
-
-
-from rest_framework import viewsets, permissions, filters
-from django_filters.rest_framework import DjangoFilterBackend
 
 
 class ProviderSkillViewSet(viewsets.ModelViewSet):
 
     http_method_names = ['post', 'get', 'patch', 'delete']
 
-    permission_classes = [IsProvider]
-
     filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
-    filterset_fields = ['proficiency', 'is_primary', 'skill__category']
+    filterset_fields = ['proficiency', 'is_primary', 'skill__category__name']
     search_fields = ['skill__name', 'description']
-    ordering_fields = ['sort_order', 'years_used', 'created_at']
+    ordering_fields = ["-created_at"]
+    pagination_class = StandardPagination
+    permission_classes = [SkillsOwnerPermissions]
 
 
     def get_serializer_class(self):
@@ -57,15 +59,18 @@ class ProviderSkillViewSet(viewsets.ModelViewSet):
         """
         Optimized queryset:
         1. Only returns skills for the logged-in provider.
-        2. select_related('skill') joins the skill table to prevent N+1 queries.
         """
-        return ProviderSkill.objects.filter(
-            provider_profile__profile=self.request.user.profile
-        ).select_related('skill')
 
-    def perform_create(self, serializer):
-        """Auto-assign the provider profile from the authenticated user."""
-        serializer.save(provider_profile=self.request.user.profile.provider_profile)
-
+        user = self.request.user
+        if user.is_customer:
+            return ProviderSkill.objects.none()
+        
+        queryset = (
+            ProviderSkill.active_objects.filter(
+                provider_profile=user.profile.provider_profile
+            ).select_related("provider_profile")
+        )
+        return queryset
+    
     def perform_destroy(self, instance):
         instance.soft_delete()
