@@ -265,6 +265,7 @@ class WithDrawalSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         user = self.context['request'].user
         recipient_code = validated_data.pop('recipient_code', None)
+        
         reference_key = generate_reference_key(user)
 
         # process account deduction

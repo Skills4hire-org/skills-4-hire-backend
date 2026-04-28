@@ -10,7 +10,7 @@ router = DefaultRouter()
 router.register("", WalletViewSet, basename='user_wallet')
 router.register('', WalletTransactionViewSet, basename='wallet_transaction')
 router.register("bank", BankAccountViewSet, basename='bank')
-router.register("transfer/receipient", TransferViewSet, basename='receipient')
+router.register("transfer/recipient", TransferViewSet, basename='receipient')
 
 
 urlpatterns = [

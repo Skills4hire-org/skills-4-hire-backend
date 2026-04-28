@@ -42,33 +42,25 @@ CACHES = {
         "LOCATION":env("DEVELOPMENT_REDIS"),
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "CONNECTION_POOL_KWARGS": {
-                "ssl_cert_reqs": ssl.CERT_NONE 
-               }
+            # "CONNECTION_POOL_KWARGS": {
+            #     "ssl_cert_reqs": ssl.CERT_NONE 
+            #    }
                   
        }
     }
 }
 
 
-CELERY_BROKER_USE_SSL = {
-    'ssl_cert_reqs': ssl.CERT_NONE
-}
-CELERY_REDIS_BACKEND_USE_SSL = {
-    'ssl_cert_reqs': ssl.CERT_NONE
-}
+# CELERY_BROKER_USE_SSL = {
+#     'ssl_cert_reqs': ssl.CERT_NONE
+# }
+# CELERY_REDIS_BACKEND_USE_SSL = {
+#     'ssl_cert_reqs': ssl.CERT_NONE
+# }
 
-CELERY_BROKER_URL = env("DEVELOPMENT_REDIS", default="redis://redis:6379/0")
-CELERY_RESULT_BACKEND = env("DEVELOPMENT_REDIS", default="redis://redis:6379/1")
-
-DATABASES = {
-        'default': dj_database_url.config(
-            default=env("DATABASE_URL_PROD"),
-            ssl_require=True,
-            conn_max_age=0
-        )
-    }
-
+RESULT_STORAGE = env("DEVELOPMENT_REDIS")
+CELERY_BROKER_URL = env("DEVELOPMENT_REDIS", default="redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = RESULT_STORAGE
 
 CHANNEL_LAYERS = {
     "default": {
@@ -94,18 +86,4 @@ DATABASES = {
         )
     }
 
-
-# CHANNEL_LAYERS = {
-#     "default": {
-#         "BACKEND": "channels_redis.core.RedisChannelLayer",
-#         "CONFIG": {
-#             "hosts": [
-#                 {
-#                     "address": "redis://localhost:6379/",
-#                     "ssl_cert_reqs": None,
-#                 }
-#             ],
-#         },
-#     },
-# }
 

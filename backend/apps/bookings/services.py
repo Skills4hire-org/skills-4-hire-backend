@@ -193,7 +193,7 @@ class BookingService:
             bookings = Bookings.objects\
                         .select_related("customer", "provider", "address", "cancelled_by", "accepted_by")\
                         .filter(booking_status=Bookings.BookingStatus.COMPLETED)\
-                        .only("booking_status", 'provider', 'customer', 'booking_id')
+                        .only("booking_status", 'provider', 'customer', 'booking_id', "address")
             return bookings
         except Exception as e:
             raise

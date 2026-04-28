@@ -176,17 +176,17 @@ class RegistrationsSerializer(serializers.Serializer):
         try:
             confirm_password = validated_data.pop("confirm_password")
             referral_code = validated_data.pop("referral_code", None)
-
+            
             with transaction.atomic():
                 user = User.objects.create_user(**validated_data)
-            logging.info(_(f"A new user instance created: {user}"))
+            logging.info(_(f"A new user instance created: {user.full_name}"))
 
             if referral_code is not None:
                     from ..referral.tasks import process_referral_attchement
 
                     code = referral_code
                     logger.info("saving user to referral")
-                    process_referral_attchement.delay(referred_user=user, code_str=code)
+                    process_referral_attchement.delay(referred_user_id=user.pk, code_str=code)
                    
             return user
         except Exception as exc :

@@ -4,6 +4,7 @@ import logging
 from django.db.models import Q
 from django.db import transaction
 from django.conf import settings
+from django.contrib.auth import  get_user_model
 
 from ..bookings.services import BookingService, Bookings
 from .models import Referral, ReferralTransactions
@@ -13,15 +14,25 @@ from .services.referral_services import ReferralService
 
 
 CONVERSATION_TRESHOLD = settings.CONVERSATION_TRESHOLD
+UserModel = get_user_model()
 
 
 logger = logging.getLogger(__name__)
 
 @celery.shared_task(bind=True, max_retries=3, reject_on_worker_lost=True)
-def process_referral_attchement(self, referred_user, code_str):
+def process_referral_attchement(self, referred_user_id, code_str):
     try:
+
+        referred_user = UserModel.objects.get(pk=referred_user_id)
+
         service = ReferralService()
         worker = service.attach_referral(referred_user=referred_user, code_str=code_str)
+        return {"status": True, "message": "task processed"}
+        
+    except UserModel.DoesNotExist:
+        logger.info("User not found with pk %s", referred_user_id)
+        return {"status": False, "message": "User not found"}
+
     except Exception as exc:
         self.retry(exc=exc, countdown=60)
 
@@ -78,7 +89,7 @@ def process_referral_conversion():
                 )
                 logger.info(f"Converted {len(list(user_pending_referral_ids))} pending referral.")
 
-@celery.shared_task(bind=True, max_retries=3)
+@celery.shared_task(bind=True, max_retries=6)
 def process_referral_conversion_task(self):
     try:
         process_referral_conversion()
@@ -192,7 +203,7 @@ def process_transfer_verification(self, webhook_response):
             transaction_instance.save()
         transaction_instance.save()
 
-        return { 'status': True, "message": "withdrawal  verified"}
+        return { 'status': True, "message": "withdrawal_processed"}
     
     except Exception as exc:
         logger.error("Error verifying transaction :%s", exc)

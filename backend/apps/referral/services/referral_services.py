@@ -2,6 +2,10 @@ from ..models import ReferralCode, Referral
 
 from django.db import transaction
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class ReferralService:
     def __init__(self):
         pass
@@ -69,6 +73,7 @@ class ReferralService:
         if not referral['status']:
             return {"status": False, "message": referral["message"]}
 
+        logger.info("attached referral to user: "+ referred_user.full_name)
         return {"status": True, "instance": referral['instance']}
 
 

@@ -211,19 +211,23 @@ def process_withdrawal_task(self, transaction_id, recipient_code):
 def process_withdrawal_verifications(self, webhook_data):
     
     logger.info(
-        "processing withdrawal verifications: transaction statu: %s", 
+        "processing withdrawal verifications: transaction status: %s", 
         webhook_data['status']
     )
 
     reference_key = webhook_data['reference']
     try:
         with transaction.atomic():
+            try:
 
-            withdrawal_transaction = (
-                WalletTransaction.objects.select_for_update(nowait=True)
-                .select_related("user", "wallet")
-                .get(reference_key=reference_key)
-            )
+                withdrawal_transaction = (
+                    WalletTransaction.objects.select_for_update(nowait=True)
+                    .select_related("user", "wallet")
+                    .get(reference_key=reference_key)
+                )
+            except WalletTransaction.DoesNotExist:
+                logger.info("Transaction with reference key %s not found", reference_key)
+                return { "status": False, "message": "Transaction not found"}
 
             transaction_status = withdrawal_transaction.status
 
@@ -248,7 +252,7 @@ def process_withdrawal_verifications(self, webhook_data):
     
     except Exception as exc:
 
-        logger.info("retrying tasks on exceptions")
+        logger.info("retrying tasks on exceptions: "+ str(exc))
         return self.retry(exc=exc, countdown=60 * 3)
 
 
