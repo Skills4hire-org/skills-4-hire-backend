@@ -2,6 +2,10 @@ from ..models import ReferralCode, Referral
 
 from django.db import transaction
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 class ReferralService:
     def __init__(self):
         pass
@@ -33,27 +37,27 @@ class ReferralService:
 
         if referred is None or referrer is None:
             return {"status": False, "message": "referred or referrer must be present"}
+        
+        if Referral.objects.filter(referrer=referrer, referred=referred).exists():
+            return {"status": False, "message": "Duplicate referral between this users"}
         try:
-            referral = Referral.objects.get_or_create(
-                referrer=referrer,
-                defaults={
-                    "referred":referred,
-                    "code_used": code_used
-                }
+            referral = Referral.objects.create(
+                referrer=referrer, referred=referred,
+                code_used=code_used
             )
+
+            return {'status': True, "instance": referral}
+        
         except Exception as exc:
             return {"status": False, "message": str(exc)}
 
-        return {'status': True, "instance": referral}
-
-
+       
     def attach_referral(self, referred_user, code_str):
 
         if not code_str:
             return {"status": False, "message": "code must be present"}
         
         referral_code_instance = self.get_referral_code_instance(code_str)
-
         if not referral_code_instance['status']:
             return {"status": False, "message": referral_code_instance["message"]}
         
@@ -65,10 +69,12 @@ class ReferralService:
             referred=referred_user,
             code_used=code_instance
         )
-        if not referral['status']:
-            return {"status": False, "message": referral.message}
 
-        return {"status": True, "instance": referral}
+        if not referral['status']:
+            return {"status": False, "message": referral["message"]}
+
+        logger.info("attached referral to user: "+ referred_user.full_name)
+        return {"status": True, "instance": referral['instance']}
 
 
 

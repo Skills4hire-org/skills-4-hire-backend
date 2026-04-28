@@ -1,10 +1,8 @@
 
-from asyncio.log import logger
-
 from django.forms import ValidationError
 from django.db import transaction, DatabaseError
 
-from .models import User, Wallet, LockedWallet
+from .models import User, Wallet, LockedWallet, BankAccount
 from ..bookings.models import Bookings
 
 from decimal import Decimal
@@ -98,3 +96,30 @@ class WalletService:
             raise DatabaseError("Failed to create wallet due to a database error.")
         except Exception:
             raise ValidationError("Failed to create wallet due to an unexpected error.")
+
+
+class BankAccountService:
+
+    def __init__(self):
+        pass
+
+    def get_account_by_account_number(self, account_number):
+        if account_number is None:
+            return {"status": False, "message": "account number must be present"}
+        
+        try:
+            bank_account = BankAccount.objects.get(account_number=account_number)
+        except BankAccount.DoesNotExist:
+            return {"status": False, "message": "bank account does not exists"}
+        return {"status": True, "instance": bank_account}
+
+    
+    def get_account_by_recipient_code(self, recipient_code):
+        if recipient_code is None:
+            return {"status": False, "message": "account number must be present"}
+        
+        try:
+            bank_account = BankAccount.objects.get(recipient_code=recipient_code, is_active=True)
+        except BankAccount.DoesNotExist:
+            return {"status": False, "message": "bank account does not exists"}
+        return {"status": True, "instance": bank_account}

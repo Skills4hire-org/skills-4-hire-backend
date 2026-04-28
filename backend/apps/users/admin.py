@@ -4,6 +4,35 @@ from .customer_models import CustomerModel
 from .base_model import BaseProfile
 from .services.models import ServiceCategory, Service
 from .profile_avater.models import Avatar
+from .skills.models import Skill, Category
+
+
+@admin.register(Skill)
+class SkillAdmin(admin.ModelAdmin):
+    list_display = [
+        'name', "category__name", "created_at",
+        'is_active'
+    ]
+    search_fields = ['name']
+
+@admin.register(Category)
+class CategoryAdmin(admin.ModelAdmin):
+    list_display = [
+        'name', "created_at", 
+        "is_active", "created_at"
+    ]
+
+    search_fields = ['name']
+
+@admin.register(ProviderSkill)
+class ProviderSKillAdmin(admin.ModelAdmin):
+    list_display = [
+        "provider_profile__profile__display_name",
+        'skill__name', "proficiency", 'years_used',
+        "is_primary", "is_active", "created_at"
+    ]
+    search_fields = ['skill__name', 'proficiency']
+    list_filter = ['is_active', 'is_primary']
 
 @admin.register(Avatar)
 class AvaterAdmin(admin.ModelAdmin):

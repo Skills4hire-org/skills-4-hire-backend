@@ -25,7 +25,6 @@ class ProfileSearchView(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
-        print(self.kwargs)
         profile_pk = self.kwargs['pk']
         if profile_pk is None:
             return False

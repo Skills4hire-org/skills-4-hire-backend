@@ -2,16 +2,7 @@ import factory
 
 from .users import CustomUserFactory, faker_instance
 from .users import ProviderProfileFactory
-from apps.ratings.models import ProfileReview, ProfileRating
-
-
-class RatingFactory(factory.django.DjangoModelFactory):
-    class Meta:
-        model = ProfileRating
-
-    rate_by = factory.SubFactory(CustomUserFactory)
-    provider_profile = factory.SubFactory(ProviderProfileFactory)
-    rating = 5
+from apps.ratings.models import ProfileReview
 
 class ReviewFactory(factory.django.DjangoModelFactory):
     class Meta:

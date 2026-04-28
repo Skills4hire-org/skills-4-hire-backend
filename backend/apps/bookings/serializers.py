@@ -16,6 +16,8 @@ from .services import BookingService
 from ..authentication.serializers import UserReadSerializer
 from apps.wallet.services import WalletService
 from ..wallet.services import get_calculated_transaction
+from ..ratings.services.reviews import ReviewService
+
 
 
 from decimal import Decimal
@@ -323,12 +325,15 @@ class ReviewPaymentRequestSerializer(serializers.ModelSerializer):
     idempotency_key = serializers.UUIDField(write_only=True, required=True)
     action = serializers.ChoiceField(choices=choices, required=True)
     request_id = serializers.UUIDField(required=True, write_only=True)
+    ratings = serializers.IntegerField(max_value=5, min_value=1,  required=False)
+    reviews = serializers.CharField(max_length=500, required=False)
 
     class Meta:
         model = PaymentRequestBooking
         fields = [
             'action', 'request_id',
-            'idempotency_key'
+            'idempotency_key', 'ratings',
+            'reviews'
         ]
 
     def validate(self, data):
@@ -359,7 +364,29 @@ class ReviewPaymentRequestSerializer(serializers.ModelSerializer):
         idempotency_key = validated_data['idempotency_key']
         request_instance = validated_data['payment_request']
         action = validated_data['action']
+        
+        if "ratings" in validated_data or "reviews" in validated_data:
+            provider = request_instance.provider
+            customer = request_instance.customer
 
+            ratings = validated_data.get("ratings", None)
+            reviews = validated_data.get("reviews", None)
+
+            data = {
+                "reviews": reviews,
+                "provider_profile": provider,
+                "reviewed_by": customer,
+                "ratings": ratings
+            }
+            review_service = ReviewService()
+            if review_service._dublicate_reviews(customer, provider):
+                raise serializers.ValidationError("review found for this user")
+
+            if review_service._cant_review_yourself(customer, provider):
+                raise serializers.ValidationError("You cannot review yourself.")
+
+            review_instance = review_service.create_review(data)
+            
         if action == self.choices[1]:
             request_instance.status = PaymentRequestBooking.RequestStatus.REJECTED
         else:
@@ -402,7 +429,6 @@ class PaymentRequestDetailSerializer(serializers.ModelSerializer):
             'attachments_payment_request'
 
         ]
-
 
 class BookingTransactionSerializer(serializers.ModelSerializer):
     class Meta:

@@ -105,29 +105,29 @@ class ProviderSkill(models.Model):
         on_delete=models.CASCADE,
         related_name="skills",
     )
+
     skill = models.ForeignKey(
         Skill,
         on_delete=models.CASCADE,
         related_name="provider_skills",
     )
+
     proficiency = models.CharField(
         max_length=20,
         choices=Proficiency.choices,
         default=Proficiency.INTERMEDIATE,
     )
-    years_used = models.PositiveSmallIntegerField(default=0)
+
+    years_used = models.PositiveSmallIntegerField(default=0, blank=True)
 
     is_primary = models.BooleanField(
         db_index=True,
         default=False,
         help_text=_("Primary skills are highlighted at the top of the profile."),
     )
-    sort_order = models.PositiveSmallIntegerField(default=0, db_index=True)
-
     created_at = models.DateTimeField(auto_now_add=True, db_index=True)
     updated_at = models.DateTimeField(auto_now=True)
 
-    level_of_experience = models.PositiveIntegerField(default=0)
     description = models.TextField(blank=True, null=True)
 
     is_active = models.BooleanField(default=True, db_index=True)
@@ -136,8 +136,6 @@ class ProviderSkill(models.Model):
         constraints = [
             models.UniqueConstraint(fields=("provider_profile", "skill"), name="unique_provider_skill")
         ]
-
-        ordering = ["-is_primary", "sort_order"]
 
         indexes = [models.Index(fields=["skill", "proficiency"])]
 

@@ -129,4 +129,95 @@ class PaystackService:
         data = self._handle_response(response)
         return data
     
+    def ressolve_bank(self, account_number, bank_code):
 
+        path = self._url(f"/bank/resolve?account_number={account_number}&bank_code={bank_code}")
+        try:
+            response = self._session.get(
+                path, timeout=_TIMEOUT
+            )
+        except requests.Timeout:
+            raise PaystackError("Paystack request timed out while ressolving bank account")
+        except requests.ConnectionError as exc:
+            raise PaystackError(f"Network error contacting Paystack: {exc}")
+        
+        data = self._handle_response(response)
+        return data
+
+    def create_transfer_recipient(
+        self,
+        account_name: str,
+        account_number: str,
+        bank_code: str,
+        currency: str = "NGN",
+        type: str = 'nuban'
+    ) -> dict[str, Any]:
+  
+        payload = {
+            "type": type,
+            "name": account_name,
+            "account_number": account_number,
+            "bank_code": bank_code,
+            "currency": currency,
+        }
+
+        logger.info(
+            "Creating Paystack transfer recipient account_number=%s | bank_code=%s",
+            account_number,
+            bank_code,
+        )
+
+        try:
+            response = self._session.post(
+                self._url("/transferrecipient"),
+                json=payload,
+                timeout=_TIMEOUT,
+            )
+        except requests.Timeout:
+            raise PaystackError("Paystack request timed out while creating recipient", status_code=500)
+        except requests.ConnectionError as exc:
+            raise PaystackError(f"Network error contacting Paystack: {exc}", status_code=500)
+
+        data = self._handle_response(response)
+        return data
+
+    def initiate_transfer(
+        self,
+        amount: Decimal,
+        recipient_code: str,
+        reference: str,
+        reason: str = "Wallet withdrawal",
+        currency: str = "NGN",
+    ) -> dict[str, Any]:
+        
+        amount_kobo = self._to_kobo(amount)
+
+        payload = {
+            "source": "balance",
+            "amount": amount_kobo,
+            "recipient": recipient_code,
+            "reference": reference,
+            "reason": reason,
+            "currency": currency,
+        }
+
+        logger.info(
+            "Initiating Paystack transfer | reference=%s | amount_kobo=%s | recipient=%s",
+            reference,
+            amount_kobo,
+            recipient_code,
+        )
+
+        try:
+            response = self._session.post(
+                self._url("/transfer"),
+                json=payload,
+                timeout=_TIMEOUT,
+            )
+        except requests.Timeout:
+            raise PaystackError("Paystack request timed out while initiating transfer")
+        except requests.ConnectionError as exc:
+            raise PaystackError(f"Network error contacting Paystack: {exc}")
+
+        data = self._handle_response(response)
+        return data
