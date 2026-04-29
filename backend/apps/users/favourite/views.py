@@ -5,7 +5,7 @@ from rest_framework import viewsets, status
 from rest_framework.response import Response
 
 from .permissions import CanAddFavourite
-from .serializers import FavouriteAddSerializer, FavouriteListSerialzer
+from .serializers import FavouriteAddSerializer, FavouriteListSerialzer, FavoriteProviderSerializer
 from .models import Favourite
 
 class FavouriteViewSet(viewsets.ModelViewSet):
@@ -16,17 +16,29 @@ class FavouriteViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ("create", "partial_update"):
             return FavouriteAddSerializer
-        return FavouriteListSerialzer
-    
+        
+        if self.action in ("list", "retrieve"):
+            if self.request.user.is_provider:
+                return FavoriteProviderSerializer
+            else:
+                return FavouriteListSerialzer
+
     def get_queryset(self):
-        owner = self.request.user
+        user = self.request.user
         queryset = Favourite.objects\
             .select_related("owner")\
             .prefetch_related("providers")
         
-        return queryset.filter(owner=owner)
+        if user.is_customer:
+            queryset = queryset.filter(owner=user)
+        elif user.is_provider:
+            queryset = queryset.filter(providers=user.profile.provider_profile)
+        else:
+            return queryset
 
-    @method_decorator(cache_page(60 * 2))
+        return queryset
+
+    # @method_decorator(cache_page(60 * 2))
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
     

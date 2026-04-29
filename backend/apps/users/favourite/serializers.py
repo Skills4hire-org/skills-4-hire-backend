@@ -4,7 +4,6 @@ from .models import Favourite, ProviderModel
 from ...core.utils.py import get_or_none
 from ..serializers.profiles import ProviderProfilePublicSerializer
 
-
 import uuid
 
 class FavouriteAddSerializer(serializers.ModelSerializer):
@@ -60,4 +59,16 @@ class FavouriteListSerialzer(serializers.ModelSerializer):
         fields = [
             "favourite_id", 'created_at', 
             'providers', "updated_at"
+        ]
+
+class FavoriteProviderSerializer(serializers.ModelSerializer):
+    from ...authentication.serializers import UserReadSerializer
+
+    owner = UserReadSerializer(read_only=True)
+    
+    class Meta: 
+        model = Favourite
+        fields = [
+            "favourite_id", 'created_at', 
+            "owner"
         ]
