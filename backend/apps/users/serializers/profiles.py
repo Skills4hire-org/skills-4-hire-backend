@@ -198,7 +198,8 @@ class ProviderProfilePublicSerializer(serializers.ModelSerializer):
         model = ProviderModel
         fields = [
             "provider_id", "profile", "professional_title",
-            "avg_rating", "total_reviews", "provider_skills"
+            "avg_rating", "total_reviews", "provider_skills", 
+            "min_charge", "max_charge", "overview", "headline"
         ]
 
     def get_avg_rating(self, obj: ProviderModel):

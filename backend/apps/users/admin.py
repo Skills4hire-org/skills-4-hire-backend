@@ -5,7 +5,13 @@ from .base_model import BaseProfile
 from .services.models import ServiceCategory, Service
 from .profile_avater.models import Avatar
 from .skills.models import Skill, Category
+from .favourite.models import Favourite
 
+@admin.register(Favourite)
+class FavouriteAdmin(admin.ModelAdmin):
+    list_display = [
+        "owner__profile__display_name", "created_at"
+    ]
 
 @admin.register(Skill)
 class SkillAdmin(admin.ModelAdmin):
