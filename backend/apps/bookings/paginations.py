@@ -1,9 +1,9 @@
-from rest_framework.pagination import CursorPagination
+from rest_framework.pagination import PageNumberPagination
 
-class CustomBookingPagination(CursorPagination):
-    page_size = 5
+class CustomBookingPagination(PageNumberPagination):
+    page_size = 10
     ordering = '-created_at'
 
-class CustomPaymentRequestPagination(CursorPagination):
+class CustomPaymentRequestPagination(PageNumberPagination):
     page_size = 5
     ordering = '-requested_at'

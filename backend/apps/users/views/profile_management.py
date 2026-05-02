@@ -6,6 +6,8 @@ from django.views.decorators.cache import cache_page
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.filters import SearchFilter
+from django_filters.rest_framework import DjangoFilterBackend
 
 
 from ..customer_models import CustomerModel
@@ -23,58 +25,63 @@ class ProfileSearchView(viewsets.ModelViewSet):
     pagination_class = ProfilePagination
     http_method_names = ['get']
     permission_classes = [permissions.IsAuthenticated]
+    serializer_class = ProviderProfilePublicSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = {
+        "professional_title": ['icontains'],
+        "min_charge": ['gte', 'lte'],
+        "max_charge": ['gte'],
+    }
 
-    def get_object(self):
-        profile_pk = self.kwargs['pk']
-        if profile_pk is None:
-            return False
-        profile = None
-        try:
-            provider = ProviderModel.objects.get(pk=profile_pk)
-            profile = provider
-        except ProviderModel.DoesNotExist:
-            customer = CustomerModel.objects.get(pk=profile_pk)
-            profile = customer
+    def get_queryset(self):
+        """
+        Build search queryset for Provider profiles.
+        Uses ?q= query parameter with Django Q objects for OR-based search.
+        """
+        queryset = ProviderModel.objects.select_related(
+            'profile', 'profile__user'
+        ).prefetch_related(
+            'skills', 'skills__skill', 'skills__skill__category'
+        ).filter(
+            is_active=True,
+            profile__is_active=True
+        )
 
-        return profile
+        # Get search query from ?q= parameter
+        query = self.request.query_params.get('q', '').strip()
+
+        if query:
+            # Build Q object with OR conditions across all relevant fields
+            # Search on user name fields, profile fields, provider fields, and skills
+            search_q = Q(profile__display_name__icontains=query) | \
+                Q(profile__user__username__icontains=query) | \
+                Q(profile__city__icontains=query) | \
+                Q(profile__country__icontains=query) | \
+                Q(professional_title__icontains=query) | \
+                Q(headline__icontains=query) | \
+                Q(description__icontains=query) | \
+                Q(skills__skill__name__icontains=query) | \
+                Q(skills__skill__category__name__icontains=query)| \
+                Q(services__name=query) |\
+                Q(services__category__name=query)
+
+            queryset = queryset.filter(search_q).distinct()
+
+            # Order by relevance (featured/top-rated first) then by creation date
+            queryset = queryset.order_by('-is_featured', '-is_top_rated', '-created_at')
+        else:
+            # Default ordering when no search query
+            queryset = queryset.order_by('-is_featured', '-is_top_rated', '-created_at')
+
+        return queryset
 
     @method_decorator(cache_page(60 * 5))
     def list(self, request, *args, **kwargs):
-        query_params = request.query_params.get("search", None)
-        if query_params is None:
-            return Response("[]", status=status.HTTP_200_OK)
-        provider = ProviderModel.objects.filter(
-            Q(professional_title__icontains=query_params) |
-            Q(profile__display_name__icontains=query_params) |
-            Q(availability__icontains=query_params)|
-            Q(experience_level__icontains=query_params)
-        ).select_related("profile")\
-        .prefetch_related("skills", "services")
-
-        customer = CustomerModel.objects.filter(
-            Q(profile__display_name__icontains=query_params) |
-            Q(industry_name__icontains=query_params)
-        ).select_related("profile")
-
-        provider_serializer = ProviderProfileDetailSerializer(provider, many=True).data
-        customer_serializer = CustomerProfileDetailSerializer(customer, many=True).data
-
-        combined = provider_serializer + customer_serializer
-
-        page = self.paginate_queryset(combined)
-        if page is not None:
-            return self.get_paginated_response(page)
-        return Response(combined, status=status.HTTP_200_OK)
+        return super().list(request, *args, **kwargs)
 
     @method_decorator(cache_page(60 * 5))
     def retrieve(self, request, *args, **kwargs):
-        profile = self.get_object()
-        if isinstance(profile, ProviderModel):
-            return Response(ProviderProfileDetailSerializer(profile).data,
-                            status=status.HTTP_200_OK)
-        else:
-            return Response(CustomerProfileDetailSerializer(profile).data,
-                            status=status.HTTP_200_OK)
+        return super().retrieve(request, *args, **kwargs)
 
 
 class ProfileViewSet(viewsets.GenericViewSet):

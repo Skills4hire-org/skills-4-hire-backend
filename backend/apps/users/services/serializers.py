@@ -119,16 +119,15 @@ class ServiceCategorySerializer(serializers.ModelSerializer):
 
 class ServiceListSerializer(serializers.ModelSerializer):
     attachments = ServiceAttachmentSerializer(many=True, read_only=True)
-    profile = ProviderProfilePublicSerializer(read_only=True)
     category = ServiceCategorySerializer(read_only=True)
     
     class Meta:
         model = Service
         fields = [
-            "service_id", "profile",
-            "name", "description",
+            "service_id",
+            "name",
             "min_charge", "max_charge",
-            "is_default", "is_verified",
+            "is_default",
             "is_active", "created_at", 
             "attachments", "category"
         ]

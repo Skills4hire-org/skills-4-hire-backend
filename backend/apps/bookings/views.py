@@ -73,6 +73,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         """" A base queryset to fetch all booking associated to the request.user"""
         if getattr(self, "swagger_fake_view", False):
             return Bookings.objects.none()
+        
         user = self.request.user
         queryset = (
             Bookings.objects.filter(
@@ -113,7 +114,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         return Response(output_serializer, status=status.HTTP_201_CREATED)
 
 
-    @method_decorator(cache_page(60 * 15))
+    @method_decorator(cache_page(60 * 5))
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 

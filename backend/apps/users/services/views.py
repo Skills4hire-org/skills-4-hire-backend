@@ -42,6 +42,8 @@ class ServiceViewSet(viewsets.ModelViewSet):
     @method_decorator(cache_page(60 * 5))
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
+    
+    
     def get_queryset(self):
         """
         Return only non-deleted services, with optimised joins.

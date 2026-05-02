@@ -25,7 +25,7 @@ import logging
 
 
 from ..users.provider_models import ProviderModel
-from ..users.serializers.profiles import ProviderProfileDetailSerializer
+from ..users.serializers.profiles import ProviderProfileDetailSerializer, ProviderProfilePublicSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -188,16 +188,16 @@ class AcceptRejectSerializer(serializers.Serializer):
         return booking
 
 class BookingSerializer(serializers.ModelSerializer):
-
+    customer = UserReadSerializer(read_only=True)
+    provider = ProviderProfilePublicSerializer(read_only=True)
     class Meta:
         model = Bookings
         fields =[
             'booking_id', 'booking_status',
             'customer', 'provider',
-            'cancelled_by', 'accepted_by',
-            'price', 'notes', 'requirements',
+            'price', "descriptions",
             'is_active', 'start_date', 'end_date',
-            'created_at', 'cancelled_at', 'accepted_at',
+            'created_at',
         ]
 
 class BookingDetailSerializer(serializers.ModelSerializer):

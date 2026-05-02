@@ -140,7 +140,7 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
         posts = serializers.SerializerMethodField()
         comments = serializers.SerializerMethodField()
         images  = serializers.SerializerMethodField()
-        provider_skills = ProviderSkillListSerializer(many=True)
+        skills = ProviderSkillListSerializer(many=True)
 
         class Meta:
             model = ProviderModel
@@ -149,7 +149,7 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
                 "headline", "overview", "profile",
                 "min_charge", "max_charge",
                 "created_at", "endorsement_count", "posts",
-                'comments', 'images', "provider_skills"
+                'comments', 'images', "skills"
             ]
 
         def get_images(self, obj):
@@ -192,13 +192,13 @@ class ProviderProfilePublicSerializer(serializers.ModelSerializer):
     profile = BaseProfileListSerializer(read_only=True)
     avg_rating = serializers.SerializerMethodField()
     total_reviews = serializers.SerializerMethodField()
-    provider_skills = ProviderSkillListSerializer(read_only=True,  many=True)
+    skills = ProviderSkillListSerializer(read_only=True,  many=True)
 
     class Meta:
         model = ProviderModel
         fields = [
             "provider_id", "profile", "professional_title",
-            "avg_rating", "total_reviews", "provider_skills", 
+            "avg_rating", "total_reviews", "skills", 
             "min_charge", "max_charge", "overview", "headline"
         ]
 
