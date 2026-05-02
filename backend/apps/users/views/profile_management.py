@@ -31,6 +31,7 @@ class ProfileSearchView(viewsets.ModelViewSet):
         "professional_title": ['icontains'],
         "min_charge": ['gte', 'lte'],
         "max_charge": ['gte'],
+        
     }
 
     def get_queryset(self):
@@ -62,8 +63,8 @@ class ProfileSearchView(viewsets.ModelViewSet):
                 Q(description__icontains=query) | \
                 Q(skills__skill__name__icontains=query) | \
                 Q(skills__skill__category__name__icontains=query)| \
-                Q(services__name=query) |\
-                Q(services__category__name=query)
+                Q(services__name__icontains=query) |\
+                Q(services__category__name__icontains=query)
 
             queryset = queryset.filter(search_q).distinct()
 
