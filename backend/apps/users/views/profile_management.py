@@ -6,11 +6,8 @@ from django.views.decorators.cache import cache_page
 from rest_framework import viewsets, status, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.filters import SearchFilter
 from django_filters.rest_framework import DjangoFilterBackend
 
-
-from ..customer_models import CustomerModel
 from ..permissions import IsProfileOwnerOrReadOnly
 from ..provider_models import ProviderModel
 from ..serializers.profiles import ProviderProfileUpdateCreateSerializer, \
@@ -31,7 +28,7 @@ class ProfileSearchView(viewsets.ModelViewSet):
         "professional_title": ['icontains'],
         "min_charge": ['gte', 'lte'],
         "max_charge": ['gte'],
-        
+        "reviews__ratings": ["gte", "lte"]
     }
 
     def get_queryset(self):
@@ -83,7 +80,6 @@ class ProfileSearchView(viewsets.ModelViewSet):
     @method_decorator(cache_page(60 * 5))
     def retrieve(self, request, *args, **kwargs):
         return super().retrieve(request, *args, **kwargs)
-
 
 class ProfileViewSet(viewsets.GenericViewSet):
     permission_classes =  [IsProfileOwnerOrReadOnly]

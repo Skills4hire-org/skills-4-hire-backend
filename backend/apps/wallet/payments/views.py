@@ -73,5 +73,5 @@ class TransferViewSet(viewsets.ModelViewSet):
             "details": "Transer code added",
             "data": BankAccountSerializer(instance).data
         })
-
+    
 

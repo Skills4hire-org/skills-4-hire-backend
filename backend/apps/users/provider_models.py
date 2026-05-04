@@ -67,6 +67,16 @@ class ProviderModel(models.Model):
     def __str__(self):
         return f"ProviderProfile {self.profile.user.full_name} — {self.professional_title}"
 
+
+    def clean(self):
+        if self.professional_title:
+            self.professional_title.title()
+        return super().clean()
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        return super().save(*args, **kwargs)
+    
     class Meta:
         verbose_name = _("Professional Profile")
         verbose_name_plural = _("Professional Profiles")

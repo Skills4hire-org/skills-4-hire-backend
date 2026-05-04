@@ -1,19 +1,22 @@
+from django.db.models import Prefetch
 from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from .serializers import WalletDetailSerializer, DepositSerializer,\
-      WalletTransactionDetailSerializer, WithDrawalSerializer
+      WalletTransactionDetailSerializer, WithDrawalSerializer, WalletTransactionSummarySerializer
 from .models import Wallet, WalletTransaction, WebhookEvent
 from .tasks import process_deposit, verify_deposit_status, process_withdrawal_verifications
 from .paystack.service import PaystackService
 from ..referral.tasks import process_transfer_verification
+from .wallet_paginations import WalletPagination
 
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.cache import cache_page
 from django.utils.decorators import method_decorator
 from django.utils import timezone
+from django_filters.rest_framework import DjangoFilterBackend
 
 import logging, json
 
@@ -29,7 +32,16 @@ class WalletViewSet(viewsets.GenericViewSet):
         try:
             user_wallet = Wallet.objects.filter(is_active=True, user=self.request.user) \
                 .select_related("user")\
-                .prefetch_related("locked_balance")\
+                .prefetch_related(
+                    "locked_balance",
+                    Prefetch(
+                        "wallet_transactions",
+                        queryset=WalletTransaction.objects.filter(is_active=True).only(
+                            'transaction_id', 'amount', 'type',
+                            'status', 'transaction_date', 'reference_key'
+                        ).order_by('-transaction_date')
+                    )
+                )\
                 .first()
         except Wallet.DoesNotExist:
             raise ValidationError("User wallet not found!")
@@ -50,7 +62,14 @@ class WalletViewSet(viewsets.GenericViewSet):
     
 class WalletTransactionViewSet(viewsets.GenericViewSet):
 
-    http_method_names = ['post']
+    http_method_names = ['post', 'get']
+    pagination_class = WalletPagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = {
+        "status": ['icontains'],
+        "type": ['icontains'],
+        "amount": ["gte", 'lte']
+    }
 
     def get_permissions(self):
         if self.action == 'webhook':
@@ -64,6 +83,36 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
             return WithDrawalSerializer
 
         return None
+    
+
+    def get_queryset(self):
+        queryset = (
+            WalletTransaction.objects.filter(
+                        is_active=True, user=self.request.user
+                        ).only('transaction_id', 'amount', 'type',
+                            'status', 'reference_key'
+                        ).order_by(
+                            '-updated_at'
+                        )
+        )
+
+        if queryset is None:
+            return WalletTransaction.objects.none()
+        
+        return queryset
+    
+    @method_decorator(cache_page(60 * 2))
+    @action(methods=['get'], detail=False, url_path="transactions")
+    def transactions(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+
+        page = self.paginate_queryset(queryset=queryset)
+        serializer = WalletTransactionSummarySerializer(queryset, many=True)
+        if page is None:
+            return Response(serializer.data, status=200)
+        
+        page_serializer = WalletTransactionSummarySerializer(page, many=True).data
+        return self.get_paginated_response(page_serializer)
     
     @action(methods=['post'], detail=False, url_path="withdraw")
     def withdraw(self, request, *args, **kwargs):
