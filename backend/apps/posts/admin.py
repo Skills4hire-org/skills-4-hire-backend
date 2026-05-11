@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Post, Comment, PostLike
+from .models import Post, Comment, Likes
 
 class PostAdmin(admin.ModelAdmin):
     list_display = ('post_id', 'user', 'post_type', 'is_active', 'is_deleted', 'created_at')

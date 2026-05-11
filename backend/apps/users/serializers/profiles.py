@@ -88,7 +88,7 @@ class ProviderProfileUpdateCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProviderModel
         fields = [
-            "profile_id", "professional_title",
+            "professional_title",
             "headline", "overview", "profile",
             "experience_level", "availability",
             "min_charge", "max_charge", "hourly_pay",
@@ -158,17 +158,17 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
             return ServiceAttachmentSerializer(images, many=True).data
 
         def get_comments(self, obj):
-            from ...posts.serializers import CommentSerializer
+            from ...posts.serializers.read import CommentListSerializer
             user = obj.profile.user
             user_comments = user.comments.filter(is_active=True, is_deleted=False)
             if len(user_comments) < 1:
                 return None
             
-            serializer = CommentSerializer(user_comments, many=True)
+            serializer = CommentListSerializer(user_comments, many=True)
             return serializer.data
 
         def get_posts(self, obj):
-            from ...posts.serializers import PostListSerializer
+            from ...posts.serializers.read import PostDetailSerializer
             user = obj.profile.user
             user_posts = user.posts.filter(is_active=True, is_deleted=False)
             user_shares = user.shares.filter(is_reposted=True, is_active=True, is_deleted=False)
@@ -177,7 +177,7 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
 
             if len(combined_objs) < 1:
                 return None
-            serializer = PostListSerializer(combined_objs, many=True)
+            serializer = PostDetailSerializer(combined_objs, many=True)
             return serializer.data
 
         def get_endorsement_count(self, obj):

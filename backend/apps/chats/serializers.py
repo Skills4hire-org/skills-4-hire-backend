@@ -17,7 +17,7 @@ from .core.utils import (
     validate_status, log_history, sanitize_message_content,
     trigger_notification
 )
-from apps.posts.serializers import PostListSerializer
+
 from .services.conversations import (
     ConversationService, NegotiationService,
 )
@@ -500,7 +500,6 @@ class NegotiationSerializer(serializers.ModelSerializer):
 class NegotiationDetailSerializer(serializers.ModelSerializer):
     sender = UserReadSerializer(read_only=True)
     conversation = ConversationSerializer(read_only=True)
-    job_post = PostListSerializer(read_only=True)
     class Meta:
         model = Negotiations
         fields = [
@@ -510,7 +509,6 @@ class NegotiationDetailSerializer(serializers.ModelSerializer):
             "sender",
             "status",
             "conversation",
-            "job_post",
             "accepted_at",
             "created_at",
             "countered_at"

@@ -34,8 +34,6 @@ if DEBUG:
 # CELERY_BROKER_URL = env("redis://localhost:6379/0", default="redis://redis:6379/0")
 # CELERY_RESULT_BACKEND = env("PRODUCTION_REDIS_URL", default="redis://redis:6379/1")
 
-import ssl
-
 CACHES = {
     "default": {
         "BACKEND": "django_redis.cache.RedisCache",

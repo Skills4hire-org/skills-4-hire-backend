@@ -1,6 +1,6 @@
 import  pytest
 
-from apps.posts.models import PostLike
+from apps.posts.models import Likes
 from apps.notification.models import Notification
 
 @pytest.mark.api
@@ -29,7 +29,7 @@ def test_like_post(request, post, client, user):
     result = response.json()
     assert  result["status"] == "success"
 
-    like = PostLike.is_active_objects.get(post__pk=post_instance.post_id)
+    like = Likes.is_active_objects.get(post__pk=post_instance.post_id)
 
     assert  like.post == post_instance
 
@@ -85,5 +85,5 @@ def test_unlike_post(request, client, post, create_like):
     result = response.json()
     assert  result["status"] == ['success']
 
-    like = PostLike.objects.get(postlike_id=create_like.pk)
+    like = Likes.objects.get(postlike_id=create_like.pk)
     assert like.is_active == False

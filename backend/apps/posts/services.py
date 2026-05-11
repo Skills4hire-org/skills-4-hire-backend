@@ -1,12 +1,13 @@
 import uuid
 
-from .models import  Post, PostLike, Comment
+from .models import  Post, Likes, Comment
 
 from rest_framework.exceptions import PermissionDenied, NotFound
 
 from django.db import  transaction
 from django.contrib.auth import  get_user_model
 from datetime import  datetime
+from django.db.models import Q
 
 
 UserModel = get_user_model()
@@ -24,10 +25,7 @@ def create_post(user, start_date: datetime | None = None, end_date: datetime | N
     return  new_post
 
 def list_nested_reposts(post, queryset):
-    qs = queryset.filter(parent=post).all()
-    if qs is None:
-        return  None
-    return  qs
+    return queryset.filter(parent=post).order_by("-created_at", '-reposted_at', "-updated_at")
 
 def get_post_by_id(post_pk: uuid.UUID):
     try:
@@ -37,25 +35,23 @@ def get_post_by_id(post_pk: uuid.UUID):
     return post
 
 
-def get_offers_or_job_post(user: UserModel | None, queryset, include_offers: bool = True):
+def get_offers_or_job_post(user,  queryset, include_offers):
     if queryset is None:
         return None
     if include_offers:
         if user is not None:
            qs = queryset\
-                .filter(user=user, post_type=Post.PostType.JOB.value)\
-                .order_by("-created_at")
+                .filter(user=user, post_type=Post.PostType.JOB)\
+                .order_by("-created_at", "-updated_at")
         else:
             qs = queryset.filter(post_type=Post.PostType.JOB.value)
         return qs
-    else:
-        if user is not None:
-            qs = queryset\
-                .filter(user=user)\
-                .order_by("-created_at")
 
-            return qs
-        return None
+def list_posts(user, queryset):
+    
+    return queryset.filter(user=user
+    ).order_by("-created_at", "-updated_at", "-reposted_at")
+
 
 def return_paginated_view(self, queryset):
     page = self.paginate_queryset(queryset)
@@ -66,36 +62,35 @@ def return_paginated_view(self, queryset):
     return  serializer.data
 
 class LikeService:
-    def __init__(self, post, user):
-        self.post = post
-        self.user = user
+    def __init__(self):
+        pass 
 
-    def check_already_liked_post(self):
-        liked_post = PostLike.is_active_objects.filter(user=self.user, post=self.post).exists()
-        if liked_post:
-            return  True
-        else:
-            return False
+    def check_already_liked_post(self, user, post) -> bool:
+        return Likes.is_active_objects.filter(user=user, post=post).exists()
+    
 
     @transaction.atomic
-    def create_like_post(self, **kwargs):
-        if self.check_already_liked_post():
+    def create_like_post(self, post, user, **kwargs):
+        if self.check_already_liked_post(user, post):
             raise PermissionDenied("You already liked this post")
         try:
-            new_like = PostLike.objects.create(user=self.user, post=self.post, **kwargs)
+            new_like = Likes.objects.create(user=user, post=post)
         except Exception as e:
             raise Exception(e)
         return  new_like
 
     @transaction.atomic
-    def unlike_post(self):
-        if not self.check_already_liked_post():
+    def unlike_post(self, post, user):
+        if not self.check_already_liked_post(user, post):
             raise PermissionDenied("No like instance on this post")
         try:
-            liked_post = PostLike.is_active_objects.get(user=self.user, post=self.post)
-        except PostLike.DoesNotExist:
-            raise Exception(f"{self.post} does not exist")
+            liked_post = Likes.is_active_objects.get(user=user, post=post)
+        except Likes.DoesNotExist:
+            raise Exception(f"post does not exist")
 
+        if liked_post.user != user:
+            raise PermissionDenied()
+        
         liked_post.soft_delete()
         return liked_post
 

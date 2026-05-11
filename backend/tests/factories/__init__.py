@@ -12,7 +12,7 @@ from .bookings import (
 
 from .post import (
     PostFactory,
-    PostLikeFactory,
+    LikesFactory,
     CommentFactory
 )
 
@@ -22,7 +22,7 @@ __all__ = [
     "NegotiationFactory",
     "ConversationFactory",
     "CommentFactory",
-    "PostLikeFactory",
+    "LikesFactory",
     "PostFactory",
     "CustomUserFactory",
     "UserModel",

@@ -9,7 +9,7 @@ router = DefaultRouter()
 
 router.register("", WalletViewSet, basename='user_wallet')
 router.register('wallet', WalletTransactionViewSet, basename='wallet_transaction')
-router.register("bank", BankAccountViewSet, basename='bank')
+router.register("bank/resolve", BankAccountViewSet, basename='bank')
 router.register("transfer/recipient", TransferViewSet, basename='receipient')
 
 

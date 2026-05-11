@@ -9,6 +9,7 @@ from ..wallet.services import BankAccountService
 from ..wallet.paystack.service import PaystackError, PaystackService
 from .services.utils import generate_reference_key
 from .tasks import process_transfer_task
+from ..authentication.serializers import UserReadSerializer
 
 import logging
 
@@ -17,27 +18,24 @@ logger = logging.getLogger(__name__)
 base_url = settings.BASE_URL
 commision = settings.REFERRAL_COMMISION
 
-# class ReferralSerializer(serializers.ModelSerializer):
-#     
+class ReferralSerializer(serializers.ModelSerializer):
+    referred = UserReadSerializer(read_only=True)
+    class Meta: 
+        model = Referral
+        fields = [
+            "referral_id", "status", "referred", "created_at"
+        ]
 
-#     class Meta: 
-#         model = Referral
-#         fields = [
-#             "created", ""
-#         ]
-
-#     def get_balance(self, obj):
-#         total_referrals  = obj.aggregate(total=Count("referral_id", distinct=True))
-        
 class ReferralCodeSerializer(serializers.ModelSerializer):
     referral_link = serializers.SerializerMethodField()
     balance = serializers.SerializerMethodField()
     total_referrals = serializers.SerializerMethodField()
+    referrals = ReferralSerializer(many=True, read_only=True)
 
     class Meta:
         model = ReferralCode
         fields = [ "code", "referral_link", "created_at",
-                  "balance", "total_referrals"]
+                  "balance", "total_referrals", "referrals" ]
 
     def get_referral_link(self, obj):
         return f"{base_url}api/v1/auth/register/?ref={obj.code}"
@@ -55,12 +53,12 @@ class ReferralCodeSerializer(serializers.ModelSerializer):
 
 class ReferralWithdrawalSerializer(serializers.ModelSerializer):
 
-    payment_recipient_code = serializers.CharField(required=True, write_only=True)
+    recipient_code = serializers.CharField(required=True, write_only=True)
     class Meta: 
         model = ReferralTransactions
         fields = [
             "amount", "idempotency_key",
-            'payment_recipient_code'
+            'recipient_code'
         ]
 
     def validated_amount(self, value):
@@ -84,7 +82,7 @@ class ReferralWithdrawalSerializer(serializers.ModelSerializer):
         if not process_amount['status']:
             raise serializers.ValidationError(process_amount['message'])
         
-        recipient_code = validated_data.pop('payment_recipient_code')
+        recipient_code = validated_data.pop('recipient_code')
         reference_key = generate_reference_key(user)
         
         total_to_reward = process_amount['total_to_reward']

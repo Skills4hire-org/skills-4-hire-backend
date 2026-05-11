@@ -36,7 +36,7 @@ class Service(models.Model):
         editable=False,
     )
     category = models.ForeignKey(
-        ServiceCategory, on_delete=models.SET_NULL, null=True, related_name="services"
+        ServiceCategory, on_delete=models.SET_NULL, null=True, related_name="services", blank=True
     )
     profile = models.ForeignKey(
         ProviderModel,
@@ -70,6 +70,13 @@ class Service(models.Model):
                 raise ValidationError(
                     {"min_charge": "min_charge must be less than or equal to max_charge."}
                 )
+        if self.name:
+            self.name = self.name.strip().title()
+        super().clean()
+    
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.name} ({self.service_id})"
@@ -90,14 +97,13 @@ class ServiceAttachment(models.Model):
     )
     image_url = models.URLField(max_length=2048)
     image_public_id = models.CharField(max_length=512)
-    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         ordering = ["-created_at"]
         indexes = [
-            models.Index(fields=["service", "is_active"]),
+            models.Index(fields=["service"]),
         ]
 
     def __str__(self):

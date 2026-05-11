@@ -130,8 +130,7 @@ class ProfileViewSet(viewsets.GenericViewSet):
 
             updated_profile = serializer.save()
             if user.is_provider:
-                output_serializer = ProviderProfileDetailSerializer(updated_profile).data
+                output_serializer = ProviderProfilePublicSerializer(updated_profile).data
             else:
-                output_serializer = CustomerProfileDetailSerializer(updated_profile).data
+                output_serializer = CustomerProfilePublicSerializer(updated_profile).data
             return Response(output_serializer, status=status.HTTP_200_OK)
-        return None

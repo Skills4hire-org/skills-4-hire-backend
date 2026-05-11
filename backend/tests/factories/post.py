@@ -1,7 +1,7 @@
 import factory
 import faker
 
-from apps.posts.models import Post, PostLike, Comment
+from apps.posts.models import Post, Likes, Comment
 from .users import  CustomUserFactory
 
 faker_instance = faker.Faker()
@@ -12,9 +12,9 @@ class PostFactory(factory.django.DjangoModelFactory):
     post_content = faker_instance.text(max_nb_chars=100)
     user = factory.SubFactory(CustomUserFactory)
 
-class PostLikeFactory(factory.django.DjangoModelFactory):
+class LikesFactory(factory.django.DjangoModelFactory):
     class Meta:
-        model = PostLike
+        model = Likes
     post = factory.SubFactory(PostFactory)
     user = factory.SubFactory(CustomUserFactory)
 

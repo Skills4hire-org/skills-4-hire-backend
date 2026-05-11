@@ -4,7 +4,7 @@ import random
 from . import service_post
 from .setup import  Post
 
-from tests.factories import  PostFactory, PostLikeFactory, CommentFactory
+from tests.factories import  PostFactory, LikesFactory, CommentFactory
 
 @pytest.fixture
 def customer_post(db, customer):
@@ -49,7 +49,7 @@ def create_multiple_posts(db, provider, customer):
 
 @pytest.fixture
 def create_like(db, customer_post, provider):
-    like = PostLikeFactory(
+    like = LikesFactory(
         post=customer_post,
         user=provider
     )

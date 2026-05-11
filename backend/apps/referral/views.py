@@ -23,7 +23,7 @@ class ReferralViewSet(viewsets.GenericViewSet):
                     .filter(owner=user)
         return queryset.first()
 
-    @action(methods=["GET"], detail=False, url_path="referral")
+    @action(methods=["GET"], detail=False, url_path="referrals")
     def referral(self, request, *args, **kwargs):
         qs = self.get_queryset()
         serializer = self.get_serializer(qs)

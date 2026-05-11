@@ -3,20 +3,20 @@ from django.dispatch import receiver
 from django.db.models.signals import post_save
 from pyexpat.errors import messages
 
-from .models import PostLike, Comment
+from .models import Likes, Comment
 from apps.notification.services import send_general_notification
 from apps.notification.events import NotificationEvents
 
 from asyncio.log import  logger
 
-@receiver(post_save, sender=PostLike)
+@receiver(post_save, sender=Likes)
 def send_realtime_notif_on_like(sender, created, instance, **kwargs):
     """
-    Automatically create or update notification when a PostLike is created.
+    Automatically create or update notification when a Likes is created.
     """
     if not created:
         return
-    if not isinstance(instance, PostLike):
+    if not isinstance(instance, Likes):
         return
 
     event = NotificationEvents.SYSTEM.value

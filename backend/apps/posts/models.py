@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 import uuid
 
 from ..users.address.models import UserAddress
-from ..users.skills.models import Skill
+from ..users.services.models import ServiceCategory
 
 logger = logging.getLogger(__name__)
 
@@ -40,9 +40,13 @@ class Post(models.Model):
 
     post_title = models.CharField(max_length=500, blank=False,null=True)
 
-    tags = models.ManyToManyField(Skill, related_name="tags", blank=True)
+    tags = models.ManyToManyField(ServiceCategory, related_name="tags", blank=True)
     post_content = models.TextField(blank=False, null=False)
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="posts", blank=True, null=True)
+
+    country = models.CharField(max_length=100, blank=True, null=True)   
+    state = models.CharField(max_length=100, blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
 
     parent = models.ForeignKey(
         "self",
@@ -52,9 +56,6 @@ class Post(models.Model):
         related_name="reposts",
         db_index=True
     )
-    
-    reposted_by = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name="shares")
-
     repost_quote = models.TextField(blank=True,null=True)
 
     post_type = models.CharField(
@@ -64,8 +65,7 @@ class Post(models.Model):
         null=True,
         blank=False
     )
-    address = models.ForeignKey(UserAddress, on_delete=models.CASCADE, related_name="posts_address", blank=True, null=True)
-
+ 
     amount = models.DecimalField(
         decimal_places=2, 
         max_digits=10, 
@@ -78,6 +78,7 @@ class Post(models.Model):
     is_deleted = models.BooleanField(default=False)
     is_pinned = models.BooleanField(default=False)
     is_reposted = models.BooleanField(default=False, db_index=True)
+    is_remote = models.BooleanField(default=False)
 
     # TimeStamp 
     start_date = models.DateTimeField(blank=True, null=True)
@@ -219,9 +220,9 @@ class PostAttachment(models.Model):
     )
 
     attachment_type = models.CharField(max_length=200, choices=Types.choices, default=None, null=True, blank=True)
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="attachment", blank=True, null=True)
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="attachments", blank=True, null=True)
     attachmentURL = models.URLField(max_length=200, null=True, blank=True)
-    comment = models.ForeignKey("Comment", on_delete=models.CASCADE, null=True, blank=True, related_name="attachment")
+    comment = models.ForeignKey("Comment", on_delete=models.CASCADE, null=True, blank=True, related_name="attachments")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -235,13 +236,12 @@ class PostAttachment(models.Model):
             models.Index(fields=["post"], name="post_id")
         ]
 
-
-class PostLike(models.Model):
+class Likes(models.Model):
 
     objects = models.Manager()
     is_active_objects = IsActiveManager()
 
-    postlike_id = models.UUIDField(
+    like_id = models.UUIDField(
         max_length=20,
         unique=True,
         primary_key=True,
@@ -251,6 +251,7 @@ class PostLike(models.Model):
 
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="likes")
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="likes")
+    comment = models.ForeignKey(Comment, on_delete=models.CASCADE, related_name="likes", null=True)
 
     is_active = models.BooleanField(default=True)
 
@@ -265,12 +266,12 @@ class PostLike(models.Model):
             )
         ]
         indexes = [
-            models.Index(fields=["postlike_id"], name="postlike_id_idx"),
+            models.Index(fields=["like_id"], name="like_id_idx"),
             models.Index(fields=["post"], name="post_like_idx")
         ]
     
     def __str__(self):
-        return f"PostLike({self.user.full_name}, {self.post.pk})"
+        return f"Likes({self.user.full_name}, {self.post.pk})"
 
 
     def soft_delete(self):

@@ -99,7 +99,7 @@ def process_referral_conversion_task(self):
     
 def process_transfer(transaction_id, recipient_code):
     logger.info(
-        "Processing Task for transfer verification for referral %s", transaction_id
+        "Processing Task for referral transfer %s", transaction_id
     )
     with transaction.atomic():
         try:

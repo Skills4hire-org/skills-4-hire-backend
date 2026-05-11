@@ -6,7 +6,7 @@ from ..serializers.profiles import ProviderProfilePublicSerializer
 class ServiceAttachmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceAttachment
-        fields = ["image_id", "image_url", "image_public_id", "is_active", "created_at"]
+        fields = ["image_id", "image_url", "image_public_id", "created_at"]
         read_only_fields = ["image_id", "created_at"]
 
     def validate_image_url(self, value: str) -> str:
@@ -32,6 +32,7 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
         fields = [
             "category_id",
             "attachments",
+            "service_id",
             "name", 
             "description",
             "min_charge",
@@ -44,7 +45,7 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
         if value is None:
             return None
         try:
-            category = ServiceCategory.objects.get(category_id=value)
+            category = ServiceCategory.objects.get(service_category_id=value)
             return category
         except ServiceCategory.DoesNotExist:
             raise serializers.ValidationError("Invalid category_id provided.")
@@ -55,10 +56,10 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
         return value.strip().title()  # Normalize to title case for consistency
 
     def validate(self, attrs: dict) -> dict:
-        min_charge = attrs["min_charge"]
-        max_charge = attrs["max_charge"]
+        min_charge = attrs.get("min_charge", None)
+        max_charge = attrs.get("max_charge", None)
 
-        if min_charge > max_charge:
+        if min_charge is not None and max_charge is not None and min_charge > max_charge:
             raise serializers.ValidationError(
                 {"min_charge": "min_charge must be less than or equal to max_charge."}
             )
@@ -98,8 +99,8 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
         instance.save()
 
         if attachments_data is not None:
-            # Soft-deactivate all existing attachments in a single query
-            instance.attachments.filter(is_active=True).update(is_active=False)
+            #delete all existing attachments in a single query
+            instance.attachments.delete()
 
             # Bulk-insert the fresh set
             ServiceAttachment.objects.bulk_create(
@@ -113,7 +114,7 @@ class ServiceCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceCategory
         fields = [
-            'name', "description", 'created_at',
+            'name',
             "service_category_id"
         ]
 

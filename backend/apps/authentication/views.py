@@ -155,21 +155,26 @@ class PasswordResetRequestViewSet(viewsets.ModelViewSet):
             status=status.HTTP_200_OK)
 
 class PasswordResetConfirmViewSet(viewsets.ModelViewSet):
-    http_method_names = ["post"]
     permission_classes = [permissions.AllowAny]
     serializer_class = PasswordResetConfirmSerializer
+    http_method_names = ["post"]
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-        code, password = validated_data["code"], validated_data["password"]
+        password =  validated_data["password"]
         try:
-            code_instance = _get_code_instance_or_none(code)
+            code_instance = validated_data["code_instance"]
+
             user = code_instance.user
             with transaction.atomic():
                 user.set_password(password)
                 user.save(update_fields=["password"])
+
+                code_instance.is_used = True
+                code_instance.is_active = False
+                code_instance.save()
 
             blacklist_outstanding_token(user)
         except Exception as e:
