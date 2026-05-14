@@ -37,7 +37,10 @@ class ReferralTransactionViewSet(viewsets.ModelViewSet):
 
     def create(self, request, *args, **kwargs):
         
-        serializer = self.get_serializer(data=request.data)
+        local_bank = request.query_params.get("local_bank", False)
+        serializer = self.get_serializer(
+            data=request.data, context={"request": request, "local_bank": local_bank})
+        
         serializer.is_valid(raise_exception=True)
 
         valid_data = serializer.validated_data

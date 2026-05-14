@@ -1,21 +1,28 @@
-
 import os
-
+import django
 from django.core.asgi import get_asgi_application
 from dotenv import load_dotenv
 
-from channels.routing import ProtocolTypeRouter, URLRouter
-from apps.notification.routings import websocket_urlpatterns
-
 load_dotenv()
 
-setting_module = os.getenv("DJANGO_SETTINGS_MODULE")
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 
-os.environ.setdefault('DJANGO_SETTINGS_MODULE',  setting_module)
+django.setup()
 
 django_asgi_app = get_asgi_application()
 
+from channels.routing import ProtocolTypeRouter, URLRouter
+from channels.auth import AuthMiddlewareStack
+from apps.chats.routing import chats_urlpatterns 
+from apps.authentication.routing import userpatterns 
+
+combined_patterns = chats_urlpatterns + userpatterns
+
 application = ProtocolTypeRouter({
     "http": django_asgi_app,
-    "websocket": URLRouter(websocket_urlpatterns),
+    "websocket": AuthMiddlewareStack(
+        URLRouter(
+            combined_patterns
+        )
+    ),
 })

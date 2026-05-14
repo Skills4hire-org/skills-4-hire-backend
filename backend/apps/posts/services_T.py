@@ -24,9 +24,6 @@ def create_post(user, start_date: datetime | None = None, end_date: datetime | N
         raise Exception(e)
     return  new_post
 
-def list_nested_reposts(post, queryset):
-    return queryset.filter(parent=post).order_by("-created_at", '-reposted_at', "-updated_at")
-
 def get_post_by_id(post_pk: uuid.UUID):
     try:
         post = Post.objects.get(post_id=post_pk)
@@ -48,9 +45,7 @@ def get_offers_or_job_post(user,  queryset, include_offers):
         return qs
 
 def list_posts(user, queryset):
-    
-    return queryset.filter(user=user
-    ).order_by("-created_at", "-updated_at", "-reposted_at")
+    return queryset.filter(user=user).order_by("-created_at", "-updated_at")
 
 
 def return_paginated_view(self, queryset):
@@ -68,6 +63,27 @@ class LikeService:
     def check_already_liked_post(self, user, post) -> bool:
         return Likes.is_active_objects.filter(user=user, post=post).exists()
     
+    def check_already_liked_comment(self, user, comment):
+        return Likes.is_active_objects.filter(user=user, comment=comment).exists()
+
+    
+    def like_comment(self, comment, user):
+        if self.check_already_liked_comment(user, comment):
+            raise PermissionDenied("You already liked this comment")
+        like = Likes.objects.create(user=user, comment=comment)
+        return like
+    
+    def unlike_comment(self, comment, user):
+        if not self.check_already_liked_comment(user, comment):
+            raise PermissionDenied("NO like instance found")
+        
+        try:
+            like = Likes.is_active_objects.get(user=user, comment=comment)
+        except Likes.DoesNotExist:
+            raise ValueError("this object does not exists")
+
+        like.soft_delete()
+        return True
 
     @transaction.atomic
     def create_like_post(self, post, user, **kwargs):
@@ -95,30 +111,32 @@ class LikeService:
         return liked_post
 
 class CommentService:
-    def __init__(self, post, user)->None:
-        self.post = post
-        self.user = user
+    def __init__(self):
+        pass
 
     @transaction.atomic
-    def add_comment(self, **kwargs):
+    def add_comment(self, post=None, parent=None, user=None, message=None):
+        if user is None:
+            raise Exception("A valid user object is required to create a comment.")
+        
+        if post is None and parent is not None:
+            post = parent.post
+
         try:
             new_comment = Comment.objects.create(
-                post=self.post,
-                user=self.user,
-                **kwargs
+                post=post,
+                parent=parent,
+                user=user,
+                message=message
             )
+            return new_comment
         except Exception as e:
-            raise Exception(e)
-        return  new_comment
-
+            raise e
 
     def list_comments(self, comments):
         """ List comment service ( list comment associated to the current post )"""
         qs = comments.filter(post=self.post).all().order_by("-created_at")
         return  qs
-
-    def create_nested_replies(self, **kwargs):
-        return  self.add_comment(**kwargs)
 
 
 

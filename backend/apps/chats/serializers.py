@@ -15,7 +15,6 @@ from .core.utils import (
     validate_message_content,
     validate_negotiation_notes, validate_negotiation_price,
     validate_status, log_history, sanitize_message_content,
-    trigger_notification
 )
 
 from .services.conversations import (
@@ -40,7 +39,6 @@ class MessageSerializer(serializers.ModelSerializer):
 
     sender = UserReadSerializer(read_only=True)
     sender_id = serializers.IntegerField(write_only=True, required=False)
-
     class Meta:
         model = Message
         fields = [
@@ -49,6 +47,7 @@ class MessageSerializer(serializers.ModelSerializer):
             'sender',
             'sender_id',
             'content',
+            'body',
             'is_read',
             'is_edited',
             'created_at',
@@ -70,7 +69,6 @@ class MessageSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(error_message)
         return value
 
-
 class MessageListSerializer(serializers.ModelSerializer):
     """
     Lightweight serializer for listing messages.
@@ -78,26 +76,29 @@ class MessageListSerializer(serializers.ModelSerializer):
     Used for paginated message lists to reduce response size.
     Includes essential information without nested user objects.
     """
-
-    sender_email = serializers.CharField(source='sender.email', read_only=True)
-    sender_name = serializers.SerializerMethodField()
+    is_participant_one = serializers.SerializerMethodField()
+    is_participant_two = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
         fields = [
             'message_id',
-            'sender_email',
-            'sender_name',
+            "is_participant_one",
+            "is_participant_two",
+            "is_edited",
             'content',
             'is_read',
             'created_at',
         ]
         read_only_fields = fields
 
-    def get_sender_name(self, obj):
-        """Get sender's display name."""
-        return obj.sender.full_name
-
+    def get_is_participant_one(self, obj):
+        sender = obj.sender
+        return sender == obj.conversation.participant_one
+    
+    def get_is_participant_two(self, obj):
+        sender = obj.sender
+        return sender == obj.conversation.participant_two
 
 class MessageCreateSerializer(serializers.ModelSerializer):
     """
@@ -133,9 +134,13 @@ class MessageCreateSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError('Conversation not found.')
 
         if not conversation.has_participant(user):
-            raise serializers.ValidationError(
-                'You are not a participant of this conversation.'
-            )
+            if not (
+                conversation.room_type == Conversation.RoomType.SUPPORT
+                and getattr(user, 'is_staff', False)
+            ):
+                raise serializers.ValidationError(
+                    'You are not a participant of this conversation.'
+                )
 
         message = Message.objects.create(
             conversation=conversation,
@@ -172,7 +177,6 @@ class ConversationSerializer(serializers.ModelSerializer):
     Includes participant information, message count, and last message.
     """
 
-    participant_one = UserReadSerializer(read_only=True)
     participant_two = UserReadSerializer(read_only=True)
     message_count = serializers.IntegerField(read_only=True)
     last_message = serializers.SerializerMethodField()
@@ -201,12 +205,8 @@ class ConversationSerializer(serializers.ModelSerializer):
 
     def get_unread_count(self, obj):
         """Get unread message count for current user."""
-        user = self.context.get("request").user
-        if user:
-            return obj.messages.filter(
-                is_read=False
-            ).exclude(sender=user).count()
-        return 0
+        user = self.context['request'].user
+        return obj.unread_count(user)
 
 class ConversationDetailSerializer(serializers.ModelSerializer):
     """
@@ -214,9 +214,6 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
 
     Used when retrieving full conversation details with message preview.
     """
-
-    participant_one = UserReadSerializer(read_only=True)
-    participant_two = UserReadSerializer(read_only=True)
     message_count = serializers.IntegerField(read_only=True)
     messages = serializers.SerializerMethodField()
 
@@ -229,15 +226,49 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
             'message_count',
             'messages',
             'created_at',
-            'updated_at',
         ]
         read_only_fields = fields
 
     def get_messages(self, obj):
         """Get recent messages."""
         # Get last 20 messages
-        messages = obj.messages.all()[:20]
+        messages = obj.messages.filter(is_active=True).order_by("-created_at")
         return MessageListSerializer(messages, many=True).data
+
+
+# Support Serializers
+class SupportRoomSerializer(serializers.ModelSerializer):
+    customer = serializers.SerializerMethodField()
+    last_message = serializers.SerializerMethodField()
+    unread_count = serializers.IntegerField(read_only=True)
+
+    class Meta:
+        model = Conversation
+        fields = [
+            'conversation_id',
+            'customer',
+            'last_message',
+            'unread_count',
+        ]
+        read_only_fields = fields
+
+    def get_customer(self, obj):
+       return UserReadSerializer(obj.participant_two).data
+    
+    def get_last_message(self, obj):
+        last_message = obj.messages.filter(is_active=True).order_by('-created_at').first()
+        if not last_message:
+            return None
+        return {
+            'body': last_message.content,
+            'created_at': last_message.created_at,
+            'is_read': last_message.is_read,
+        }
+
+
+class MarkReadSerializer(serializers.Serializer):
+    room_id = serializers.UUIDField()
+
 
 class ConversationCreateSerializer(serializers.ModelSerializer):
     """
@@ -245,38 +276,15 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
 
     Validates participants and prevents duplicate conversations.
     """
-
-    participant_two_id = serializers.UUIDField(write_only=True, required=True)
-    participant_one = UserReadSerializer(read_only=True)
-    participant_two = UserReadSerializer(read_only=True)
+    participant_two_id = serializers.PrimaryKeyRelatedField(
+        queryset=User.objects.filter(is_verified=True, is_active=True)
+    )
 
     class Meta:
         model = Conversation
         fields = [
-            'conversation_id',
-            'participant_one',
-            'participant_two',
             'participant_two_id',
-            'created_at',
-            'updated_at',
         ]
-        read_only_fields = [
-            'conversation_id',
-            'participant_one',
-            'participant_two',
-            'created_at',
-            'updated_at',
-        ]
-
-    def validate_participant_two_id(self, value):
-        """Validate other participant exists."""
-
-        try:
-            User.objects.get(pk=value, is_active=True)
-        except User.DoesNotExist:
-            raise serializers.ValidationError('User not found.')
-
-        return value
 
     def validate(self, data):
         """
@@ -286,10 +294,10 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
         - Check for existing conversation
         """
         user = self.context.get("request").user
-        participant_two_id = data.get('participant_two_id')
+        participant_two = data.get('participant_two_id')
 
         # Check for self-conversation
-        if user.id == participant_two_id:
+        if user.id == participant_two.pk:
             raise serializers.ValidationError(
                 'You cannot create a conversation with yourself.'
             )
@@ -298,9 +306,9 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
         existing = Conversation.objects.filter(
             models.Q(
                 participant_one=user,
-                participant_two_id=participant_two_id
+                participant_two=participant_two
             ) | models.Q(
-                participant_one_id=participant_two_id,
+                participant_one=participant_two,
                 participant_two=user
             )
         ).exists()
@@ -316,8 +324,7 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
         """Create conversation with current user as participant_one."""
 
         user = self.context['request'].user
-        participant_two_id = validated_data.pop('participant_two_id')
-        participant_two = User.objects.get(pk=participant_two_id, is_active=True)
+        participant_two = validated_data.pop('participant_two_id')
 
         try:
             service = ConversationService(
@@ -447,20 +454,17 @@ class NegotiationCreateSerializer(serializers.ModelSerializer):
                     accept = NegotiationService().accept_negotiation(instance, user=user)
                     if accept:
                         instance.set_final_price(validated_data["price"])
-                        trigger_notification(notification_type, sender, receiver)
                         log_history(negotiation=instance, sender=user, action=action, price=validated_data["price"])
             case Negotiations.Status.REJECTED:
                 with transaction.atomic():
                     reject = NegotiationService().reject_negotiation(instance, user=user)
                     if reject:
-                        trigger_notification(notification_type, sender, receiver)
                         log_history(negotiation=instance, sender=user,
                                     price=validated_data["price"], action=action)
             case Negotiations.Status.COUNTERED:
                 with transaction.atomic():
                     counter = NegotiationService().counter_negotiation(instance, user=user)
                     if counter:
-                        trigger_notification(notification_type, sender, receiver)
                         log_history(negotiation=instance, sender=user,
                                     price=validated_data['price'], action=action)
         instance.bulk_update(validated_data)

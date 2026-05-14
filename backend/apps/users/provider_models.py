@@ -12,16 +12,15 @@ class ActiveManager(models.Manager):
         return super().get_queryset().filter(is_active=True)
 
 class ProviderModel(models.Model):
-
     class ExperienceLevel(models.TextChoices):
-        ENTRY = "entry", _("Entry Level")
-        INTERMEDIATE = "intermediate", _("Intermediate")
-        EXPERT = "expert", _("Expert")
+        ENTRY = "ENTRY"
+        INTERMEDIATE = "INTERMEDIATE"
+        EXPERT = "EXPERT"
 
     class AvailabilityStatus(models.TextChoices):
-        AVAILABLE = "available", _("Available")
-        PARTIALLY = "partially", _("Partially Available")
-        UNAVAILABLE = "unavailable", _("Not Available")
+        AVAILABLE = "AVAILABLE"
+        PARTIALLY = "PARTIALLY"
+        UNAVAILABLE = "UNAVAILABLE"
         
     provider_id = models.UUIDField(
         max_length=20, 
@@ -101,10 +100,10 @@ class ProviderSkill(models.Model):
     objects =  models.Manager()
 
     class Proficiency(models.TextChoices):
-        BEGINNER = "beginner", _("Beginner")
-        INTERMEDIATE = "intermediate", _("Intermediate")
-        ADVANCED = "advanced", _("Advanced")
-        EXPERT = "expert", _("Expert")
+        BEGINNER = "BEGINNER"
+        INTERMEDIATE = "INTERMEDIATE"
+        ADVANCED = "ADVANCED"
+        EXPERT = "EXPERT"
 
     provider_skill_id = models.UUIDField(
         primary_key=True, db_index=True, editable=False,

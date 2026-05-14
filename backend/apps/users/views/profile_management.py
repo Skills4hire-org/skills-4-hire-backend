@@ -116,10 +116,10 @@ class ProfileViewSet(viewsets.GenericViewSet):
         
         if request.method == "GET":
             if user.is_provider:
-                serializer = ProviderProfileDetailSerializer(profile)
+                serializer = ProviderProfileDetailSerializer(profile, context={'request': request})
                 return Response(data=serializer.data, status=status.HTTP_200_OK)
             else:
-                serializer = CustomerProfileDetailSerializer(profile)
+                serializer = CustomerProfileDetailSerializer(profile, context={"request": request})
                 return Response(data=serializer.data, status=status.HTTP_200_OK)
         else:
             serializer = self.get_serializer(

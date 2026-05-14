@@ -47,6 +47,7 @@ class Service(models.Model):
     description = models.TextField(null=True, blank=True)
     min_charge = models.DecimalField(max_digits=12, decimal_places=2, null=True)
     max_charge = models.DecimalField(max_digits=12, decimal_places=2, null=True)
+    years_of_experience = models.IntegerField(default=0)
 
     is_default = models.BooleanField(default=False)
     is_verified = models.BooleanField(default=True)

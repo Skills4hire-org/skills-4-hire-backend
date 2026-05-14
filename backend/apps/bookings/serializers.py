@@ -18,14 +18,11 @@ from apps.wallet.services import WalletService
 from ..wallet.services import get_calculated_transaction
 from ..ratings.services.reviews import ReviewService
 
-
-
 from decimal import Decimal
 import logging
 
-
 from ..users.provider_models import ProviderModel
-from ..users.serializers.profiles import ProviderProfileDetailSerializer, ProviderProfilePublicSerializer
+from ..users.serializers.profiles import ProviderProfilePublicSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -37,19 +34,18 @@ class BookingAttachmentSerializer(serializers.ModelSerializer):
         ]
 
 class BookingCreateSerializer(serializers.ModelSerializer):
-    address = AddressCreateSerializer(required=True)
-    provider_id = serializers.UUIDField(required=True)
+    address = AddressCreateSerializer(required=False)
+    provider_id = serializers.UUIDField(required=False)
     attachments = BookingAttachmentSerializer(many=True, required=False)
-    idempotency_key = serializers.UUIDField(required=True)
+    idempotency_key = serializers.UUIDField(required=False)
 
     class Meta:
         model = Bookings
         fields = [
-            'address',
-            "provider_id",
+            'address', "provider_id",
             "price", "notes",
             "descriptions", "start_date",
-            "end_date", "currency",
+            "end_date", "currency", "is_remote",
             "requirements", 'attachments', 'idempotency_key'
         ]
 
@@ -59,7 +55,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
             if attrs["end_date"] <= attrs["start_date"]:
                 raise serializers.ValidationError("'end_date' cannot be less than 'start_date'")
             elif attrs["start_date"].date() < timezone.now().date():
-                raise serializers.ValidationError("invalid start date. can't be less than today")
+                raise serializers.ValidationError("start date can't be less than today")
 
         return attrs
 
@@ -93,11 +89,9 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         validated_data.pop("provider_id")
 
         if address is not None:
-            postal_code = address.pop('postal_code')
             address, created = UserAddress.objects.get_or_create(
-                user_profile=request.user.profile,
-                postal_code=postal_code,
-                **address
+                user_profile=request.user.profile, **address,
+                defaults=address
             )
 
         booking_instance = BookingService().create_booking(
@@ -121,8 +115,11 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         address = validated_data.pop("address", None)
         attachments = validated_data.pop("attachments", None)
         user = self.context['request'].user
+        
         if address:
-            booking_address, _ = UserAddress.objects.get_or_create(profile=user.profile, postal_code=address['postal_code'])
+            booking_address, _ = UserAddress.objects.get_or_create(
+                profile=user.profile, **address, defaults=address)
+            
             instance.address = booking_address
 
         if attachments:
@@ -132,9 +129,6 @@ class BookingCreateSerializer(serializers.ModelSerializer):
                 for data in attachments
             ])
 
-        validated_data.pop('idempotency_key')
-        validated_data.pop("provider_id")
-
         updated_instance = super().update(instance, validated_data)
         return updated_instance
 
@@ -143,7 +137,6 @@ class AcceptRejectSerializer(serializers.Serializer):
 
     status = serializers.ChoiceField(choices=choices, required=True)
     idempotency_key = serializers.UUIDField(required=True)
-    booking_id = serializers.UUIDField(required=True)
 
     def validate_status(self, value):
         if value.upper() not in self.choices:
@@ -153,14 +146,15 @@ class AcceptRejectSerializer(serializers.Serializer):
     def create(self, validated_data):
         choice = validated_data['status']
         idempotency_key = validated_data['idempotency_key']
-        booking_instance_pk = validated_data['booking_id']
 
-        instance = get_or_none(Bookings, pk=booking_instance_pk,
-                               is_active=True, booking_status=Bookings.BookingStatus.FUNDED)
+        instance = self.context['booking']
 
         if instance is None:
-            raise serializers.ValidationError("No booking found. Try requesting for a funded booking")
+            raise serializers.ValidationError("Booking not Found")
 
+        if instance.booking_status != Bookings.BookingStatus.FUNDED:
+            raise serializers.ValidationError("You can only update funded booking")
+        
         user = self.context['request'].user
 
         if not instance.is_participants(user):
@@ -190,39 +184,44 @@ class AcceptRejectSerializer(serializers.Serializer):
 class BookingSerializer(serializers.ModelSerializer):
     customer = UserReadSerializer(read_only=True)
     provider = ProviderProfilePublicSerializer(read_only=True)
+    attachments = BookingAttachmentSerializer(read_only=True)
+    address = AddressSerializer(read_only=True)
     class Meta:
         model = Bookings
         fields =[
             'booking_id', 'booking_status',
             'customer', 'provider',
-            'price', "descriptions",
+            'price', "platform_fee", "descriptions",
             'is_active', 'start_date', 'end_date',
-            'created_at',
+            'created_at', "attachments", "address"
         ]
 
 class BookingDetailSerializer(serializers.ModelSerializer):
 
     customer = UserReadSerializer(read_only=True)
-    provider = ProviderProfileDetailSerializer(read_only=True)
+    provider = ProviderProfilePublicSerializer(read_only=True)
     cancelled_by = UserReadSerializer(read_only=True)
     accepted_by = UserReadSerializer(read_only=True)
-
+    attachments = BookingAttachmentSerializer(read_only=True)
+    address = AddressSerializer(read_only=True)
+    provider_pay = serializers.SerializerMethodField()
     class Meta:
         model = Bookings
         fields = [
             'booking_id', 'booking_status',
             'customer', 'provider',
             'cancelled_by', 'accepted_by',
-            'price', 'notes', 'requirements',
+            'price', "platform_fee", "provider_pay", 'notes', 'requirements',
             'is_active', 'start_date', 'end_date',
             'created_at', 'cancelled_at', 'accepted_at',
-            'descriptions', 'currency'
+            'descriptions', 'currency', "attachments", "address"
         ]
 
-class PaymentRequestSerializer(serializers.ModelSerializer):
+    def get_provider_pay(self, obj):
+        return str(obj.price - obj.platform_fee)
 
+class PaymentRequestSerializer(serializers.ModelSerializer):
     attachments_payment_request = BookingAttachmentSerializer(many=True, required=True)
-    booking_id = serializers.UUIDField(required=True, write_only=True)
 
     class Meta:
         model = PaymentRequestBooking
@@ -236,15 +235,12 @@ class PaymentRequestSerializer(serializers.ModelSerializer):
     
     def validate(self, data):
 
-        booking_pk = data['booking_id']
-
-        booking_instance = get_or_none(
-            Bookings, pk=booking_pk,
-            booking_status=Bookings.BookingStatus.IN_PROGRESS)
- 
+        booking_instance = self.context['booking']
         if booking_instance is None:
             raise serializers.ValidationError("invalid request")
 
+        if booking_instance.booking_status != Bookings.BookingStatus.IN_PROGRESS:
+            raise serializers.ValidationError("Booking not in progress")
         user = self.context['request'].user
         
         if not booking_instance.is_participants(user):
@@ -324,33 +320,21 @@ class ReviewPaymentRequestSerializer(serializers.ModelSerializer):
 
     idempotency_key = serializers.UUIDField(write_only=True, required=True)
     action = serializers.ChoiceField(choices=choices, required=True)
-    request_id = serializers.UUIDField(required=True, write_only=True)
     ratings = serializers.IntegerField(max_value=5, min_value=1,  required=False)
     reviews = serializers.CharField(max_length=500, required=False)
 
     class Meta:
         model = PaymentRequestBooking
         fields = [
-            'action', 'request_id',
-            'idempotency_key', 'ratings',
-            'reviews'
+            'action','idempotency_key', 'ratings','reviews'
         ]
 
     def validate(self, data):
         user = self.context['request'].user
 
-        request_instance  = (
-            PaymentRequestBooking.objects.filter(pk=data['request_id'])
-            .select_related("booking", "provider", "customer")
-            .order_by("-requested_at")
-            .first()
-        )
-
+        request_instance  = self.context["payment_request"]
         if request_instance is None:
             raise serializers.ValidationError("payment request not found")
-
-        if user != request_instance.customer:
-            raise PermissionDenied()
 
         if request_instance.status != PaymentRequestBooking.RequestStatus.PENDING:
             raise serializers.ValidationError("You can only review pending request")
@@ -413,7 +397,7 @@ class RequestSerializer(serializers.ModelSerializer):
 
 class PaymentRequestDetailSerializer(serializers.ModelSerializer):
     customer = UserReadSerializer(read_only=True)
-    provider = ProviderProfileDetailSerializer(read_only=True)
+    provider = ProviderProfilePublicSerializer(read_only=True)
     booking = BookingDetailSerializer(read_only=True)
     attachments_payment_request = BookingAttachmentSerializer(many=True, read_only=True)
 

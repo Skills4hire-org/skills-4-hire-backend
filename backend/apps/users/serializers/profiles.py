@@ -32,16 +32,16 @@ class BaseProfileCreateSerializer(serializers.ModelSerializer):
         model = BaseProfile
         fields = [
             "gender", "display_name",
-            "country", "city", "bio"
+            "country", "city", "bio", "location",
         ]
 
     def validate_bio(self, value):
-        if len(value) > 2000:
+        if len(value) > 1_000:
             raise serializers.ValidationError("exceeded max length")
         return value
 
     def validate_gender(self, value):
-        if value not in BaseProfile.GenderChoices.choices:
+        if value not in BaseProfile.GenderChoices.values:
             raise serializers.ValidationError("Invalid gender")
         return value.strip()
 
@@ -73,14 +73,35 @@ class BaseProfileCreateSerializer(serializers.ModelSerializer):
 
 class BaseProfileListSerializer(serializers.ModelSerializer):
     avatar = AvatarDetailSerializer(read_only=True)
-    addresses = AddressDetailSerializer(many=True, read_only=True)
+    professional_title = serializers.SerializerMethodField()
+    provider_id = serializers.SerializerMethodField()
+    customer_id = serializers.SerializerMethodField()
     class Meta:
         model = BaseProfile
         fields = [
-            "gender", "display_name", "addresses",
-            "country", "city", "created_at", "avatar"
+            "gender", "display_name", "professional_title", "trust_score",
+            "country", "city", "created_at", "avatar", 'user',
+            "customer_id", "provider_id"
         ]
 
+    def get_provider_id(self, obj):
+        user = obj.user
+        if user.is_provider:
+            return str(obj.provider_profile.provider_id)
+        return None
+    
+    def get_customer_id(self, obj):
+        user = obj.user
+        if user.is_customer:
+            return str(obj.customer_profile.customer_id)
+        return None
+    
+    def get_professional_title(self, obj):
+        user = obj.user
+        if not user.is_provider:
+            return None
+        return obj.provider_profile.professional_title
+    
 class ProviderProfileUpdateCreateSerializer(serializers.ModelSerializer):
 
     profile = BaseProfileCreateSerializer(required=False)
@@ -154,7 +175,7 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
 
         def get_images(self, obj):
             from ..services.serializers import ServiceAttachmentSerializer
-            images = ServiceAttachment.objects.filter(service__profile=obj, is_active=True)
+            images = ServiceAttachment.objects.filter(service__profile=obj)
             return ServiceAttachmentSerializer(images, many=True).data
 
         def get_comments(self, obj):
@@ -164,20 +185,15 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
             if len(user_comments) < 1:
                 return None
             
-            serializer = CommentListSerializer(user_comments, many=True)
+            serializer = CommentListSerializer(user_comments, many=True, context={"request": self.context['request']})
             return serializer.data
 
         def get_posts(self, obj):
             from ...posts.serializers.read import PostDetailSerializer
             user = obj.profile.user
             user_posts = user.posts.filter(is_active=True, is_deleted=False)
-            user_shares = user.shares.filter(is_reposted=True, is_active=True, is_deleted=False)
-
-            combined_objs = user_posts | user_shares
-
-            if len(combined_objs) < 1:
-                return None
-            serializer = PostDetailSerializer(combined_objs, many=True)
+    
+            serializer = PostDetailSerializer(user_posts, many=True, context={'request': self.context['request']})
             return serializer.data
 
         def get_endorsement_count(self, obj):

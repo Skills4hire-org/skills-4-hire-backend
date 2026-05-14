@@ -62,6 +62,7 @@ def process_deposit(wallet_transaction_id: uuid.UUID) -> dict:
 def verify_deposit_status(self, webhook_data: dict):
     logger.info("Task Execution: Processing Task, Deposit verifications")
 
+    print("Found task verification")
     payment_status = webhook_data.get("status")
     payment_reference = webhook_data.get("reference")
 
@@ -99,6 +100,7 @@ def verify_deposit_status(self, webhook_data: dict):
                             .select_for_update(nowait=True)\
                             .get(reference_key=payment_reference)
 
+            print(status)
             if status == "success":
                 user = w_transaction.user
                 amount_naira = verify_transaction['data']['amount'] / 100

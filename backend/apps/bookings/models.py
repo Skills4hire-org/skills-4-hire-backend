@@ -30,11 +30,12 @@ class Bookings(models.Model):
     address = models.ForeignKey(UserAddress, on_delete=models.CASCADE, related_name="booking_address", blank=True,
                                 null=True)
 
+    is_remote = models.BooleanField(default=False)
     cancelled_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="booking_cancelled", null=True, blank=True)
     accepted_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="booking_accepted", blank=True,null=True)
 
     currency = models.CharField(max_length=20, default="NGN")
-    price = models.DecimalField(max_digits=10, decimal_places=2, null=False, blank=False)
+    price = models.DecimalField(max_digits=10, decimal_places=2, null=False, blank=True)
     platform_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
     notes = models.TextField(blank=True)
@@ -76,10 +77,16 @@ class Bookings(models.Model):
     def is_participants(self, user):
         if user.is_superuser or user.is_staff:
             return True
-        if user.profile.provider_profile == self.provider:
-            return True
-        if user == self.customer:
-            return True
+        if user.is_provider:
+            if user.profile.provider_profile == self.provider:
+                return True
+            else:
+                return False
+        if user.is_customer:
+            if user == self.customer:
+                return True
+            else:
+                return False
         return False
     
     @staticmethod

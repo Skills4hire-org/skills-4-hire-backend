@@ -10,6 +10,7 @@ dependencies = [
     "channels>=4.3.2",
     "channels-redis>=4.3.0",
     "cloudinary>=1.44.1",
+    "daphne>=4.2.1",
     "decouple>=0.0.7",
     "django>=6.0.2",
     "django-anymail>=14.0",

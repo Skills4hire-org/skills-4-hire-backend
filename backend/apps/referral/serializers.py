@@ -5,7 +5,7 @@ from rest_framework import serializers
 
 from .models import Referral, ReferralCode, ReferralTransactions
 from .services_T import TransactionService
-from ..wallet.services import BankAccountService
+from ..wallet.services import BankAccountService, WalletService
 from ..wallet.paystack.service import PaystackError, PaystackService
 from .services.utils import generate_reference_key
 from .tasks import process_transfer_task
@@ -53,7 +53,7 @@ class ReferralCodeSerializer(serializers.ModelSerializer):
 
 class ReferralWithdrawalSerializer(serializers.ModelSerializer):
 
-    recipient_code = serializers.CharField(required=True, write_only=True)
+    recipient_code = serializers.CharField(required=False, write_only=True)
     class Meta: 
         model = ReferralTransactions
         fields = [
@@ -103,6 +103,16 @@ class ReferralWithdrawalSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(exc)
         
         transaction_instance = referral_transaction['instance']
+
+        to_local_bank = self.context['local_bank']
+
+        if not to_local_bank:
+
+            with transaction.atomic():
+                transaction_service = TransactionService()
+                transaction_service.process_completed_transaction(transaction_instance)
+                wallet_service = WalletService()
+                credit = wallet_service.credit_user_wallet(transaction_instance.user, transaction_instance.amount)
 
         bank_service = BankAccountService()
         bank = bank_service.get_account_by_recipient_code(recipient_code)

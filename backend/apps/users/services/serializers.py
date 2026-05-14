@@ -34,6 +34,7 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
             "attachments",
             "service_id",
             "name", 
+            "years_of_experience",
             "description",
             "min_charge",
             "max_charge",
@@ -128,7 +129,7 @@ class ServiceListSerializer(serializers.ModelSerializer):
             "service_id",
             "name",
             "min_charge", "max_charge",
-            "is_default",
+            "is_default", "years_of_experience",
             "is_active", "created_at", 
             "attachments", "category"
         ]

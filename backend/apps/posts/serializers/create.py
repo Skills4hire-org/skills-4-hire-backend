@@ -4,8 +4,8 @@ from ..utils.posts import  (
     can_make_post, verify_post_with_amount,
     get_date
 )
-from ..services import  create_post, CommentService
-from ..models import Post, PostAttachment, Comment
+from ..services_T import  create_post, CommentService
+from ..models import Post, PostAttachment, Comment, Repost
 
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -18,13 +18,12 @@ class PostAttachmentSerializer(serializers.ModelSerializer):
         model = PostAttachment
         fields = [
             "post_attachment_id",
-            "post",
             "attachment_type",
             "attachmentURL",
             "created_at"
         ]
         read_only_fields = [
-            "post_attachment_id", "post",
+            "post_attachment_id",
             "created_at"
         ]
 
@@ -41,12 +40,6 @@ class PostAttachmentSerializer(serializers.ModelSerializer):
         if not is_valid:
             raise serializers.ValidationError(_(f"{url}"))
         return  url
-    
-    def create(self, validated_data):
-        return None
-    
-    def update(self, instance, validated_data):
-        return None
     
 class PostCreateSerializer(serializers.ModelSerializer):
     attachments = PostAttachmentSerializer(many=True, required=False)
@@ -182,16 +175,16 @@ class CommentCreateSerializer(serializers.ModelSerializer):
         post = self.context.get("post")
 
         attachments = validated_data.pop("attachments")
-
         try:
-            comment_instance = CommentService(post=post, user=user)
-            comment = comment_instance.add_comment(**validated_data)
-
+            comment_instance = CommentService()
+            comment = comment_instance.add_comment(post=post, user=user, message=validated_data['message'])
             if attachments:
-                PostAttachment.objects.bulk_create([
-                    PostAttachment(comment=comment, **data)
-                    for data in attachments
-                ])
+                PostAttachment.objects.bulk_create(
+                [PostAttachment(
+                    comment=comment, attachment_type=data['attachment_type'], 
+                    attachmentURL=data['attachmentURL']
+                    ) for data in attachments]
+            )
         except Exception as e:
             raise Exception(e)
 
@@ -201,13 +194,14 @@ class CommentCreateSerializer(serializers.ModelSerializer):
         instance.message = validated_data.get("message", instance.message)
 
         if "attachments" in validated_data:
-            instance_attachment = instance.attachment.all().delete()
+            instance_attachment = instance.attachments.all().delete()
+            attachments = validated_data.pop("attachments")
             PostAttachment.objects.bulk_create([
                 PostAttachment(comment=instance, **data)
-                for data in validated_data['attachments']
+                for data in attachments
             ])
 
-        validated_data.pop("attachments")
+        
         super().update(instance, validated_data)
     
         return instance
@@ -215,15 +209,15 @@ class CommentCreateSerializer(serializers.ModelSerializer):
 class RepostSerializer(serializers.ModelSerializer):
     
     class Meta:
-        model = Post
+        model = Repost
         fields = [
-            "repost_quote"
+            "comment"
         ]
 
-    def validated_repost_quote(self, value):
+    def validated_comment(self, value):
 
-        if value and not isinstance(value, str) or len(value) < 3:
-            raise serializers.ValidationError(_("Your repost quote is Invalid"))
+        if value and not isinstance(value, str) or len(value) < 1:
+            raise serializers.ValidationError(_("Add a meaningful comment"))
         return  value.strip()
 
     def create(self, validated_data):
@@ -231,20 +225,25 @@ class RepostSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         post = self.context['post'] 
 
-        if Post.is_active_objects.filter(user=user, parent=post).exists():
+        if Repost.objects.filter(reposted_by=user, original_post=post).exists():
             raise serializers.ValidationError("You already reposted this post")
         
         if not post.is_reposted:
             post.is_reposted = True
         try:
             validated_data.update({
-                "user": user,
-                "parent": post,
-                "reposted_at": timezone.now()
+                "reposted_by": user,
+                "original_post": post,
             })
         
             repost = super().create(validated_data)
             post.save()
+
+            if "comment" in validated_data:
+                Post.objects.create(
+                    user=user, post_content=validated_data['comment'], 
+                    post_type=Post.PostType.GENERAL
+                )
         except Exception as e:
             raise serializers.ValidationError(e)
         return repost

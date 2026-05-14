@@ -1,9 +1,12 @@
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
-from .models import UserAddress, UserModel
+from .models import UserAddress
 from .services.address_services import AddressService
 # from ..serializers import BaseProfileReadSerializer
+from django.contrib.auth import get_user_model
+
+UserModel = get_user_model()
 
 
 class AddressCreateSerializer(serializers.ModelSerializer):

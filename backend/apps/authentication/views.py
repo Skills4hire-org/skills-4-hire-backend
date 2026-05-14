@@ -73,6 +73,7 @@ class RegistrationViewSet(viewsets.ModelViewSet):
         registration_result = registrations_service.register_service()
         return Response({
                 "status": "success",
+                "create_connection_websocket": f"ws/user/{registration_result.user_id}/",
                 "detail": "Registration successful. Verify your account using the OTP sent to your email"},
             status=status.HTTP_201_CREATED,
         )

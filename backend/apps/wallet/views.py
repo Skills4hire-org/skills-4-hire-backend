@@ -52,7 +52,6 @@ class WalletViewSet(viewsets.GenericViewSet):
 
         return user_wallet
 
-    @method_decorator(cache_page(60 * 5))
     @action(methods=['get'], detail=False, url_path="wallet")
     def wallet(self, request, *args, **kwargs):
 
@@ -234,9 +233,8 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
             webhook_event.status = WebhookEvent.Status.PROCESSING
             webhook_event.save(update_fields=['status'])
 
-            reason = data['reason']
-
             if event != "charge.success":
+                reason = data['reason']
                 if reason.startswith("Referral-WithDrawal"):
                     # handles transfer verification for referral withdrawal
                     EVENT_HANDLERS[event] = process_transfer_verification

@@ -357,6 +357,7 @@ class UserReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
+            "user_id",
             "email", "first_name", "total_reviews",
             "last_name", "is_provider", "is_customer",
             "is_verified", "profile", "avg_rating", 

@@ -24,7 +24,6 @@ class WalletTransactionSummarySerializer(serializers.ModelSerializer):
             'reference_key'
         ]
 
-
 class WalletDetailSerializer(serializers.ModelSerializer):
     available_balance = serializers.DecimalField(
         source="balance", read_only=True,
@@ -60,7 +59,7 @@ class WalletDetailSerializer(serializers.ModelSerializer):
 
         recent_transactions = [
             tx for tx in active_transactions
-            if tx.transaction_date >= boundary_date
+            if tx.transaction_date.date() >= boundary_date
         ]
 
         return WalletTransactionSummarySerializer(
@@ -89,9 +88,10 @@ class DepositSerializer(serializers.ModelSerializer):
     
     def validate_idempotency_key(self, value):
         try:
-            uuid.UUID(value)
+            if not isinstance(value, uuid.UUID):
+                raise serializers.ValidationError("Not a valid uuid instance 'idempotency key'")
         except Exception as e:
-            raise serializers.ValidationError(f"Error validatind idempotency_key: {e}")
+            raise serializers.ValidationError(f"Error validating idempotency_key: {e}")
         return value
     
 

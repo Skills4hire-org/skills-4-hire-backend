@@ -1,16 +1,11 @@
 from django.db import  models
-from django.contrib.auth import  get_user_model
 from django.utils import timezone
-
-from ..base_model import BaseProfile
-
 from postal_regex.validator import validate as _validate_postal_code
-
 import uuid
 import logging
 
 logger = logging.getLogger(__name__)
-UserModel = get_user_model()
+
 
 
 class UserAddress(models.Model):
@@ -19,16 +14,15 @@ class UserAddress(models.Model):
         max_length=20, primary_key=True,
         unique=True, db_index=True,
         default=uuid.uuid4
-    )
-
-    user_profile = models.ForeignKey(BaseProfile, on_delete=models.CASCADE, related_name="addresses")
+    ) 
+    user_profile = models.ForeignKey("users.BaseProfile", on_delete=models.CASCADE, related_name="addresses")
 
     street_address = models.CharField(max_length=255)
     apartment = models.CharField(max_length=100, blank=True)
 
     city = models.CharField(max_length=100)
     state = models.CharField(max_length=100)
-    postal_code = models.CharField(max_length=20)
+    postal_code = models.CharField(max_length=20, null=True)
     country = models.CharField(max_length=100)
     is_default = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
