@@ -101,7 +101,7 @@ class ProfileViewSet(viewsets.GenericViewSet):
         else:
             raise ValueError("Invalid user obj")
 
-    @method_decorator(cache_page(60 * 5))
+    @method_decorator(cache_page(60 * 2))
     @action(methods=['get', 'patch'], detail=False, url_path="me")
     def me(self, request, *args, **kwargs):
         user = request.user

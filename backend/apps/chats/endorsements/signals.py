@@ -3,7 +3,7 @@ from django.db.models.signals import post_save
 from django.conf import settings
 
 from .models import Endorsements
-from ...authentication.helpers import _send_email_to_user
+from ...authentication.helpers import send_email_to_user
 from .helpers import generate_context_for_endorsement_email
 
 import logging
@@ -36,7 +36,7 @@ def send_provider_endorsement_message(sender, instance, created, **kwargs):
         sender_full_name=sender_full_name
     )
     try:
-        _send_email_to_user(context)
+        send_email_to_user(context)
     except Exception as exc:
         logger.exception(f"Error: {str(exc)}")
     

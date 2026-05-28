@@ -64,6 +64,7 @@ class RecommendationService:
         category: str = None,
         location: str = None,
         exclude_seen: bool = True,
+        include_offers: bool = False,
         limit: int = 20,
         offset: int = 0
     ) -> list:
@@ -83,7 +84,8 @@ class RecommendationService:
         # Layer 1: Candidate Generation
         candidates = self._get_candidates(
             category=category,
-            exclude_seen=exclude_seen
+            exclude_seen=exclude_seen,
+            include_offers=include_offers
         )
         
         if not candidates:
@@ -113,7 +115,7 @@ class RecommendationService:
         return paginated
     
 
-    def _get_candidates(self, category: str = None, exclude_seen: bool = True) -> QuerySet:
+    def _get_candidates(self, category: str = None, exclude_seen: bool = True, include_offers: bool = False) -> QuerySet:
         """
         Generate candidates: published posts created in last N days that the user
         hasn't seen and didn't create themselves.
@@ -121,6 +123,7 @@ class RecommendationService:
         Args:
             category: Optional category slug to filter
             exclude_seen: Whether to exclude already-viewed posts
+            include_offers: Whether to include offer posts
             
         Returns:
             Optimized QuerySet of candidate posts
@@ -151,6 +154,10 @@ class RecommendationService:
         if category:
             candidates = candidates.filter(tags__name__icontains=category)
         
+        # Optionally filter out offers if include_offers
+        if include_offers:
+            candidates = candidates.filter(post_type=Post.PostType.JOB)
+            
         # Optimize query with select_related and prefetch_related
         candidates = candidates.select_related(
             'user',

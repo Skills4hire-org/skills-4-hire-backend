@@ -107,7 +107,6 @@ class ReferralWithdrawalSerializer(serializers.ModelSerializer):
         to_local_bank = self.context['local_bank']
 
         if not to_local_bank:
-
             with transaction.atomic():
                 transaction_service = TransactionService()
                 transaction_service.process_completed_transaction(transaction_instance)

@@ -17,6 +17,7 @@ from ..authentication.serializers import UserReadSerializer
 from apps.wallet.services import WalletService
 from ..wallet.services import get_calculated_transaction
 from ..ratings.services.reviews import ReviewService
+from ..notification.consumers import broadcast_notification
 
 from decimal import Decimal
 import logging
@@ -94,10 +95,13 @@ class BookingCreateSerializer(serializers.ModelSerializer):
                 defaults=address
             )
 
-        booking_instance = BookingService().create_booking(
-            customer=request.user, provider=provider_profile,
-            **validated_data
-        )
+        try:
+            booking_instance = BookingService().create_booking(
+                customer=request.user, provider=provider_profile,
+                **validated_data
+            )
+        except Exception as exc:
+            raise serializers.ValidationError(str(exc))
 
         if attachment is not None:
             BookingAttachments.objects.bulk_create([
@@ -310,8 +314,14 @@ class PaymentRequestSerializer(serializers.ModelSerializer):
             BookingAttachments.objects.bulk_create([
                 BookingAttachments(payment_request=payment_request_instance, **data)
                 for data in attachments
-            ]
-            )
+            ])
+        try:
+            broadcast_notification("payment_request", {
+                "sender": user, "receiver": booking_instance.customer,
+                'amount': amount, "is_credit": False, "is_debit": False
+            })
+        except Exception as exc:
+            logger.error("Exception while sending message to websocket")
 
         return payment_request_instance
 

@@ -52,6 +52,8 @@ DJANGO_SETTINGS_MODULE=env("DJANGO_SETTINGS_MODULE")
 # Channels Config
 ASGI_APPLICATION = "config.asgi.application"
 
+DJANGO_ALLOW_ASYNC_UNSAFE = False
+
 # Application definition
 
 INSTALLED_APPS = [

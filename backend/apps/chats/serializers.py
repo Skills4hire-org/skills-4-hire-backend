@@ -47,7 +47,6 @@ class MessageSerializer(serializers.ModelSerializer):
             'sender',
             'sender_id',
             'content',
-            'body',
             'is_read',
             'is_edited',
             'created_at',

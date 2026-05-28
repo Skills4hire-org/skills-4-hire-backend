@@ -11,7 +11,7 @@ from .serializers import (
 )
 from .utils.helpers import create_otp_for_user
 from .helpers import (
-    _send_email_to_user,
+    send_email_to_user,
     _get_user_by_email,
     _get_code_instance_or_none,
     blacklist_outstanding_token,
@@ -73,7 +73,7 @@ class RegistrationViewSet(viewsets.ModelViewSet):
         registration_result = registrations_service.register_service()
         return Response({
                 "status": "success",
-                "create_connection_websocket": f"ws/user/{registration_result.user_id}/",
+                "create_connection_websocket": f"/ws/user/{registration_result.user_id}/",
                 "detail": "Registration successful. Verify your account using the OTP sent to your email"},
             status=status.HTTP_201_CREATED,
         )
@@ -121,7 +121,7 @@ class ResendOtpViewSet(viewsets.ModelViewSet):
                 code=code, email=user.email, 
                 full_name=user.full_name
                 )
-            _send_email_to_user(context)
+            send_email_to_user(context)
 
             return Response(
                 {"status": "success", "detail": "OTP code sent. check your email address"}, 
@@ -148,7 +148,7 @@ class PasswordResetRequestViewSet(viewsets.ModelViewSet):
             context = generate_context_for_password_reset(code, valid_email, name=user.full_name)
         except Exception:
             raise
-        send_email = _send_email_to_user(context)
+        send_email = send_email_to_user(context)
         if not send_email.get("success"):
             return Response({"status": "Failed", "detail": "email notification Failed"})
         return Response(

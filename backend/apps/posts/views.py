@@ -430,6 +430,11 @@ class FeedListView(ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = FeedPostSerializer
     pagination_class = CustomPostPagination
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = [
+        "amount", "post_type", "country", "state", "city",
+        "post_title", "tags__name", ""
+    ]
     
     def get_queryset(self):
         """
@@ -452,7 +457,8 @@ class FeedListView(ListAPIView):
         # Parse query parameters
         category = request.query_params.get('category', None)
         location = request.query_params.get('location', None)
-        exclude_seen = request.query_params.get('exclude_seen', False).lower() == 'true'
+        exclude_seen = request.query_params.get('exclude_seen', False)
+        include_offers = request.query_params.get('include_offers', False)
         
         try:
             limit = min(int(request.query_params.get('limit', 20)), 50)
@@ -471,6 +477,7 @@ class FeedListView(ListAPIView):
                 category=category,
                 location=location,
                 exclude_seen=exclude_seen,
+                include_offers=include_offers,
                 limit=limit,
                 offset=offset
             )
@@ -486,7 +493,8 @@ class FeedListView(ListAPIView):
         self._record_feed_impressions(request.user, feed_posts)
         
         # Serialize the results with recommendation scores
-        page = self.paginate_queryset(feed_posts)
+        filtered_post = self.filter_queryset(feed_posts)
+        page = self.paginate_queryset(filtered_post)
         serialized_posts = []
         for item in page:
             post = item['post']

@@ -280,7 +280,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         password = attrs.get("password")
         email = attrs["email"]
-        valid_email = validate_email(email)
+        valid_email = validate_email(email=email, check_deliverability=True)
 
         if valid_email is None:
             raise serializers.ValidationError(_("email returned none when verifying email address"))
@@ -297,12 +297,8 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         
         self.user = user
         data = super().validate(attrs)
-        data.update({"user_data": {
-            "user_id": user.pk, "email": user.email,
-            "name": getattr(user, "full_name") or "",
-            'is_customer': user.is_customer,
-            'is_provider': user.is_provider
-        }})
+        serializer = UserReadSerializer(user, context=self.context)
+        data.update({"user_data": serializer.data})
         self.user.last_login = timezone.now()
         self.user.save()
 

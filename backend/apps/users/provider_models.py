@@ -39,23 +39,12 @@ class ProviderModel(models.Model):
     experience_level  = models.CharField(max_length=20, choices=ExperienceLevel.choices, default=ExperienceLevel.ENTRY)
     availability = models.CharField(max_length=20, choices=AvailabilityStatus.choices,default=AvailabilityStatus.PARTIALLY)
 
-    min_charge = models.DecimalField(max_digits=10, decimal_places=2, blank=True, null=True)
-    max_charge = models.DecimalField(decimal_places=2, max_digits=10, blank=True, null=True)
-    hourly_pay = models.DecimalField(max_digits=10, decimal_places=2, blank=True , null=True)
-
-    years_of_experience =  models.PositiveSmallIntegerField(default=0)
-
     open_to_full_time = models.BooleanField(
         default=False,
         help_text=_("Willing to convert to full-time employment."),
     )
 
-
-    is_featured = models.BooleanField(default=False, db_index=True)
     description = models.TextField(blank=True)
-
-    jobs_done = models.PositiveIntegerField(default=0, blank=True, null=True)
-    is_top_rated = models.BooleanField(default=False, db_index=True)
 
     is_active = models.BooleanField(default=True, db_index=True)
 
@@ -81,12 +70,6 @@ class ProviderModel(models.Model):
         verbose_name_plural = _("Professional Profiles")
         indexes = [
             models.Index(fields=["availability"]),
-            models.Index(fields=["hourly_pay"]),
-            models.Index(fields=["jobs_done"]),
-            models.Index(fields=["min_charge"]),
-            models.Index(fields=["max_charge"]),
-            models.Index(fields=["experience_level"]),
-            models.Index(fields=["is_top_rated", "is_featured"]),
             models.Index(fields=['professional_title'])
         ]
 

@@ -15,7 +15,7 @@ APP_NAME = getattr(settings, "APP_NAME", "Skill4Hire")
 
 def send_mail_base(context: dict) :
     """
-    Docstring for _send_mail_base
+    Docstring for send_mail_base
     
     :param context: Description
     :type context: dict
@@ -23,7 +23,6 @@ def send_mail_base(context: dict) :
     :rtype: bool
     """
     context.update({"app_name": APP_NAME})
-    logger.debug(context)
     try:
         html_content = render_to_string(context.get("template_name"), context)
         subject = context.get("subject")
@@ -31,7 +30,7 @@ def send_mail_base(context: dict) :
         
         send_mail(
             subject=subject,
-            from_email="noreply@skills4hireapp.com",
+            from_email="skills4hireofficial@gmail.com",
             recipient_list=[to_email],
             fail_silently=False,
             message='',

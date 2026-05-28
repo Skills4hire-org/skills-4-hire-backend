@@ -18,9 +18,9 @@ import email_validator
 logger  = logging.getLogger(__name__)
 User = get_user_model()
 
-def _send_email_to_user(context: dict):
+def send_email_to_user(context: dict):
     """
-    Docstring for _send_email_to_user
+    Docstring for send_email_to_user
     
     :param subject: Description
     :type subject: str
@@ -77,9 +77,12 @@ def blacklist_outstanding_token(user):
     except Exception as exc:
         raise ValidationError(F"Error blacklisting tokens: {exc}")
 
-def validate_email(email):
+def validate_email(email, check_deliverability=False):
     try:
-        valid_email = email_validator.validate_email(email, check_deliverability=True)
+        valid_email = email_validator.validate_email(
+            email,
+            check_deliverability=check_deliverability,
+        )
     except email_validator.EmailNotValidError as exc:
         raise ValidationError("Invalid email address provided")
     return valid_email.normalized

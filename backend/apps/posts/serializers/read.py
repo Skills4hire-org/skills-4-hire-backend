@@ -1,4 +1,5 @@
 
+from django.utils import timezone
 from rest_framework import serializers
 
 from ..models import Post, PostAttachment, Comment, Repost
@@ -16,6 +17,8 @@ class GeneralPostSerializer(serializers.ModelSerializer):
     is_liked = serializers.SerializerMethodField()
     is_commented = serializers.SerializerMethodField()
     is_reposted = serializers.SerializerMethodField()
+    duration = serializers.SerializerMethodField()
+    post_status = serializers.SerializerMethodField()
 
     class Meta: 
         model = Post
@@ -25,9 +28,25 @@ class GeneralPostSerializer(serializers.ModelSerializer):
             "post_type", "created_at", "updated_at",
             "tags", "attachments",
             "comments_count", "likes_count", "reposts_count",
-            "is_liked", "is_commented", "is_reposted"
+            "is_liked", "is_commented", "is_reposted", "duration", "post_status"
         ]
-
+    
+    def get_duration(self, obj):
+        if obj.start_date and obj.end_date:
+            return (obj.end_date - obj.start_date).days
+        return None
+    
+    def get_post_status(self, obj):
+        if obj.post_type == Post.PostType.JOB:
+            currrent_datetime  = timezone.now()
+            if obj.end_date is None:
+                return "active"
+            end_datetime = obj.end_date
+            if end_datetime < currrent_datetime:
+                return "closed"
+        return "active"
+    
+    
     def get_is_liked(self, obj):
         user = self.context['request'].user
         if not user or not user.is_authenticated:
@@ -63,14 +82,14 @@ class JobPostSerializer(GeneralPostSerializer):
             "country", "city", "state",
             "is_reposted", 'user'
         ]
+    
 
 class PostDetailSerializer(GeneralPostSerializer):
     user = UserReadSerializer(read_only=True)
-
     class Meta(GeneralPostSerializer.Meta):
         model = GeneralPostSerializer.Meta.model
         fields = GeneralPostSerializer.Meta.fields + [
-            "is_reposted", "user"
+            "is_reposted", "user"   
         ]
 
 class CommentListSerializer(serializers.ModelSerializer):

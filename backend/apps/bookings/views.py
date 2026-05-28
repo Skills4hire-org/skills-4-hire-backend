@@ -17,6 +17,7 @@ from .permissions import IsCustomer, IsBookingParticipants, IsProvider, IsReques
 from .paginations import CustomBookingPagination, CustomPaymentRequestPagination
 from .services import BookingService
 from .booking_transaction import transaction_ready_exists
+from ..notification.consumers import broadcast_notification
 
 
 from django.db.models import Q
@@ -60,7 +61,7 @@ class BookingViewSet(viewsets.ModelViewSet):
 
         idempotency = serializer.validated_data['idempotency_key']
         user = request.user
-
+        status = serializer.validated_data['status']
         if transaction_ready_exists(user, idempotency=idempotency)[0]:
 
             return Response(
@@ -71,8 +72,15 @@ class BookingViewSet(viewsets.ModelViewSet):
                     'data': BookingTransactionSerializer(transaction_ready_exists(user, idempotency)[1]).data
                 }
             )
-
         saved_booking = serializer.save()
+        try:
+            if status == "ACCEPT": 
+                broadcast_notification("booking_approved", {"booking": saved_booking})
+            else:
+                broadcast_notification("booking_rejected", {'booking': saved_booking})
+        except Exception as exc:
+            logger.error("Exception while broadcasting message to websocket")
+
         output_serializer = BookingSerializer(saved_booking).data
         return Response(output_serializer, status=status.HTTP_200_OK)
 
@@ -110,7 +118,7 @@ class BookingViewSet(viewsets.ModelViewSet):
 
         if transaction_ready_exists(user, idempotency=idempotency)[0]:
     
-            logger.info("Dublicate Booking Found, returning the initial request")
+            logger.info("Dublicate Booking Transaction Found, returning the initial request")
 
             return Response(
                 status=status.HTTP_200_OK,
@@ -122,6 +130,11 @@ class BookingViewSet(viewsets.ModelViewSet):
             )
         
         created_booking = serializer.save()
+        try:
+            broadcast_notification("booking_made", {'booking': created_booking})
+        except Exception as exc:
+            logger.info(f"Failed to broadcast message to consumer: {exc}")
+
         output_serializer = BookingSerializer(created_booking).data
         return Response(output_serializer, status=status.HTTP_201_CREATED)
 

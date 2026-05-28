@@ -7,15 +7,14 @@ from rest_framework.exceptions import PermissionDenied
 
 import validators
 
-from ..base_model import BaseProfile
+from ..base_model import BaseProfile, WorkImages
 from ..customer_models import CustomerModel
 from ..profile_avater.serializers import AvatarDetailSerializer
 from ..profile_services.customer_profile import CustomerService
 from ..profile_services.provider_profile import ProviderProfileServices
 from ..profile_services.utils import get_profile_avatar
 from ..provider_models import ProviderModel
-from ..address.serializers import AddressDetailSerializer
-from ..services.models import ServiceAttachment
+from ..services.models import ServiceAttachment, ServiceCategory
 from ..skills.serializers import ProviderSkillListSerializer
 
 def save_base_profile_with_serializer(base_profile, validated_data, request):
@@ -27,13 +26,49 @@ def save_base_profile_with_serializer(base_profile, validated_data, request):
 
     serializer.save()
 
+
+class WorkImagesSerializer(serializers.Serializer):
+    class Meta:
+        model = WorkImages
+        fields = [
+            "image_url", "description"
+        ]
+
+    def validate_image_url(self, value):
+        if value and not validators.url(value):
+            raise serializers.ValidationError("Invalid image URL")
+        return value
+    
+    def validate_description(self, value):
+        if value and len(value) > 255:
+            raise serializers.ValidationError("Description exceeded max length")
+        return value.strip().title()
+    
+    def create(self, validated_data):
+        return super().create(validated_data)
+
 class BaseProfileCreateSerializer(serializers.ModelSerializer):
+    work_images = WorkImagesSerializer(many=True, required=False, read_only=True)
+    category_interest = serializers.PrimaryKeyRelatedField(
+        queryset=ServiceCategory.objects.all(), required=False, allow_null=True,
+        many=True
+    )
     class Meta:
         model = BaseProfile
         fields = [
-            "gender", "display_name",
-            "country", "city", "bio", "location",
+            "gender", "display_name", "country", 
+            "city", "bio", "location", "work_images", 
+            "category_interest", "years_of_experience", "is_certified",
+            "place_of_work", "phone_number", "nin", "date_of_birth",
+            "drivers_lisence", "passport", "certificates"
         ]
+    
+    
+    def validate_nin(self, value):
+        if value and len(value) != 11:
+            raise serializers.ValidationError("Invalid NIN")
+        return value
+
 
     def validate_bio(self, value):
         if len(value) > 1_000:
@@ -51,25 +86,20 @@ class BaseProfileCreateSerializer(serializers.ModelSerializer):
             value = user.full_name or user.username
         return value.title()
 
-    def validate(self, data):
-        for value in data.values():
-            value = value.strip()
-        return data
-
     def update(self, instance: BaseProfile, validated_data: dict):
-
-        if not isinstance(instance, BaseProfile):
-            raise serializers.ValidationError("Invalid profile type")
+        work_images_data = validated_data.pop("work_images", None)
 
         user = self.context.get("request").user
         if instance.user != user:
-            raise PermissionDenied()
+            raise PermissionDenied("You do not have permission to update this profile.")
 
-        for key, value in validated_data.items():
-            if hasattr(instance, key):
-                setattr(instance, key, value)
-        instance.save()
-        return instance
+        if work_images_data is not None:
+            serializer = WorkImagesSerializer(data=work_images_data, many=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save(profile=instance)
+
+        validated_data['user'] = instance.user
+        return super().update(instance, validated_data)
 
 class BaseProfileListSerializer(serializers.ModelSerializer):
     avatar = AvatarDetailSerializer(read_only=True)
@@ -109,49 +139,32 @@ class ProviderProfileUpdateCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProviderModel
         fields = [
-            "professional_title",
-            "headline", "overview", "profile",
-            "experience_level", "availability",
-            "min_charge", "max_charge", "hourly_pay",
-            "years_of_experience", "open_to_full_time",
-            "jobs_done",
+            "professional_title", "headline", 
+            "overview", "profile","experience_level", 
+            "availability",
         ]
 
     def validate(self, data):
         for value in data.values():
             if isinstance(value, str):
                 value.strip()
-
         return data
-
-    @transaction.atomic
-    def create(self, validated_data):
-        user = self.context.get("request").user
-        base_profile = user.profile
-        if "profile" in validated_data:
-            user_base_profile_data = validated_data.get("profile")
-            save_base_profile_with_serializer(
-                base_profile, user_base_profile_data, self.context.get("request"))
-            validated_data.pop("profile")
-        try:
-            user_profile = ProviderProfileServices()\
-                .create_provider_profile(base_profile, validated_data)
-        except Exception as e:
-            raise serializers.ValidationError(str(e))
-        return user_profile
 
     def update(self, instance, validated_data):
         user = self.context.get("request").user
         if instance.profile.user != user:
              raise PermissionDenied()
 
+        profile = getattr(user, "profile", None)
+        if profile is None:
+            raise serializers.ValidationError("profile not found for provider")
+
         if "profile" in validated_data:
-            base_profile_data = validated_data.get("profile")
-            save_base_profile_with_serializer(
-                instance.profile, base_profile_data, self.context.get("request"))
-
-            validated_data.pop("profile")
-
+            profile_data = validated_data.pop('profile')
+            serializer = BaseProfileCreateSerializer(profile, data=profile_data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            serializer.save()
+            
         updated_profile = super().update(instance, validated_data)
         return updated_profile
 
@@ -168,7 +181,6 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
             fields = [
                 "provider_id", "professional_title",
                 "headline", "overview", "profile",
-                "min_charge", "max_charge",
                 "created_at", "endorsement_count", "posts",
                 'comments', 'images', "skills"
             ]
@@ -215,7 +227,7 @@ class ProviderProfilePublicSerializer(serializers.ModelSerializer):
         fields = [
             "provider_id", "profile", "professional_title",
             "avg_rating", "total_reviews", "skills", 
-            "min_charge", "max_charge", "overview", "headline"
+            "overview", "headline"
         ]
 
     def get_avg_rating(self, obj: ProviderModel):

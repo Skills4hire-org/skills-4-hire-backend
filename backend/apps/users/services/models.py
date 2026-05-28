@@ -5,7 +5,6 @@ from django.core.exceptions import ValidationError
 
 from ..provider_models import ProviderModel
 
-
 class ServiceCategory(models.Model):
 
     service_category_id = models.UUIDField(

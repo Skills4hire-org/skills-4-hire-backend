@@ -32,7 +32,7 @@ class Notification(models.Model):
         ]
     
     def __str__(self):
-        return "Notification Service ({}, {})".format(self.user.email, self.event)
+        return "Notification Service"
     
     def mark_as_read(self):
         with transaction.atomic():

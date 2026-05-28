@@ -14,9 +14,9 @@ django_asgi_app = get_asgi_application()
 from channels.routing import ProtocolTypeRouter, URLRouter
 from channels.auth import AuthMiddlewareStack
 from apps.chats.routing import chats_urlpatterns 
-from apps.authentication.routing import userpatterns 
+from apps.notification.routings import notificationpatterns 
 
-combined_patterns = chats_urlpatterns + userpatterns
+combined_patterns = chats_urlpatterns + notificationpatterns
 
 application = ProtocolTypeRouter({
     "http": django_asgi_app,

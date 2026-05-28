@@ -2,8 +2,6 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 
 from .models import Bookings, ProviderModel, PaymentRequestBooking, BookingTransaction
-from ..notification.events import NotificationEvents
-from .exceptions import DuplicateBookingError
 from .booking_transaction import process_transaction
 from apps.wallet.services import WalletService, lock_booking, refund_booking, get_calculated_transaction
 
@@ -96,6 +94,7 @@ class BookingService:
             except Exception as e:
                 logger.exception(f"Failed to create booking: {e}", exc_info=True)
                 transaction_status = False
+                raise
 
             if booking:
                 process_transaction(

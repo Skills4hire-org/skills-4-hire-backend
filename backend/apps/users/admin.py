@@ -54,7 +54,7 @@ class AvaterAdmin(admin.ModelAdmin):
 
 @admin.register(ServiceCategory)
 class ServiceCategoryAdmin(admin.ModelAdmin):
-    list_display = ['name', 'created_at']
+    list_display = ['service_category_id', 'name', 'created_at']
     list_filter = ['name']
 
 @admin.register(Service)
@@ -77,11 +77,9 @@ class BaseProfileManage(admin.ModelAdmin):
 class ProviderModelAdmin(admin.ModelAdmin):
     list_display = ["profile__display_name",
                     "professional_title",
-                    "availability",
-                    "years_of_experience",
-                    "open_to_full_time", 'is_active']
+                    "availability", 'is_active']
 
-    list_filter = ['is_active', "profile__display_name", "years_of_experience"]
+    list_filter = ['is_active', "profile__display_name"]
     list_per_page = 50
 
 @admin.register(CustomerModel)
