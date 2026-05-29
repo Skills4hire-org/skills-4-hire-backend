@@ -10,11 +10,8 @@ from functools import wraps
 from decimal import Decimal
 
 from django.utils.html import escape
-from rest_framework.exceptions import ValidationError
-
 from  ..services.conversations import NegotiationHistoryService, Negotiations
-from ...notification.services import send_general_notification
-from ...notification.events import NotificationEvents
+
 logger = logging.getLogger(__name__)
 
 
@@ -193,33 +190,3 @@ def truncate_text(text, length=100):
     if len(text) > length:
         return text[:length] + '...'
     return text
-
-def trigger_notification(notification_type, sender, receiver):
-
-    types = Negotiations.Status.values
-    if notification_type not in types:
-        raise ValidationError("type in valid")
-
-    message = ""
-    match notification_type:
-        case Negotiations.Status.PROPOSED.value:
-            message = f"{sender.full_name} Proposed an Offer"
-        case Negotiations.Status.COUNTERED.value:
-            message = f"{sender.full_name} countered your offer"
-        case Negotiations.Status.ACCEPTED.value:
-            message = f"{sender.full_name} accepted your offer"
-        case Negotiations.Status.REJECTED.value:
-            message = f'{sender.full_name} rejected your offer'
-        case _:
-            message = None
-
-    event = NotificationEvents.MESSAGE.value
-    try:
-        send_general_notification(
-            sender=sender,
-            receiver=receiver,
-            message=message,
-            event=event
-        )
-    except Exception as e:
-        logger.exception(f"Error sending notification: {e}")

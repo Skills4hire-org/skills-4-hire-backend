@@ -137,7 +137,7 @@ class WalletTransaction(models.Model):
 
     reasons = models.TextField(null=True)
 
-    transaction_date = models.DateField(auto_now_add=True)
+    transaction_date = models.DateTimeField(auto_now_add=True)
     completed_at = models.DateTimeField(blank=True, null=True)
     failed_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(auto_now_add=True)

@@ -7,8 +7,8 @@ from .views import ReferralViewSet, ReferralTransactionViewSet
 
 router = DefaultRouter()
 
-router.register("users", ReferralViewSet, basename="referral")
-router.register("referral/withdraw", ReferralTransactionViewSet, basename='referral-withdraw')
+router.register("", ReferralViewSet, basename="referral")
+router.register("referrals-withdraw", ReferralTransactionViewSet, basename='referral-withdraw')
 
 urlpatterns = [
     path("", include(router.urls))

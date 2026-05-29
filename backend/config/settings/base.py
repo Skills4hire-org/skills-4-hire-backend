@@ -52,9 +52,12 @@ DJANGO_SETTINGS_MODULE=env("DJANGO_SETTINGS_MODULE")
 # Channels Config
 ASGI_APPLICATION = "config.asgi.application"
 
+DJANGO_ALLOW_ASYNC_UNSAFE = False
+
 # Application definition
 
 INSTALLED_APPS = [
+    "daphne",
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -250,6 +253,10 @@ CELERY_BEAT_SCHEDULE = {
     "auto_update_pending_referrals": {
         "task": "apps.referral.tasks.process_referral_conversion_task",
         "schedule": crontab(hour=0, minute=0) # run daily at midnight
+    },
+    "auto_update_trust_score": {
+        "task": "apps.bookings.tasks.auto_update_trust_score",
+        "schedule": crontab(hour=0, minute=0)
     }
 }
 CORS_ALLOWED_ORIGINS = env('CORS_ALLOWED_ORIGINS').split(",")

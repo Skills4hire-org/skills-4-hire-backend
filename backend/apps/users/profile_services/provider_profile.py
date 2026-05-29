@@ -16,7 +16,7 @@ class ProviderProfileServices:
             if validate_data is not None:
                 provider_profile = ProviderModel.objects.get_or_create(profile=user_base_profile, **validate_data)
             else:
-                provider_profile = ProviderModel.objects.get_or_create(profile=user_base_profile)
+                provider_profile = ProviderModel.objects.get_or_create(profile=user_base_profile, professional_title="new")
             setattr(user_base_profile.user, "is_provider", True)
             user_base_profile.user.save(update_fields=["is_provider"])
         except Exception as e:

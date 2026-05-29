@@ -6,7 +6,7 @@ from .address.urls import address_urlpatterns
 from .skills.urls import skills_urlpatterns
 from .services.urls import service_urlpatterns
 from .favourite.urls import favourite_urlpatterns
-from .views.onboard import OnboardViewSet
+from .views.onboard import OnboardViewSet, OnboardCompleteViewSet
 from .views.profile_management import ProfileViewSet, ProfileSearchView
 
 routers = DefaultRouter()
@@ -14,6 +14,7 @@ routers = DefaultRouter()
 routers.register("onboard", OnboardViewSet, basename="onboard")
 routers.register("profile", ProfileViewSet, basename="profile")
 routers.register("profile_search", ProfileSearchView, basename="search")
+routers.register("profile-onboard", OnboardCompleteViewSet, basename="onboard-complete")
 
 urlpatterns = [
     path("", include(routers.urls)),

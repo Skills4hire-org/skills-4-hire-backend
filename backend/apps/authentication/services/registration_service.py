@@ -24,10 +24,10 @@ class RegistrationsService(BaseService):
                 raise SerializerNotValidException
 
             # save user data if serializer is valid
-            self.serializer.save()
+            user = self.serializer.save()
 
         except Exception as exc:
             logging.error(f"error occurred: {exc}")
             raise exc
         
-        return self.serializer.validated_data
+        return user

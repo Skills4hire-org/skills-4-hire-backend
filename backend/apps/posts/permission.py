@@ -1,4 +1,4 @@
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
+from rest_framework.permissions import IsAuthenticatedOrReadOnly, BasePermission
 from typing import Any
 
 class IsOwnerOrReadOnly(IsAuthenticatedOrReadOnly):
@@ -16,3 +16,14 @@ class IsOwnerOrReadOnly(IsAuthenticatedOrReadOnly):
             return True
         # Write permissions only to owner
         return getattr(obj, 'user', None) == getattr(request, 'user', None)
+
+
+class IsComentOwner(BasePermission):
+
+    def has_object_permission(self, request, view, obj):
+        user = request.user
+
+        if user.is_superuser or user.is_staff:
+            return True
+        
+        return obj.user == user

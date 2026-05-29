@@ -9,23 +9,11 @@ class ProviderProfileFilter(django_filters.FilterSet):
     title = django_filters.CharFilter(field_name="professional_title")
     experience_level = django_filters.CharFilter(field_name='experience_level')
     availability = django_filters.CharFilter(field_name='availability')
-    min_charge = django_filters.NumberFilter(field_name='min_charge', lookup_expr='lte')
-    max_charge = django_filters.NumberFilter(field_name='max_charge', lookup_expr="gte")
-    hourly_pay = django_filters.NumberFilter(field_name="hourly_pay", lookup_expr="gte")
-
-    year_of_experience = django_filters.NumberFilter(field_name="years_or_experience")
-    open_to_full_time  = django_filters.BooleanFilter(field_name="open_to_full_time")
-
-    is_top_rated = django_filters.BooleanFilter(field_name="is_top_rated")
-
     class Meta:
         model = ProviderModel
         fields = [
             "title", "experience_level",
-            "availability", "min_charge",
-            "max_charge", "hourly_pay",
-            "year_of_experience", "open_to_full_time",
-            "is_top_rated", "provider_name"
+            "availability", "provider_name"
         ]
 
 

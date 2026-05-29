@@ -16,8 +16,8 @@ class BookingAttachmentAdmin(admin.ModelAdmin):
 @admin.register(Bookings)
 class BookingAdmin(admin.ModelAdmin):
     list_display = [
-        'booking_status', 'customer', 
-        'provider', 'price', 'is_active', 
+        'booking_status', 'customer__profile__display_name', 
+        'provider__profile__display_name', 'price', 'platform_fee', 'is_active', 
         'start_date', 'end_date', 'created_at'
  
         ]

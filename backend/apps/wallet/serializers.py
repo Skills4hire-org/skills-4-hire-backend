@@ -8,12 +8,21 @@ from ..referral.services.utils import generate_reference_key
 from .transactions.services import WalletTransactionService
 from .tasks import process_withdrawal_task
 
-
 import uuid
 import logging
+from datetime import timedelta
 from django.db import transaction
+from django.utils import timezone
 
 logger = logging.getLogger(__name__)
+
+class WalletTransactionSummarySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = WalletTransaction
+        fields = [
+            'transaction_id', 'amount', 'type', 'status',
+            'reference_key'
+        ]
 
 class WalletDetailSerializer(serializers.ModelSerializer):
     available_balance = serializers.DecimalField(
@@ -26,6 +35,8 @@ class WalletDetailSerializer(serializers.ModelSerializer):
     
     user_email = serializers.CharField(source='user.email')
 
+    transactions = serializers.SerializerMethodField()
+
     class Meta:
         model = Wallet
 
@@ -33,8 +44,27 @@ class WalletDetailSerializer(serializers.ModelSerializer):
             'wallet_id', 'user_email', 
             "is_active", 'created_at',
             'available_balance', 'overall_balance',
-            'overall_locked_balance'
+            'overall_locked_balance', "transactions"
         ]
+
+    def get_transactions(self, obj):
+
+        active_transactions = obj.wallet_transactions.filter(is_active=True).only(
+            'transaction_id', 'amount', 'type', 'status',
+            'transaction_date', 'reference_key'
+        ).order_by('-transaction_date')
+
+        boundary_day = timezone.now() - timedelta(hours=24)
+        boundary_date = boundary_day.date()
+
+        recent_transactions = [
+            tx for tx in active_transactions
+            if tx.transaction_date.date() >= boundary_date
+        ]
+
+        return WalletTransactionSummarySerializer(
+            recent_transactions, many=True
+        ).data
 
     def get_overall_balance(self, obj):
         return str(obj.get_total_balance)
@@ -58,9 +88,10 @@ class DepositSerializer(serializers.ModelSerializer):
     
     def validate_idempotency_key(self, value):
         try:
-            uuid.UUID(value)
+            if not isinstance(value, uuid.UUID):
+                raise serializers.ValidationError("Not a valid uuid instance 'idempotency key'")
         except Exception as e:
-            raise serializers.ValidationError(f"Error validatind idempotency_key: {e}")
+            raise serializers.ValidationError(f"Error validating idempotency_key: {e}")
         return value
     
 

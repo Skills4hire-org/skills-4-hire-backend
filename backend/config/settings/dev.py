@@ -34,21 +34,29 @@ if DEBUG:
 # CELERY_BROKER_URL = env("redis://localhost:6379/0", default="redis://redis:6379/0")
 # CELERY_RESULT_BACKEND = env("PRODUCTION_REDIS_URL", default="redis://redis:6379/1")
 
-import ssl
-
 CACHES = {
     "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION":env("DEVELOPMENT_REDIS"),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            # "CONNECTION_POOL_KWARGS": {
-            #     "ssl_cert_reqs": ssl.CERT_NONE 
-            #    }
-                  
-       }
+        "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+        "LOCATION": "unique-snowflake",
+        "TIMEOUT": 300,
     }
 }
+
+# Uncomment below to use Redis (ensure Redis is running on the port specified)
+# CACHES = {
+#     "default": {
+#         "BACKEND": "django_redis.cache.RedisCache",
+#         "LOCATION": env("DEVELOPMENT_REDIS"),
+#         "OPTIONS": {
+#             "CLIENT_CLASS": "django_redis.client.DefaultClient",
+#             "CONNECTION_POOL_KWARGS": {
+#                 "socket_connect_timeout": 5,  # 5 second timeout
+#                 "socket_timeout": 5,
+#                 "retry_on_timeout": False,
+#             },
+#         }
+#     }
+# }
 
 
 # CELERY_BROKER_USE_SSL = {

@@ -1,7 +1,7 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
 
-from .helpers import _send_email_to_user
+from .helpers import send_email_to_user
 from .utils.helpers import create_otp_for_user
 from .utils.template_helpers import genrate_context_for_otp
 
@@ -15,9 +15,9 @@ class EmailNotifTest(TestCase):
     def setUp(self):
         user = User.objects.create_user(email="test_user@example.com", password="0987poiu")
 
-    # def test_send_email_to_user(self):
+    # def testsend_email_to_user(self):
     #     user = User.objects.first()
-    #     result = _send_email_to_user()
+    #     result = send_email_to_user()
     #     print(result)
 
     def test_generate_context(self):

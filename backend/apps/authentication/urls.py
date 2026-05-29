@@ -16,7 +16,7 @@ router = DefaultRouter()
 router.register("verify", AccountVerificationViewSet, basename="account_verify")
 router.register("resend/otp", ResendOtpViewSet, basename="otp_resend")
 router.register("password/reset", PasswordResetRequestViewSet, basename="password_reset")
-router.register("password/reset/confirm", PasswordResetConfirmViewSet, basename="password_reset_confirm")
+router.register("password/reset-confirm", PasswordResetConfirmViewSet, basename="password_reset_confirm")
 router.register("logout", LogOutViewSet, basename="logout")
 router.register("register", RegistrationViewSet, basename='register')
 

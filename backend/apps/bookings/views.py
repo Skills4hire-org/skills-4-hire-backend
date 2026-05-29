@@ -17,6 +17,7 @@ from .permissions import IsCustomer, IsBookingParticipants, IsProvider, IsReques
 from .paginations import CustomBookingPagination, CustomPaymentRequestPagination
 from .services import BookingService
 from .booking_transaction import transaction_ready_exists
+from ..notification.consumers import broadcast_notification
 
 
 from django.db.models import Q
@@ -32,7 +33,9 @@ logger = logging.getLogger(__name__)
 class BookingViewSet(viewsets.ModelViewSet):
     pagination_class = CustomBookingPagination
     filter_backends = [DjangoFilterBackend]
-    filterset_fields = ['booking_status']
+    filterset_fields = {
+        "booking_status": ['icontains']
+    }
 
     http_method_names = ['post', 'get', 'patch', 'delete']
 
@@ -43,29 +46,41 @@ class BookingViewSet(viewsets.ModelViewSet):
             return AcceptRejectSerializer
         if self.action == 'retrieve':
             return BookingDetailSerializer
+        if self.action == 'request_payout':
+            return PaymentRequestSerializer
         return BookingSerializer
 
-    @action(methods=['patch'], detail=False, url_path='accept_or_reject')
+    @action(methods=['patch'], detail=True, url_path='accept_or_reject')
     def accept_or_reject(self, request, *args, **kwargs):
 
-        serializer = self.get_serializer(data=request.data)
+        booking = self.get_object()
+        serializer = self.get_serializer(
+            data=request.data, context={"request": request, "booking": booking})
+        
         serializer.is_valid(raise_exception=True)
 
         idempotency = serializer.validated_data['idempotency_key']
         user = request.user
-
+        status = serializer.validated_data['status']
         if transaction_ready_exists(user, idempotency=idempotency)[0]:
 
             return Response(
-                status=status.HTTP_200_OK,
+                status=status.HTTP_409_CONFLICT,
                 data={
                     "status": "success",
                     'msg': "Found duplicate transaction",
                     'data': BookingTransactionSerializer(transaction_ready_exists(user, idempotency)[1]).data
                 }
             )
-
         saved_booking = serializer.save()
+        try:
+            if status == "ACCEPT": 
+                broadcast_notification("booking_approved", {"booking": saved_booking})
+            else:
+                broadcast_notification("booking_rejected", {'booking': saved_booking})
+        except Exception as exc:
+            logger.error("Exception while broadcasting message to websocket")
+
         output_serializer = BookingSerializer(saved_booking).data
         return Response(output_serializer, status=status.HTTP_200_OK)
 
@@ -73,19 +88,25 @@ class BookingViewSet(viewsets.ModelViewSet):
         """" A base queryset to fetch all booking associated to the request.user"""
         if getattr(self, "swagger_fake_view", False):
             return Bookings.objects.none()
+        
         user = self.request.user
-        queryset = (
-            Bookings.objects.filter(
-                Q(customer=user) |
-                Q(provider=user.profile.provider_profile)
-            ).select_related("customer", 'provider', 'address', 'cancelled_by', 'accepted_by')
-            .prefetch_related("attachments")
-        )
+        queryset =  (
+            Bookings.objects.select_related(
+                "customer", 'provider', 'address', 'cancelled_by', 'accepted_by'
+                ).prefetch_related("attachments")
+        )   
+        if user.is_customer:
+            queryset = queryset.filter(customer=user)
+        else:
+            queryset = queryset.filter(provider=user.profile.provider_profile)
+
         return queryset
 
     def get_permissions(self):
         if self.action in ("create", "partial_update", "destroy"):
             return [IsCustomer()]
+        if self.action == 'request_payout':
+            return [IsProvider()]
         return [IsBookingParticipants()]
 
     def create(self, request, *args, **kwargs):
@@ -97,7 +118,7 @@ class BookingViewSet(viewsets.ModelViewSet):
 
         if transaction_ready_exists(user, idempotency=idempotency)[0]:
     
-            logger.info("Dublicate Booking Found, returning the initial request")
+            logger.info("Dublicate Booking Transaction Found, returning the initial request")
 
             return Response(
                 status=status.HTTP_200_OK,
@@ -109,11 +130,16 @@ class BookingViewSet(viewsets.ModelViewSet):
             )
         
         created_booking = serializer.save()
+        try:
+            broadcast_notification("booking_made", {'booking': created_booking})
+        except Exception as exc:
+            logger.info(f"Failed to broadcast message to consumer: {exc}")
+
         output_serializer = BookingSerializer(created_booking).data
         return Response(output_serializer, status=status.HTTP_201_CREATED)
 
 
-    @method_decorator(cache_page(60 * 15))
+    @method_decorator(cache_page(60 * 2))
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 
@@ -130,59 +156,50 @@ class BookingViewSet(viewsets.ModelViewSet):
             return Response(status=status.HTTP_204_NO_CONTENT)
         return Response({"detail": "Failed to delete booking instance"}, exception=True,status=status.HTTP_400_BAD_REQUEST)
 
-class BookingPaymentRequestViewSet(
-    ListModelMixin, RetrieveModelMixin,
-    viewsets.GenericViewSet):
+        
+    @action(methods=['post'], detail=True, url_path='request_payout')
+    def request_payout(self, request, *args, **kwargs):
+        booking = self.get_object()
+        serializer = self.get_serializer(data=request.data, 
+                                         context={'request': request, "booking": booking})
+        serializer.is_valid(raise_exception=True)
+        output_serializer = serializer.save()
+        return Response(RequestSerializer(output_serializer).data, status=status.HTTP_201_CREATED)
+    
+
+class BookingPaymentRequestViewSet(RetrieveModelMixin, viewsets.GenericViewSet):
 
     pagination_class = CustomPaymentRequestPagination
-
     def get_permissions(self):
-        if self.action == 'request_payout':
-            return [IsProvider()]
         if self.action == 'payment_request_review':
             return [IsCustomer()]
         return [IsRequestReceiverOrSender()]
 
     def get_serializer_class(self):
-        if self.action == 'request_payout':
-            return PaymentRequestSerializer
         if self.action == 'payment_request_review':
             return ReviewPaymentRequestSerializer
         if self.action == 'retrieve':
             return PaymentRequestDetailSerializer
         return RequestSerializer
 
-
     def get_queryset(self):
         user = self.request.user
-        queryset = (
-            PaymentRequestBooking.objects
-            .select_related("booking", "customer", 'provider')
+        queryset =PaymentRequestBooking.objects.select_related("booking", "customer", 'provider')\
             .prefetch_related("attachments_payment_request")
-            .filter(
-                Q(customer=user) |
-                Q(provider=user.profile.provider_profile)
-            )
-        )
+        
+        if user.is_customer:
+            queryset = queryset.filter(customer=user)
+        elif user.is_provider:
+            queryset = queryset.filter(provider=user.profile.provider_profile)
+    
         return queryset
 
-    
-    @method_decorator(cache_page(60 * 5))
-    def list(self, request, *args, **kwargs):
-        return super().list(request, *args, **kwargs)
+    http_method_names = ['post', "get"]
 
-    http_method_names = ['post', 'get']
-
-    @action(methods=['post'], detail=False, url_path='request_payout')
-    def request_payout(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
-        serializer.is_valid(raise_exception=True)
-        output_serializer = serializer.save()
-        return Response(RequestSerializer(output_serializer).data, status=status.HTTP_201_CREATED)
-
-    @action(methods=['post'], detail=False, url_path='review_request')
+    @action(methods=['post'], detail=True, url_path='review')
     def payment_request_review(self, request, *args, **kwargs):
-        serializer = self.get_serializer(data=request.data)
+        serializer = self.get_serializer(
+            data=request.data, context={'request': request, "payment_request": self.get_object()})
         serializer.is_valid(raise_exception=True)
 
         idempotency = serializer.validated_data['idempotency_key']
@@ -190,7 +207,6 @@ class BookingPaymentRequestViewSet(
         user = request.user
 
         if transaction_ready_exists(user, idempotency=idempotency)[0]:
-    
             logger.info("Dublicate Transaction Found, returning the initial request")
 
             return Response(

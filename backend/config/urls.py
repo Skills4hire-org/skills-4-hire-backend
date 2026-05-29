@@ -3,7 +3,6 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from .services import health, check_docker_update, test_email, get_banks
-from .drf_yasg import get_swagger_view
 
 # ADMIN view and health checks
 urlpatterns = [
@@ -14,10 +13,10 @@ urlpatterns = [
     path('banks/', get_banks, name='get_banks')
 ]
 # Project Documentation
-urlpatterns += [
-    path("docs/", get_swagger_view().with_ui("swagger", cache_timeout=0), name="swagger-documentation"),
-    path("re_docs/", get_swagger_view().with_ui("redoc", cache_timeout=0), name="redoc-documentation"),
-]
+# urlpatterns += [
+#     path("docs/", get_swagger_view().with_ui("swagger", cache_timeout=0), name="swagger-documentation"),
+#     path("re_docs/", get_swagger_view().with_ui("redoc", cache_timeout=0), name="redoc-documentation"),
+# ]
 
 # App level url config
 urlpatterns += [

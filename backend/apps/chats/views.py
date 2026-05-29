@@ -11,11 +11,11 @@ Handles all conversation-related operations:
 
 from django.db import transaction
 
-from rest_framework import viewsets, status, generics, filters
+from rest_framework import viewsets, status, generics, filters, mixins
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, NotFound
 from rest_framework.response import Response
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, IsAdminUser
 
 from django.shortcuts import get_object_or_404
 from django.db.models import Q
@@ -33,18 +33,30 @@ from .serializers import (
     NegotiationCreateSerializer,
     NegotiationDetailSerializer,
     NegotiationSerializer,
-    NegotiationHistorySerializer
+    NegotiationHistorySerializer,
+    SupportRoomSerializer,
+    MarkReadSerializer,
 )
 from .core.permissions import IsParticipant, NegotiationParticipantPermission, IsMessageSenderOrReadOnly
 from .core.pagination import ConversationPagination, MessagePagination
+from .services.support_service import (
+    get_or_create_support_room,
+    get_all_support_rooms,
+    mark_messages_as_read,
+)
+from .consumers import broadcast_chat_message
 from apps.core.utils.py import log_action, get_or_none
-from apps.posts.services import return_paginated_view
+from apps.posts.services_T import return_paginated_view
 import logging
 
 logger = logging.getLogger(__name__)
 
 
-class ConversationViewSet(viewsets.ModelViewSet):
+class ConversationViewSet(
+    mixins.ListModelMixin, 
+    mixins.CreateModelMixin, 
+    viewsets.GenericViewSet
+    ):
     """
     ViewSet for managing conversations.
 
@@ -52,17 +64,16 @@ class ConversationViewSet(viewsets.ModelViewSet):
     - POST /api/conversations/ - Create new conversation
     - GET /api/conversations/ - List user's conversations
     - GET /api/conversations/{id}/ - Get conversation details
-    - PATCH /api/conversations/{id}/mark-as-read/ - Mark all messages as read
     """
 
     http_method_names = ["get", "post", 'patch']
     pagination_class = ConversationPagination
-    filter_backends = [DjangoFilterBackend, filters.OrderingFilter, filters.SearchFilter]
-    ordering = ['-updated_at']
-    search_fields = [
-        'participant_one__email', 'participant_two__email',
-        "participant_one__username", "participant_two_username"
-    ]
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    ordering = ['-created_at']
+    filterset_fields = {
+        "participant_two__profile__display_name": ['icontains'],
+        "participant_one__profile__display_name": ['icontains']
+    }
 
     def get_permissions(self):
         if self.action in ("list", "retrieve", "patch"):
@@ -79,8 +90,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
         """
         if self.action == 'create':
             return ConversationCreateSerializer
-        elif self.action == 'retrieve':
-            return ConversationDetailSerializer
         return ConversationSerializer
 
     def get_queryset(self):
@@ -129,7 +138,6 @@ class ConversationViewSet(viewsets.ModelViewSet):
         output_serializer = ConversationSerializer(conversation, context={'request': request})
         return Response(output_serializer.data, status=status.HTTP_201_CREATED)
 
-
     def list(self, request, *args, **kwargs):
         """
         List all conversations for current user.
@@ -140,92 +148,159 @@ class ConversationViewSet(viewsets.ModelViewSet):
         """
         return super().list(request, *args, **kwargs)
 
-    def retrieve(self, request, pk=None, *args, **kwargs):
+    @action(methods=["get", "post"], detail=True, url_path="messages")
+    def retrieve_conversation(self, request, *args, **kwargs):
         """
         Retrieve detailed conversation information.
 
-        GET /api/conversations/{id}/
-
-        Returns: Conversation details with last 10 messages
+        GET /api/conversations/{id}/messages
+        POST /api/conversations/{id}/messages
         """
+
         conversation = self.get_object()
         if not conversation.has_participant(request.user):
+            if not (
+                conversation.room_type == Conversation.RoomType.SUPPORT
+                and request.user.is_staff
+            ):
+                raise PermissionDenied()
+        
+        if request.method == "GET":
+            # mark all message as read
+            mark_messages_as_read(conversation, request.user)
+
+            serializer = ConversationDetailSerializer(conversation)
+            return Response(serializer.data)
+        else:
+            serializer = MessageCreateSerializer(
+                data=request.data,
+                context={
+                    'request': request,
+                    'conversation': conversation
+                }
+            )
+            serializer.is_valid(raise_exception=True)
+            message = serializer.save()
+
+            try:
+                broadcast_chat_message(message)
+            except Exception as exc:
+                logger.info(f"Exception broadcating message to websocket: {exc}")
+
+            log_action('message_sent', request.user, {
+                'message_id': message.pk,
+                'conversation_id': conversation.pk
+            })
+
+            output_serializer = MessageSerializer(message)
+            return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+
+# Support Views
+
+class OpenSupportRoomView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    http_method_names = ['post']
+    def post(self, request, *args, **kwargs):
+        if request.user.is_staff:
+            raise PermissionDenied('Staff users cannot open a customer support room.')
+
+        try:
+            support_room = get_or_create_support_room(request.user)
+            return Response(
+                {
+                    'room_id': str(support_room.conversation_id),
+                    'ws_url': f'/ws/chat/{support_room.conversation_id}/'
+                },
+                status=status.HTTP_200_OK
+            )
+        except Exception as exc:
+            return Response(status=400, data={"status": False, "details": str(exc)})
+
+class SupportInboxView(generics.ListAPIView):
+    permission_classes = [IsAdminUser]
+    serializer_class = SupportRoomSerializer
+    pagination_class = ConversationPagination
+
+    def get_queryset(self):
+        queryset = get_all_support_rooms()
+        unread = self.request.query_params.get('unread')
+        search = self.request.query_params.get('search')
+
+        if unread and unread.lower() == 'true':
+            queryset = queryset.filter(unread_count__gt=0)
+
+        if search:
+            queryset = queryset.filter(
+                participant_one__is_staff=False, participant_two__profile__display_name=search
+            )
+
+        return queryset
+
+class MarkMessagesReadView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = MarkReadSerializer
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        room_id = serializer.validated_data['room_id']
+        support_room = get_object_or_404(
+            Conversation,
+            conversation_id=room_id,
+            room_type=Conversation.RoomType.SUPPORT
+        )
+
+        if not request.user.is_staff and not support_room.has_participant(request.user):
             raise PermissionDenied()
-        serializer = self.get_serializer(conversation)
-        return Response(serializer.data)
 
-    @action(detail=True, methods=['post'])
-    def mark_as_read(self, request, pk=None):
-        """
-        Mark all messages in conversation as read.
+        updated_count = mark_messages_as_read(support_room, request.user)
+        return Response({'marked_as_read': updated_count}, status=status.HTTP_200_OK)
 
-        PATCH /api/conversations/{id}/mark-as-read/
+class SupportRoomMessagesView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
 
-        Returns: Updated conversation with unread_count = 0
-        """
-        conversation = self.get_object()
+    def get(self, request, room_id, *args, **kwargs):
+        support_room = get_object_or_404(
+            Conversation,
+            conversation_id=room_id,
+            room_type=Conversation.RoomType.SUPPORT
+        )
+        if not request.user.is_staff and not support_room.has_participant(request.user):
+            raise PermissionDenied()
 
-        # Mark all unread messages from other participant as read
-        messages_to_update = conversation.messages.filter(
-            is_read=False
-        ).exclude(sender=request.user)
+        limit = min(int(request.query_params.get('limit', 50)), 100)
+        page = max(int(request.query_params.get('page', 1)), 1)
+        offset = (page - 1) * limit
 
-        count = messages_to_update.update(is_read=True)
+        queryset = Message.objects.filter(
+            conversation=support_room,
+            is_active=True
+        ).select_related('sender').order_by('created_at')
 
-        log_action('messages_marked_read', request.user, {
-            'conversation_id': conversation.id,
-            'count': count
-        })
-
-        serializer = ConversationSerializer(conversation)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-    @action(detail=True, methods=['get'])
-    def unread_count(self, request, pk=None):
-        """
-        Get unread message count for conversation.
-
-        GET /api/conversations/{id}/unread_count/
-
-        Returns: {"unread_count": 5}
-        """
-        conversation = self.get_object()
-        unread_count = conversation.messages.filter(
-            is_read=False
-        ).exclude(sender=request.user).count()
+        mark_messages_as_read(support_room, request.user)
+        messages = list(queryset[offset:offset + limit])
+        serializer = MessageListSerializer(messages, many=True)
 
         return Response(
-            {'unread_count': unread_count},
+            {
+                'count': queryset.count(),
+                'page': page,
+                'limit': limit,
+                'results': serializer.data,
+            },
             status=status.HTTP_200_OK
         )
 
 class MessageViewSet(viewsets.ModelViewSet):
     """
     ViewSet for managing messages within conversations.
-
-    Endpoints:
-    - POST /api/conversations/{conversation_id}/messages/ - Send message
-    - GET /api/conversations/{conversation_id}/messages/ - List messages (paginated)
-    - PATCH /api/conversations/{conversation_id}/messages/{id}/ - Mark as read
     """
 
-    permission_classes = [IsMessageSenderOrReadOnly]
-    pagination_class = MessagePagination
-    filter_backends = [filters.OrderingFilter]
-    ordering = ['-created_at']  # Most recent first
-
     def get_serializer_class(self):
-        """
-        Use appropriate serializer based on action.
 
-        - create: MessageCreateSerializer
-        - list: MessageListSerializer (optimized)
-        - retrieve/update: MessageSerializer (full)
-        """
-        if self.action in ('create', "partial_update"):
+        if self.action in ("partial_update"):
             return MessageCreateSerializer
-        elif self.action == 'list':
-            return MessageListSerializer
         return MessageSerializer
 
     def get_queryset(self):
@@ -236,7 +311,7 @@ class MessageViewSet(viewsets.ModelViewSet):
         - Filter by conversation
         - Order by timestamp
         """
-        conversation_id = self.kwargs.get('conversation_id')
+        conversation_id = self.kwargs.get('conversation_pk')
 
         queryset = Message.objects.filter(
             conversation_id=conversation_id
@@ -244,16 +319,9 @@ class MessageViewSet(viewsets.ModelViewSet):
 
         return queryset
 
-    http_method_names =  ['post', "patch", "get", "delete"]
-
-    def get_permissions(self):
-        if self.action in ("update", "partial_update", "retrieve", "destroy"):
-            return [IsAuthenticated(), IsParticipant(), IsMessageSenderOrReadOnly()]
-        elif self.action == 'create':
-            return [IsAuthenticated(), IsParticipant()]
-        return [IsParticipant()]
-
-
+    http_method_names =  ["patch", "delete"]
+    permission_classes = [IsMessageSenderOrReadOnly]
+    
     def perform_destroy(self, instance):
         if isinstance(instance, Message):
             if hasattr(instance, "conversation"):
@@ -263,145 +331,7 @@ class MessageViewSet(viewsets.ModelViewSet):
                 log_action(
                     "deleted_message", self.request.user, {"message_id": instance.pk}
                 )
-
-    def get_conversation(self):
-        """
-        Get conversation object with permission check.
-
-        Raises 404 if conversation doesn't exist or user is not participant.
-        """
-
-        conversation_id = self.kwargs.get('conversation_pk')
-
-        conversation = get_object_or_404(
-            Conversation,
-            pk=conversation_id
-        )
-        # Check if user is participant
-        if not conversation.has_participant(self.request.user):
-            raise PermissionDenied('You are not a participant of this conversation.')
-
-        return conversation
-
-    def create(self, request, conversation_id=None, *args, **kwargs):
-        """
-        Send a message to conversation.
-
-        POST /api/conversations/{conversation_id}/messages/
-
-        Body:
-        {
-            "content": "Hello, this is my message!"
-        }
-
-        Returns: Message object with full details
-        """
-        conversation = self.get_conversation()
-
-        serializer = self.get_serializer(
-            data=request.data,
-            context={
-                'request': request,
-                'conversation': conversation
-            }
-        )
-        serializer.is_valid(raise_exception=True)
-        message = serializer.save()
-
-        log_action('message_sent', request.user, {
-            'message_id': message.pk,
-            'conversation_id': conversation.pk
-        })
-
-        output_serializer = MessageSerializer(message)
-        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
-
-    def list(self, request, conversation_id=None, *args, **kwargs):
-        """
-        List messages in conversation (paginated).
-
-        GET /api/conversations/{conversation_id}/messages/
-
-        Query parameters:
-        - page: Page number
-        - page_size: Results per page (max 100)
-
-        Returns: Paginated list of messages
-        """
-        conversation = self.get_conversation()
-        return super().list(request, *args, **kwargs)
-
-
-
-    def retrieve(self, request, conversation_id=None, pk=None, *args, **kwargs):
-        """
-        Get single message details.
-
-        GET /api/conversations/{conversation_id}/messages/{id}/
-
-        Returns: Message object
-        """
-        conversation = self.get_conversation()
-        message = self.get_object()
-
-        # Auto-mark as read when retrieved by recipient
-        if message.sender != request.user and not message.is_read:
-            message.mark_as_read()
-
-        serializer = self.get_serializer(message)
-        return Response(serializer.data)
-
-    @action(detail=True, methods=['post'])
-    def mark_as_read(self, request, conversation_id=None, pk=None):
-        """
-        Mark single message as read.
-
-        POST /api/conversations/{conversation_id}/messages/{id}/mark_as_read/
-
-        Returns: Updated message object
-        """
-        conversation = self.get_conversation()
-        message = self.get_object()
-
-        # Only allow recipient to mark as read
-        if message.sender == request.user:
-            return Response(
-                {'error': 'You cannot mark your own message as read'},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-
-        message.mark_as_read()
-
-        log_action('message_read', request.user, {
-            'message_id': message.id,
-            'conversation_id': conversation.id
-        })
-
-        serializer = self.get_serializer(message)
-        return Response(serializer.data, status=status.HTTP_200_OK)
-
-class ConversationSearchView(generics.ListAPIView):
-    """
-    Search conversations by participant email or name.
-
-    GET /api/conversations/search/?q=email@example.com
-
-    Returns: List of matching conversations
-    """
-
-    serializer_class = ConversationSerializer
-    permission_classes = [IsAuthenticated]
-    pagination_class = ConversationPagination
-    filter_backends = [filters.SearchFilter]
-    search_fields = ['participant_one__email', 'participant_two__email',
-                     'participant_one__first_name', 'participant_two__first_name']
-
-    def get_queryset(self):
-        """Get user's conversations matching search."""
-        user = self.request.user
-        return Conversation.objects.filter(
-            Q(participant_one=user) | Q(participant_two=user)
-        ).select_related('participant_one', 'participant_two')
+        return Response(status=204)
 
 class NegotiationViewSet(viewsets.ModelViewSet):
     permission_classes = [NegotiationParticipantPermission]

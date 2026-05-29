@@ -5,7 +5,7 @@ from django.contrib.auth import get_user_model
 from ..users.base_model import BaseProfile
 from ..wallet.services import WalletService
 from .utils.helpers import (create_otp_for_user)
-from .helpers import _send_email_to_user, logger
+from .helpers import send_email_to_user, logger
 from .utils.template_helpers import genrate_context_for_otp
 from ..referral.services.utils import generate_code
 from ..referral.services.referral_services import ReferralService
@@ -27,8 +27,8 @@ def post_save_otp_after_account_registration(sender, instance, created, **kwargs
     try:
         code = create_otp_for_user(instance)
         context = genrate_context_for_otp(code=code, email=instance.email, full_name=instance.full_name)
-        _send_email_to_user(context)
-        logger.debug(f"OTP created and email sent for user: {instance.email}")
+        send_email_to_user(context)
+        logger.info(f"OTP created and email sent to user: {instance.email}")
     except Exception as e:
         logger.error(f"Error in post_save signal for {instance.email}: {e}")
 

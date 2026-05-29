@@ -60,15 +60,20 @@ class ProviderSkillViewSet(viewsets.ModelViewSet):
         Optimized queryset:
         1. Only returns skills for the logged-in provider.
         """
-
         user = self.request.user
+
         if user.is_customer:
+            return ProviderSkill.objects.none()
+        
+        profile = getattr(user.profile, "provider_profile", None)
+        if profile is None:
             return ProviderSkill.objects.none()
         
         queryset = (
             ProviderSkill.active_objects.filter(
-                provider_profile=user.profile.provider_profile
+                provider_profile=profile
             ).select_related("provider_profile")
+            .order_by("-created_at")
         )
         return queryset
     

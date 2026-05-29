@@ -67,7 +67,7 @@ class RegistrationsSerializer(serializers.Serializer):
         exist in the database and complies with company domain restrictions.
         """
         if User.objects.filter(phone=value).exists():
-            raise serializers.ValidationError("Phone number already exists")
+            raise serializers.ValidationError("Invalid phone number. try logging in instead", code="phone_exists")
         return value
     
     def validate_email(self, value:str):
@@ -90,7 +90,7 @@ class RegistrationsSerializer(serializers.Serializer):
         email = value.strip().lower()
         valid_email = validate_email(email)
         if User.objects.filter(email=valid_email).exists():
-            raise serializers.ValidationError(_("A user with this email already exist"))
+            raise serializers.ValidationError(_("Invalid email address. try logging in instead"), code="email_exists")
         
         return valid_email
 
@@ -247,10 +247,10 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
         
         if code_instance.is_expired():
             raise serializers.ValidationError(_("code already expired"), code="expired")
+        if not code_instance.is_active or code_instance.is_used:
+            raise serializers.ValidationError(_('code already expired'), code="invalid_code")
         
-        user = code_instance.user
-        if not user.is_active or user.is_verified:
-            raise serializers.ValidationError("Account not verified")
+        self.validated_data["code_instance"] = code_instance
         return value
     
     def validate_password(self, value):
@@ -280,29 +280,25 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         password = attrs.get("password")
         email = attrs["email"]
-        valid_email = validate_email(email)
+        valid_email = validate_email(email=email, check_deliverability=True)
 
         if valid_email is None:
             raise serializers.ValidationError(_("email returned none when verifying email address"))
         try:
             user = User.objects.get(email=valid_email) 
         except User.DoesNotExist:
-            raise AuthenticationFailed(code="invalid_credentials", detail={"status": "Failed", "message": f"account not found for user {valid_email}"})
+            raise AuthenticationFailed(code="invalid_credentials", detail={"status": "Failed", "message": f"Invalid credentials"})
         
         if not self.user_can_authenticate(user):
-            raise AuthenticationFailed(code="invalid_request", detail={"status": "Failed", "detail": _("account not verified")})
+            raise AuthenticationFailed(code="invalid_request", detail={"status": "Failed", "detail": _("invalid credentials")})
         
         if not user.check_password(password):
             raise AuthenticationFailed(code="invalid_credentials", detail={"status": "failed", "detail": _("invalid_credentials")})
         
         self.user = user
         data = super().validate(attrs)
-        data.update({"user_data": {
-            "user_id": user.pk, "email": user.email,
-            "name": getattr(user, "full_name") or "",
-            'is_customer': user.is_customer,
-            'is_provider': user.is_provider
-        }})
+        serializer = UserReadSerializer(user, context=self.context)
+        data.update({"user_data": serializer.data})
         self.user.last_login = timezone.now()
         self.user.save()
 
@@ -357,6 +353,7 @@ class UserReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
         fields = [
+            "user_id",
             "email", "first_name", "total_reviews",
             "last_name", "is_provider", "is_customer",
             "is_verified", "profile", "avg_rating", 

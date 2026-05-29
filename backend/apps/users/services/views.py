@@ -9,20 +9,26 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 
-from .models import Service
+from .models import Service, ServiceCategory
 from .pagination import ServicePagination
-from .permissions import IsOwnerOrReadOnly
-from .serializers import ServiceCreateSerializer, ServiceListSerializer
+from .permissions import IsOwnerOrReadOnly, IsServiceProvider
+from .serializers import ServiceCreateSerializer, ServiceListSerializer, ServiceCategorySerializer
+
+
+class ServiceCategoryViewSet(viewsets.ModelViewSet):
+    http_method_names = ['get']
+    queryset = ServiceCategory.objects.all().only("name", "service_category_id").order_by("name")
+    serializer_class = ServiceCategorySerializer
+    pagination_class = None  # Disable pagination for categories
+    permission_classes = [IsAuthenticated]
 
 class ServiceViewSet(viewsets.ModelViewSet):
 
     http_method_names = ['post', 'get', 'patch', 'delete']
     pagination_class = ServicePagination
-    permission_classes = [IsAuthenticated, IsOwnerOrReadOnly]
-
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
 
-    search_fields = ["name", "description", "category__name"]
+    search_fields = ["@name", "@category__name"]
     filterset_fields = {
         "name": ["icontains"],
         "is_active": ["exact"],
@@ -31,7 +37,12 @@ class ServiceViewSet(viewsets.ModelViewSet):
         "category__name": ["icontains"],
     }
 
-
+    def get_permissions(self):
+        if  self.action in ("create", "auth_user_services"):
+            return [IsServiceProvider()]
+        if  self.action in ("partial_update", "destroy"):
+            return [IsAuthenticated(), IsOwnerOrReadOnly()]
+        return [IsAuthenticated()]
 
     def get_serializer_class(self):
         if self.action in ("create", "partial_update"):
@@ -42,6 +53,8 @@ class ServiceViewSet(viewsets.ModelViewSet):
     @method_decorator(cache_page(60 * 5))
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
+    
+    
     def get_queryset(self):
         """
         Return only non-deleted services, with optimised joins.

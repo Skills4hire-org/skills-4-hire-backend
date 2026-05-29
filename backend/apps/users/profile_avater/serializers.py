@@ -8,12 +8,12 @@ from ...core.utils.py import get_or_none
 
 
 class AvatarCreateSerializer(serializers.ModelSerializer):
-    base_profile_id = serializers.UUIDField(write_only=True, required=False)
+    base_profile_id = serializers.UUIDField(write_only=True, required=True)
 
     class Meta:
         model = Avatar
         fields = [
-            'avatar_id', "base_profile_id",
+            "base_profile_id",
             'avatar', 'avatar_public_id',
             'description'
         ]
@@ -63,8 +63,7 @@ class AvatarDetailSerializer(serializers.ModelSerializer):
         model = Avatar
         fields = [
             "avatar_id","description", 'avatar',
-            "avatar_public_id", "is_active",
-            'created_at'
+            "avatar_public_id",'created_at'
         ]
 
 

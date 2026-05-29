@@ -60,7 +60,6 @@ class IsMessageSenderOrReadOnly(BasePermission):
     Used for message updates/deletes.
     """
 
-    message = 'You can only modify messages you sent'
     def has_permission(self, request, view):
 
         return request.user and request.user.is_authenticated

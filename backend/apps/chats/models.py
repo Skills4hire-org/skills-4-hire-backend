@@ -41,6 +41,19 @@ class Conversation(models.Model):
         default=uuid.uuid4,
         help_text="pk  for conversation"
     )
+
+    class RoomType(models.TextChoices):
+        DIRECT = 'direct', 'Direct'
+        SUPPORT = 'support', 'Support'
+
+    room_type = models.CharField(
+        max_length=20,
+        choices=RoomType.choices,
+        default=RoomType.DIRECT,
+        db_index=True,
+        help_text='Type of conversation room'
+    )
+
     objects = models.Manager()
     active_objects = ActiveConversationManager()
 
@@ -55,7 +68,8 @@ class Conversation(models.Model):
         settings.AUTH_USER_MODEL,
         on_delete=models.CASCADE,
         related_name='conversations_as_participant_two',
-        help_text='Second participant in the conversation'
+        help_text='Second participant in the conversation',
+        null=True
     )
 
     is_active = models.BooleanField(
@@ -93,6 +107,7 @@ class Conversation(models.Model):
             models.Index(fields=['participant_two', 'participant_one']),
             models.Index(fields=['created_at']),
             models.Index(fields=['updated_at']),
+            models.Index(fields=['room_type'], name='conversation_room_type_idx'),
             models.Index(
                 fields=['participant_one', 'updated_at'],
                 name='conversation_user_updated_idx'
@@ -173,9 +188,8 @@ class Conversation(models.Model):
     @property
     def message_count(self):
         """Get total number of messages in conversation."""
-        return self.messages.count()
+        return self.messages.filter(is_active=True).count()
 
-    @property
     def unread_count(self, user):
         """
         Get number of unread messages for a user.
@@ -195,7 +209,7 @@ class Conversation(models.Model):
         Returns:
             Message: Last message or None
         """
-        return self.messages.first()
+        return self.messages.filter(is_active=True).first()
 
 class Message(models.Model):
     """
@@ -325,7 +339,7 @@ class Message(models.Model):
             logger.debug(f"Message {self.message_id} marked as unread")
 
     def soft_delete(self):
-        if self.is_actice:
+        if self.is_active:
             self.is_active = False
             self.save(update_fields=["is_active"])
             logger.debug(f"Message {self.message_id} deleted")
@@ -351,7 +365,6 @@ class Message(models.Model):
 
         time_threshold = timezone.now() - timedelta(hours=24)
         return self.created_at >= time_threshold
-
 
 class Negotiations(models.Model):
     negotiation_id = models.UUIDField(

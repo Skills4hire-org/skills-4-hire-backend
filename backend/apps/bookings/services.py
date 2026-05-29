@@ -2,9 +2,6 @@ from django.contrib.auth import get_user_model
 from django.db import transaction
 
 from .models import Bookings, ProviderModel, PaymentRequestBooking, BookingTransaction
-from ..notification.events import NotificationEvents
-from .exceptions import DuplicateBookingError
-from ..notification.services import send_general_notification
 from .booking_transaction import process_transaction
 from apps.wallet.services import WalletService, lock_booking, refund_booking, get_calculated_transaction
 
@@ -69,16 +66,11 @@ class BookingService:
 
     @staticmethod
     def create_booking(customer, provider, **validated_data):
-        idempotency_key = validated_data.pop('idempotency_key')
-        if BookingTransaction.objects.filter(idempotency_key=idempotency_key).exists():
-            raise DuplicateBookingError()
-        
         booking = None
         transaction_status = False
-        
+        idempotency_key = validated_data.pop("idempotency_key")
         with transaction.atomic():
             try:
-            
                 booking = Bookings.objects.create(customer=customer, provider=provider, 
                                                 **validated_data)
                 # deduct user wallet under the same atomicity, is either the booking is
@@ -102,6 +94,7 @@ class BookingService:
             except Exception as e:
                 logger.exception(f"Failed to create booking: {e}", exc_info=True)
                 transaction_status = False
+                raise
 
             if booking:
                 process_transaction(
@@ -114,7 +107,7 @@ class BookingService:
     @staticmethod
     def cancel_booking(booking, user, idempotency_key):
 
-        if not isinstance(booking, Bookings) or  not isinstance(user, User):
+        if not isinstance(booking, Bookings) or not isinstance(user, User):
             raise ValidationError("Failed: 'booking' and 'user' should be valid instances")
 
         transaction_status = False
@@ -140,16 +133,8 @@ class BookingService:
                 idempotency_key=idempotency_key, status=transaction_status
                 ))
 
-        message = f"Your booking has been cancelled by {user.full_name}."
+        message = f"Booking cancelled by {user.full_name}."
         logger.info(f"Booking {booking.pk} cancelled by user {user.get_username()}.")
-
-        send_general_notification(
-            event=NotificationEvents.BOOKING.value,
-            message=message,
-            sender=user,
-            receiver=booking.provider.profile.user if user == booking.customer else booking.customer
-        )
-
 
     @staticmethod
     def accept_booking(booking, user):
@@ -160,12 +145,6 @@ class BookingService:
             booking.accept_booking(user=user)
 
         booking_message = f"Booking {booking.pk}: Accepted {booking.provider.profile.user.username}."
-        send_general_notification(
-            event=NotificationEvents.BOOKING.value,
-            message=booking_message,
-            sender=booking.provider.profile.user,
-            receiver=booking.customer
-        )
         return booking
 
     @staticmethod
