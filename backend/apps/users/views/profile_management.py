@@ -10,9 +10,9 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from ..permissions import IsProfileOwnerOrReadOnly
 from ..provider_models import ProviderModel
-from ..serializers.profiles import ProviderProfileUpdateCreateSerializer, \
+from ..serializers.profiles import ProviderProfileUpdateCreateSerializer, BaseProfileListSerializer, \
     ProviderProfileDetailSerializer, ProviderProfilePublicSerializer, CustomerProfilePublicSerializer, \
-    CustomerCreateUpdateSerializer, CustomerProfileDetailSerializer
+    CustomerCreateUpdateSerializer, CustomerProfileDetailSerializer, CoverPhoto
 from ..profile_services.paginations import ProfilePagination
 from ...authentication.serializers import UserReadSerializer
 
@@ -100,6 +100,15 @@ class ProfileViewSet(viewsets.GenericViewSet):
                 return CustomerProfilePublicSerializer
         else:
             raise ValueError("Invalid user obj")
+        
+    @action(methods=['patch'], detail=False, url_path="cover-photo")
+    def upload_cover_photo(self, request, *args, **kwargs):
+        user_base_profile = request.user.profile
+        serializer = CoverPhoto(instance=user_base_profile, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        cover_letter = serializer.save()
+        return Response(data={"status": True, 'message': "profile cover photo updated successfully"}, status=200)
+
 
     @method_decorator(cache_page(60 * 2))
     @action(methods=['get', 'patch'], detail=False, url_path="me")

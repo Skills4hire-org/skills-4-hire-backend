@@ -28,7 +28,7 @@ from .serializers.read import (
 from .serializers.feed_serializer import FeedPostSerializer
 
 from .paginations import CustomPostPagination
-from .permission import IsOwnerOrReadOnly, IsComentOwner
+from .permission import IsOwnerOrReadOnly
 from .utils.posts import get_post_by_id
 from .services_T import  (
     return_paginated_view, LikeService,
@@ -36,10 +36,7 @@ from .services_T import  (
     get_offers_or_job_post, list_posts
 )
 from .services.recommendation_service import RecommendationService
-from .services.trust_score_service import compute_trust_score
 from apps.bookings.permissions import  IsCustomer
-from apps.notification.events import NotificationEvents
-
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
@@ -350,7 +347,6 @@ class CommentViewSet(viewsets.ModelViewSet):
             data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         post, comment = self.get_object()
-
         data = serializer.validated_data
         service = CommentService()
         try:
@@ -370,14 +366,29 @@ class CommentViewSet(viewsets.ModelViewSet):
 
 class CommentLikeViewSet(viewsets.GenericViewSet):
 
-    http_method_names = ["post", "delete"]
+    http_method_names = ["post", "delete", "get"]
     permission_classes = [permissions.IsAuthenticated]
+    pagination_class = CustomPostPagination
 
     def get_object(self):
         comment_id = self.kwargs.get("pk")
         comment = get_object_or_404(Comment, pk=comment_id, is_active=True)
 
         return comment
+
+    @method_decorator(cache_page(60))
+    @action(methods=['get'], detail=False, url_path="mine")
+    def user_comments(self, request, *args, **kwargs):
+        user = request.user
+        comments = user.comments.filter(is_active=True)
+        page = self.paginate_queryset(comments)
+        if page is not None:
+            serializer = CommentListSerializer(page, many=True, context={"request": request})
+            return self.get_paginated_response(serializer.data)
+        
+        serializer = CommentListSerializer(comments, many=True, context={'request': request})
+        return Response(data=serializer.data, status=200)
+    
 
     @action(methods=["POST"], detail=True, url_path='like')
     def like_comment(self, request, *args, **kwargs):
