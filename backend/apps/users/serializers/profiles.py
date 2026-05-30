@@ -26,12 +26,22 @@ def save_base_profile_with_serializer(base_profile, validated_data, request):
 
     serializer.save()
 
+class CoverPhoto(serializers.Serializer):
+    image_url = serializers.URLField(required=False, max_length=500)
+    public_id = serializers.CharField(required=False, max_length=255)
 
+    def update(self, instance: BaseProfile,  validated_data: dict):
+        if not "image_url" in validated_data and "publid_id" in validated_data:
+            raise serializers.ValidationError("required fields are not present")
+        instance.cover_photo = validated_data
+        instance.save()
+        return instance 
+        
 class WorkImagesSerializer(serializers.Serializer):
     class Meta:
         model = WorkImages
         fields = [
-            "image_url", "description"
+            "image_url", "description", "public_id"
         ]
 
     def validate_image_url(self, value):
@@ -111,7 +121,7 @@ class BaseProfileListSerializer(serializers.ModelSerializer):
         fields = [
             "gender", "display_name", "professional_title", "trust_score",
             "country", "city", "created_at", "avatar", 'user',
-            "customer_id", "provider_id"
+            "customer_id", "provider_id", "cover_photo"
         ]
 
     def get_provider_id(self, obj):
@@ -173,39 +183,34 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
         endorsement_count = serializers.SerializerMethodField()
         posts = serializers.SerializerMethodField()
         comments = serializers.SerializerMethodField()
-        images  = serializers.SerializerMethodField()
-        skills = ProviderSkillListSerializer(many=True)
-
+        skill = serializers.SerializerMethodField()
+    
         class Meta:
             model = ProviderModel
             fields = [
                 "provider_id", "professional_title",
                 "headline", "overview", "profile",
                 "created_at", "endorsement_count", "posts",
-                'comments', 'images', "skills"
+                'comments', "skill"
             ]
 
-        def get_images(self, obj):
-            from ..services.serializers import ServiceAttachmentSerializer
-            images = ServiceAttachment.objects.filter(service__profile=obj)
-            return ServiceAttachmentSerializer(images, many=True).data
-
+        def get_skill(self, obj):
+            primary_skill = obj.skills.filter(is_active=True, is_primary=True).last()
+            serializer = ProviderSkillListSerializer(primary_skill)
+            return serializer.data
+        
         def get_comments(self, obj):
             from ...posts.serializers.read import CommentListSerializer
             user = obj.profile.user
-            user_comments = user.comments.filter(is_active=True, is_deleted=False)
-            if len(user_comments) < 1:
-                return None
-            
-            serializer = CommentListSerializer(user_comments, many=True, context={"request": self.context['request']})
+            user_comments = user.comments.filter(is_active=True, is_deleted=False).last()
+            serializer = CommentListSerializer(user_comments, context={"request": self.context['request']})
             return serializer.data
 
         def get_posts(self, obj):
             from ...posts.serializers.read import PostDetailSerializer
             user = obj.profile.user
-            user_posts = user.posts.filter(is_active=True, is_deleted=False)
-    
-            serializer = PostDetailSerializer(user_posts, many=True, context={'request': self.context['request']})
+            user_posts = user.posts.filter(is_active=True, is_deleted=False).last()
+            serializer = PostDetailSerializer(user_posts, context={'request': self.context['request']})
             return serializer.data
 
         def get_endorsement_count(self, obj):

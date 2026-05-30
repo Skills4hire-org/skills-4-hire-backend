@@ -28,7 +28,8 @@ class BaseProfile(models.Model):
     place_of_work = models.CharField(max_length=255, blank=True, null=True)
 
     # Contact info: optional fields for phone and location, used for relevance and trust scoring
-    phone_number = models.CharField(max_length=50, blank=True, null=True)
+    phone_number = models.CharField(max_length=50, blank=True, null=True)   
+    cover_photo = models.JSONField(default=dict)
 
     nin = models.CharField(max_length=100, blank=True, null=True, unique=True, db_index=True)
     drivers_lisence = models.JSONField(name="drivers_lisence", default=dict)
@@ -88,6 +89,7 @@ class WorkImages(models.Model):
     """
     profile = models.ForeignKey(BaseProfile, on_delete=models.CASCADE, related_name="work_images")
     image_url = models.URLField(max_length=200, blank=True, null=True)
+    public_id = models.CharField(max_length=255, blank=True)
     description = models.CharField(max_length=255, blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
