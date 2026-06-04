@@ -1,7 +1,7 @@
 from django.contrib import admin
 from .provider_models import ProviderSkill, ProviderModel
 from .customer_models import CustomerModel
-from .base_model import BaseProfile
+from .base_model import BaseProfile, WorkImages
 from .services.models import ServiceCategory, Service, ServiceAttachment
 from .profile_avater.models import Avatar
 from .skills.models import Skill, Category
@@ -14,6 +14,11 @@ class ServiceAttachmentAdmin(admin.ModelAdmin):
         "image_url", 'image_public_id', 'created_at'
     ]
 
+@admin.register(WorkImages)
+class ImagesAdmin(admin.ModelAdmin):
+    list_display = [
+        "profile__display_name", "image_url", "public_id", "created_at"
+    ]
 
 @admin.register(Favourite)
 class FavouriteAdmin(admin.ModelAdmin):

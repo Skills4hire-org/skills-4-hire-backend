@@ -72,13 +72,9 @@ CELERY_RESULT_BACKEND = RESULT_STORAGE
 
 CHANNEL_LAYERS = {
     "default": {
-        "BACKEND": "channels_redis.core.RedisChannelLayer",
-        "CONFIG": {
-            "hosts": [env("DEVELOPMENT_REDIS")],
-        },
+        "BACKEND": "channels.layers.InMemoryChannelLayer"
     }
 }
-
 
 CORS_ALLOW_ALL_ORIGINS = False
 

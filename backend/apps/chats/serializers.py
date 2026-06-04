@@ -152,7 +152,6 @@ class MessageCreateSerializer(serializers.ModelSerializer):
 
     def update(self, instance: Message, validated_data: dict):
 
-        print("serializer context", self.context)
         user = self.context.get("request").user
 
         message_content = validated_data["content"]
@@ -324,7 +323,6 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
 
         user = self.context['request'].user
         participant_two = validated_data.pop('participant_two_id')
-
         try:
             service = ConversationService(
                 participant_two=participant_two,

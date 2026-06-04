@@ -30,7 +30,7 @@ class ConversationService:
 
     def _validate_required_attribute(self):
         if self.participant_two is None:
-            raise NotFound("User not found", code=404)
+            raise NotFound("participant two not found", code=404)
         if self.participant_one is None:
             raise NotFound("receiver not found", code=404)
 
@@ -49,10 +49,6 @@ class ConversationService:
     def create_conversation(self, **kwargs):
         if not self._validate_required_attribute():
             return False
-
-        if self._validate_users():
-            raise ConversationFound()
-
         try:
             new_conversation = Conversation.objects.create(
                 participant_one=self.participant_one,
