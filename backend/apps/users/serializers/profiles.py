@@ -123,7 +123,7 @@ class BaseProfileListSerializer(serializers.ModelSerializer):
         model = BaseProfile
         fields = [
             "gender", "display_name", "professional_title", "trust_score",
-            "country", "city", "created_at", "avatar", 'user',
+            "country", "city", "location", "created_at", "avatar", 'user',
             "customer_id", "provider_id", "cover_photo"
         ]
 
@@ -154,7 +154,7 @@ class ProviderProfileUpdateCreateSerializer(serializers.ModelSerializer):
         fields = [
             "professional_title", "headline", 
             "overview", "profile","experience_level", 
-            "availability",
+            "availability", "min_charge", "max_charge"
         ]
 
     def validate(self, data):
@@ -192,7 +192,7 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
         class Meta:
             model = ProviderModel
             fields = [
-                "provider_id", "professional_title",
+                "provider_id", "professional_title", "max_charge", "min_charge",
                 "headline", "overview", "profile",
                 "created_at", "endorsement_count", "posts",
                 'comments', "skill", "images"
@@ -200,7 +200,7 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
 
         def get_images(self, obj):
             base_profile = obj.profile
-            images = base_profile.work_images.all()[:2]
+            images = base_profile.work_images.all()[:10]
             return WorkImagesSerializer(images, many=True).data
 
         def get_skill(self, obj):
