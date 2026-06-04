@@ -35,6 +35,8 @@ class ProviderModel(models.Model):
     professional_title = models.CharField(max_length=250, blank=False, null=True)
     headline = models.CharField(max_length=255, blank=True, null=True)
     overview = models.TextField(blank=True, null=True)
+    min_charge = models.DecimalField(max_digits=8, decimal_places=2, null=True, default=0, blank=True)
+    max_charge = models.DecimalField(max_digits=8, decimal_places=2, null=True, default=0, blank=True)
 
     experience_level  = models.CharField(max_length=20, choices=ExperienceLevel.choices, default=ExperienceLevel.ENTRY)
     availability = models.CharField(max_length=20, choices=AvailabilityStatus.choices,default=AvailabilityStatus.PARTIALLY)

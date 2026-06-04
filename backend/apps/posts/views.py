@@ -37,6 +37,9 @@ from .services_T import  (
 )
 from .services.recommendation_service import RecommendationService
 from apps.bookings.permissions import  IsCustomer
+
+import uuid
+
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
@@ -72,7 +75,7 @@ class PostViewSet(viewsets.ModelViewSet):
 
         if self.action in ('create', 'update', 'partial_update'):
             return PostCreateSerializer
-        if self.action in ("list", "retrieve"):
+        if self.action in ("list", "retrieve", "user_posts"):
             if user.is_provider:
                 return JobPostSerializer
             else:
@@ -247,6 +250,15 @@ class PostViewSet(viewsets.ModelViewSet):
             return  Response({"status": "failed", "msg": str(e)}, status=400)
         return  return_paginated_view(self, reposts)
 
+    @action(methods=['get'], detail=False, url_path="user/(?P<user_id>[^/.]+)/posts")
+    def user_posts(self, request, user_id: uuid.UUID = None):
+        queryset = self.filter_queryset(self.get_queryset())
+        if user_id is None:
+            return Post.objects.none()
+        qs = queryset.filter(user__pk=user_id)
+        return return_paginated_view(self, qs)
+    
+
 class CommentViewSet(viewsets.ModelViewSet):
     pagination_class = CustomPostPagination
 
@@ -376,16 +388,19 @@ class CommentLikeViewSet(viewsets.GenericViewSet):
 
         return comment
 
+    def get_serializer_class(self):
+        if self.action == "user_comments":
+            return CommentListSerializer
+
     @method_decorator(cache_page(60))
-    @action(methods=['get'], detail=False, url_path="mine")
-    def user_comments(self, request, *args, **kwargs):
-        user = request.user
+    @action(methods=['get'], detail=False, url_path="user/(?P<user_id>[^/.]+)/comments")
+    def user_comments(self, request, user_id: uuid.UUID=None):
+        user = get_object_or_404(User, pk=user_id, is_active=True, is_verified=True)
         comments = user.comments.filter(is_active=True)
         page = self.paginate_queryset(comments)
         if page is not None:
             serializer = CommentListSerializer(page, many=True, context={"request": request})
             return self.get_paginated_response(serializer.data)
-        
         serializer = CommentListSerializer(comments, many=True, context={'request': request})
         return Response(data=serializer.data, status=200)
     
