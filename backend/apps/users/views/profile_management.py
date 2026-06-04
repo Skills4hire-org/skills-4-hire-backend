@@ -10,12 +10,14 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from ..permissions import IsProfileOwnerOrReadOnly
 from ..provider_models import ProviderModel
+from ..base_model import WorkImages
 from ..serializers.profiles import ProviderProfileUpdateCreateSerializer, BaseProfileListSerializer, \
     ProviderProfileDetailSerializer, ProviderProfilePublicSerializer, CustomerProfilePublicSerializer, \
-    CustomerCreateUpdateSerializer, CustomerProfileDetailSerializer, CoverPhoto
+    CustomerCreateUpdateSerializer, CustomerProfileDetailSerializer, CoverPhoto, WorkImagesSerializer
 from ..profile_services.paginations import ProfilePagination
 from ...authentication.serializers import UserReadSerializer
 
+from uuid import UUID
 
 class ProfileSearchView(viewsets.ModelViewSet):
 
@@ -143,3 +145,29 @@ class ProfileViewSet(viewsets.GenericViewSet):
             else:
                 output_serializer = CustomerProfilePublicSerializer(updated_profile).data
             return Response(output_serializer, status=status.HTTP_200_OK)
+        
+
+class WorkImagesViewSet(viewsets.ModelViewSet):
+    http_method_names = ['post', "get"]
+    pagination_class = ProfilePagination
+
+    def get_serializer_class(self):
+        return WorkImagesSerializer
+    
+    def get_queryset(self):
+        return self.filter_queryset(
+            WorkImages.objects.filter(
+                profile=self.request.user.profile
+                )
+                .select_related("profile")
+        )
+    
+    @action(methods=["get"], detail=False, url_path="user/(?P<user_id>[^/.]+)/images")
+    def user_images(self, request, user_id: UUID = None):
+        images = WorkImages.objects.filter(profile__user__pk=user_id)
+        page = self.paginate_queryset(images)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(images, many=True)
+        return Response(data=serializer.data, status=200)

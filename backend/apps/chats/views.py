@@ -44,7 +44,6 @@ from .services.support_service import (
     get_all_support_rooms,
     mark_messages_as_read,
 )
-from .consumers import broadcast_chat_message
 from apps.core.utils.py import log_action, get_or_none
 from apps.posts.services_T import return_paginated_view
 import logging
@@ -182,11 +181,6 @@ class ConversationViewSet(
             serializer.is_valid(raise_exception=True)
             message = serializer.save()
 
-            try:
-                broadcast_chat_message(message)
-            except Exception as exc:
-                logger.info(f"Exception broadcating message to websocket: {exc}")
-
             log_action('message_sent', request.user, {
                 'message_id': message.pk,
                 'conversation_id': conversation.pk
@@ -201,6 +195,7 @@ class OpenSupportRoomView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
     http_method_names = ['post']
     def post(self, request, *args, **kwargs):
+        
         if request.user.is_staff:
             raise PermissionDenied('Staff users cannot open a customer support room.')
 

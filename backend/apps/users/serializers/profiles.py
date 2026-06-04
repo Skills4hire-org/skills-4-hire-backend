@@ -37,7 +37,7 @@ class CoverPhoto(serializers.Serializer):
         instance.save()
         return instance 
         
-class WorkImagesSerializer(serializers.Serializer):
+class WorkImagesSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkImages
         fields = [
@@ -55,6 +55,9 @@ class WorkImagesSerializer(serializers.Serializer):
         return value.strip().title()
     
     def create(self, validated_data):
+        user = self.context['request'].user
+        profile = getattr(user, "profile")
+        validated_data.update({"profile": profile})
         return super().create(validated_data)
 
 class BaseProfileCreateSerializer(serializers.ModelSerializer):
@@ -184,6 +187,7 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
         posts = serializers.SerializerMethodField()
         comments = serializers.SerializerMethodField()
         skill = serializers.SerializerMethodField()
+        images = serializers.SerializerMethodField()
     
         class Meta:
             model = ProviderModel
@@ -191,8 +195,13 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
                 "provider_id", "professional_title",
                 "headline", "overview", "profile",
                 "created_at", "endorsement_count", "posts",
-                'comments', "skill"
+                'comments', "skill", "images"
             ]
+
+        def get_images(self, obj):
+            base_profile = obj.profile
+            images = base_profile.work_images.all()[:2]
+            return WorkImagesSerializer(images, many=True).data
 
         def get_skill(self, obj):
             primary_skill = obj.skills.filter(is_active=True, is_primary=True).last()
