@@ -166,7 +166,7 @@ class PasswordResetConfirmViewSet(viewsets.ModelViewSet):
         validated_data = serializer.validated_data
         password =  validated_data["password"]
         try:
-            code_instance = validated_data["code_instance"]
+            code_instance = validated_data["code"]
 
             user = code_instance.user
             with transaction.atomic():

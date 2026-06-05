@@ -249,9 +249,8 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
             raise serializers.ValidationError(_("code already expired"), code="expired")
         if not code_instance.is_active or code_instance.is_used:
             raise serializers.ValidationError(_('code already expired'), code="invalid_code")
-        
-        self.validated_data["code_instance"] = code_instance
-        return value
+
+        return code_instance
     
     def validate_password(self, value):
         _validate_password(value)
