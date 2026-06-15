@@ -19,7 +19,7 @@ class PostAttachmentSerializer(serializers.ModelSerializer):
         fields = [
             "post_attachment_id",
             "attachment_type",
-            "attachmentURL",
+            "attachmentURL", "public_id",
             "created_at"
         ]
         read_only_fields = [

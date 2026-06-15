@@ -191,13 +191,14 @@ class PostAttachment(models.Model):
     attachment_type = models.CharField(max_length=200, choices=Types.choices, default=None, null=True, blank=True)
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="attachments", blank=True, null=True)
     attachmentURL = models.URLField(max_length=200, null=True, blank=True)
+    public_id = models.CharField(max_length=50, null=True, blank=True)
     comment = models.ForeignKey(Comment, on_delete=models.CASCADE, null=True, blank=True, related_name="attachments")
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"PostAttachment({self.post.pk}, )"
+        return f"PostAttachment()"
 
     class Meta:
         ordering = ['-created_at']

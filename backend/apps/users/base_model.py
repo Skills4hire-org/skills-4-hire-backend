@@ -40,6 +40,7 @@ class BaseProfile(models.Model):
 
     country = models.CharField(max_length=100, blank=True, null=True)
     city = models.CharField(max_length=100, blank=True, null=True)
+    state = models.CharField(max_length=100, blank=True, null=True)
 
     # Trust score: computed from completed jobs, ratings, and endorsements
     # Normalized to 0.0-1.0 range. This is the most important ranking signal.

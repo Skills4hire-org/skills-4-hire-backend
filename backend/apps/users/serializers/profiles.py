@@ -14,7 +14,8 @@ from ..profile_services.customer_profile import CustomerService
 from ..profile_services.provider_profile import ProviderProfileServices
 from ..profile_services.utils import get_profile_avatar
 from ..provider_models import ProviderModel
-from ..services.models import ServiceAttachment, ServiceCategory
+from ..services.models import ServiceCategory
+
 from ..skills.serializers import ProviderSkillListSerializer
 
 def save_base_profile_with_serializer(base_profile, validated_data, request):
@@ -114,16 +115,15 @@ class BaseProfileCreateSerializer(serializers.ModelSerializer):
         validated_data['user'] = instance.user
         return super().update(instance, validated_data)
 
-class BaseProfileListSerializer(serializers.ModelSerializer):
+class BaseProfileListSerializer(serializers.ModelSerializer):  
     avatar = AvatarDetailSerializer(read_only=True)
-    professional_title = serializers.SerializerMethodField()
     provider_id = serializers.SerializerMethodField()
     customer_id = serializers.SerializerMethodField()
     class Meta:
         model = BaseProfile
         fields = [
-            "gender", "display_name", "professional_title", "trust_score",
-            "country", "city", "location", "created_at", "avatar", 'user',
+            "gender", "display_name", "trust_score",
+            "country", "city", "state", "location", "created_at", "avatar",
             "customer_id", "provider_id", "cover_photo"
         ]
 
@@ -138,12 +138,7 @@ class BaseProfileListSerializer(serializers.ModelSerializer):
         if user.is_customer:
             return str(obj.customer_profile.customer_id)
         return None
-    
-    def get_professional_title(self, obj):
-        user = obj.user
-        if not user.is_provider:
-            return None
-        return obj.provider_profile.professional_title
+
     
 class ProviderProfileUpdateCreateSerializer(serializers.ModelSerializer):
 
@@ -182,30 +177,74 @@ class ProviderProfileUpdateCreateSerializer(serializers.ModelSerializer):
         return updated_profile
 
 class ProviderProfileDetailSerializer(serializers.ModelSerializer):
-        profile = BaseProfileListSerializer(read_only=True)
+        user = serializers.SerializerMethodField(read_only=True)
         endorsement_count = serializers.SerializerMethodField()
         posts = serializers.SerializerMethodField()
         comments = serializers.SerializerMethodField()
-        skill = serializers.SerializerMethodField()
-        images = serializers.SerializerMethodField()
+        services = serializers.SerializerMethodField()
+        gallary = serializers.SerializerMethodField()
+        avg_rating = serializers.SerializerMethodField()
+        total_reviews = serializers.SerializerMethodField()
+        completed_bookings = serializers.SerializerMethodField()
+        media = serializers.SerializerMethodField()
     
         class Meta:
             model = ProviderModel
             fields = [
-                "provider_id", "professional_title", "max_charge", "min_charge",
-                "headline", "overview", "profile",
-                "created_at", "endorsement_count", "posts",
-                'comments', "skill", "images"
+                "provider_id", "professional_title", "max_charge", "min_charge", 
+                'avg_rating', "total_reviews", "completed_bookings",
+                "headline", "overview", "created_at", "endorsement_count", "user",
+                "posts", 'comments', "services", "gallary", "media"
             ]
 
-        def get_images(self, obj):
+        def get_media(self, obj: ProviderModel):
+            from ...posts.serializers.create import PostAttachmentSerializer, PostAttachment
+            from django.db.models import Q
+
+            media  = PostAttachment.objects.filter(
+                Q(post__user=obj.profile.user) |
+                Q(comment__user=obj.profile.user)
+            ).select_related("post", "comment").order_by("-created_at")[:2]
+
+            return PostAttachmentSerializer(media, many=True).data
+
+
+        def get_user(self, obj: ProviderModel):
+            from ...authentication.serializers import UserReadSerializer
+            user = obj.profile.user
+            return UserReadSerializer(user).data
+
+        def get_completed_bookings(self, obj: ProviderModel):
+            from ...bookings.models import Bookings
+
+            completed_bookings = obj.bookings.filter(
+                booking_status=Bookings.BookingStatus.COMPLETED
+                ).aggregate(total=Count("booking_id", distinct=True))["total"]
+            return completed_bookings
+        
+        def get_avg_rating(self, obj: ProviderModel):
+            profile_reviews = obj.reviews.filter(is_active=True)
+            if len(profile_reviews) < 1:
+                return 0
+            avg_rating = profile_reviews.aggregate(avg=Avg("ratings"))
+            return avg_rating['avg']
+            
+        def get_total_reviews(self, obj):
+            profile_reviews = obj.reviews.filter(is_active=True)
+            if len(profile_reviews) < 1:
+                return 0
+            total_reviews= profile_reviews.aggregate(total=Count("reviews"))
+            return total_reviews['total']
+
+        def get_gallary(self, obj):
             base_profile = obj.profile
             images = base_profile.work_images.all()[:10]
             return WorkImagesSerializer(images, many=True).data
 
-        def get_skill(self, obj):
-            primary_skill = obj.skills.filter(is_active=True, is_primary=True).last()
-            serializer = ProviderSkillListSerializer(primary_skill)
+        def get_services(self, obj):
+            from ..services.serializers import ServiceListSerializer
+            primary_service = obj.services.filter(is_active=True, is_default=True).last()
+            serializer = ServiceListSerializer(primary_service)
             return serializer.data
         
         def get_comments(self, obj):

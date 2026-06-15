@@ -345,43 +345,11 @@ class CustomLogoutSerializer(serializers.Serializer):
 
 class UserReadSerializer(serializers.ModelSerializer):
     profile = BaseProfileListSerializer(read_only=True)
-
-    avg_rating = serializers.SerializerMethodField()
-    total_reviews = serializers.SerializerMethodField()
-
     class Meta:
         model = User
         fields = [
-            "user_id",
-            "email", "first_name", "total_reviews",
-            "last_name", "is_provider", "is_customer",
-            "is_verified", "profile", "avg_rating", 
+            "user_id", "phone",
+            "email", "first_name", "last_name", 
+            "is_provider", "is_customer",
+            "is_verified", "profile", 
         ]   
-
-    def get_avg_rating(self, obj):
-
-        if not obj.is_provider:
-            return None
-        provider = getattr(obj.profile, "provider_profile")
-
-        if provider is None:
-            return 0
-        
-        rating = provider.reviews.filter(is_active=True)\
-                                .aggregate(avg=Avg("ratings"))
-        return rating['avg']
-    
-    def get_total_reviews(self, obj):
-
-        if not obj.is_provider:
-            return None
-        
-        provider = getattr(obj.profile, "provider_profile")
-        if provider is None:
-            return 0
-        
-        reviews = provider.reviews.filter(is_active=True)\
-                        .aggregate(total_reviews=Count("reviews"))
-        if reviews["total_reviews"]:
-            return reviews['total_reviews']
-        return 0

@@ -8,12 +8,9 @@ from ...core.utils.py import get_or_none
 
 
 class AvatarCreateSerializer(serializers.ModelSerializer):
-    base_profile_id = serializers.UUIDField(write_only=True, required=True)
-
     class Meta:
         model = Avatar
         fields = [
-            "base_profile_id",
             'avatar', 'avatar_public_id',
             'description'
         ]

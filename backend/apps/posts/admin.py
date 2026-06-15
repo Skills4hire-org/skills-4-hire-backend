@@ -1,6 +1,12 @@
 from django.contrib import admin
 
-from .models import Post, Comment, Likes, Repost, UserPostInteraction
+from .models import Post, Comment, Likes, Repost, UserPostInteraction, PostAttachment
+
+@admin.register(PostAttachment)
+class PostAttachmentAdmin(admin.ModelAdmin):
+    list_display = [
+        'attachmentURL', "public_id", "created_at", "attachment_type", 
+        "post__user__profile__display_name", "comment__user__profile__display_name"]
 
 class PostAdmin(admin.ModelAdmin):
     list_display = ('post_id', 'user__profile__display_name', 'post_type', 'is_active', 'is_deleted', 'created_at')
