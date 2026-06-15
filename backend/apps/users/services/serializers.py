@@ -1,6 +1,5 @@
 from rest_framework import serializers
 from .models import Service, ServiceAttachment, ServiceCategory
-from ..serializers.profiles import ProviderProfilePublicSerializer
 
 
 class ServiceAttachmentSerializer(serializers.ModelSerializer):
@@ -127,7 +126,7 @@ class ServiceListSerializer(serializers.ModelSerializer):
         model = Service
         fields = [
             "service_id",
-            "name",
+            "name", "description",
             "min_charge", "max_charge",
             "is_default", "years_of_experience",
             "is_active", "created_at", 

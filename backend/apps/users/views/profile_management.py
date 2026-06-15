@@ -10,6 +10,9 @@ from django_filters.rest_framework import DjangoFilterBackend
 
 from ..permissions import IsProfileOwnerOrReadOnly
 from ..provider_models import ProviderModel
+from ...posts.models import PostAttachment
+from ...posts.services_T import return_paginated_view
+from ...posts.serializers.create import PostAttachmentSerializer
 from ..base_model import WorkImages
 from ..serializers.profiles import ProviderProfileUpdateCreateSerializer, BaseProfileListSerializer, \
     ProviderProfileDetailSerializer, ProviderProfilePublicSerializer, CustomerProfilePublicSerializer, \
@@ -152,7 +155,12 @@ class WorkImagesViewSet(viewsets.ModelViewSet):
     pagination_class = ProfilePagination
 
     def get_serializer_class(self):
-        return WorkImagesSerializer
+        if self.action == "user_images":
+            return WorkImagesSerializer
+        elif self.action == "user_activity":
+            return PostAttachmentSerializer
+        else:
+            return WorkImagesSerializer
     
     def get_queryset(self):
         return self.filter_queryset(
@@ -165,9 +173,13 @@ class WorkImagesViewSet(viewsets.ModelViewSet):
     @action(methods=["get"], detail=False, url_path="user/(?P<user_id>[^/.]+)/images")
     def user_images(self, request, user_id: UUID = None):
         images = WorkImages.objects.filter(profile__user__pk=user_id)
-        page = self.paginate_queryset(images)
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-        serializer = self.get_serializer(images, many=True)
-        return Response(data=serializer.data, status=200)
+        return return_paginated_view(self, images)
+
+    @action(methods=['get'], detail=False, url_path="user/(?P<user_id>[^/.]+)/activity")
+    def user_activity(self, request, user_id: UUID = None):
+        ''' fetch all images related to the user from posts and comments'''
+        images = PostAttachment.objects.filter(
+            Q(post__user__pk=user_id) | Q(comment__user__pk=user_id)
+        ).select_related("post", 'comment')
+
+        return return_paginated_view(self, images)
