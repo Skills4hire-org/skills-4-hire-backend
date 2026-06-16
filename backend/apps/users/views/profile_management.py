@@ -114,8 +114,6 @@ class ProfileViewSet(viewsets.GenericViewSet):
         cover_letter = serializer.save()
         return Response(data={"status": True, 'message': "profile cover photo updated successfully"}, status=200)
 
-
-    @method_decorator(cache_page(60 * 2))
     @action(methods=['get', 'patch'], detail=False, url_path="me")
     def me(self, request, *args, **kwargs):
         user = request.user
@@ -138,16 +136,11 @@ class ProfileViewSet(viewsets.GenericViewSet):
         else:
             serializer = self.get_serializer(
                 profile, data=request.data,
-                context={"request":request}, partial=True
+                context={"request": request}, partial=True
             )
             serializer.is_valid(raise_exception=True)
-
             updated_profile = serializer.save()
-            if user.is_provider:
-                output_serializer = ProviderProfilePublicSerializer(updated_profile).data
-            else:
-                output_serializer = CustomerProfilePublicSerializer(updated_profile).data
-            return Response(output_serializer, status=status.HTTP_200_OK)
+            return Response({"status": True, "detail": "Profile updated"}, status=status.HTTP_200_OK)
         
 
 class WorkImagesViewSet(viewsets.ModelViewSet):
