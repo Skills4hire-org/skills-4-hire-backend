@@ -139,9 +139,7 @@ class BaseProfileListSerializer(serializers.ModelSerializer):
             return str(obj.customer_profile.customer_id)
         return None
 
-    
 class ProviderProfileUpdateCreateSerializer(serializers.ModelSerializer):
-
     profile = BaseProfileCreateSerializer(required=False)
 
     class Meta:
