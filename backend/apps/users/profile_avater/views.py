@@ -34,8 +34,7 @@ class AvatarViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         user_avatar = serializer.save()
-        output_serializer = AvatarDetailSerializer(user_avatar).data
-        return Response(output_serializer, status=status.HTTP_201_CREATED)
+        return Response({"status": True, "detail": "profile added"}, status=status.HTTP_201_CREATED)
 
 
 
