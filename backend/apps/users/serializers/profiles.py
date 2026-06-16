@@ -64,13 +64,13 @@ class WorkImagesSerializer(serializers.ModelSerializer):
 class BaseProfileCreateSerializer(serializers.ModelSerializer):
     work_images = WorkImagesSerializer(many=True, required=False, read_only=True)
     category_interest = serializers.PrimaryKeyRelatedField(
-        queryset=ServiceCategory.objects.all(), required=False, allow_null=True,
+        queryset=ServiceCategory.objects.all().values_list("service_category_id", flat=True), required=False, allow_null=True,
         many=True
     )
     class Meta:
         model = BaseProfile
         fields = [
-            "gender", "display_name", "country", 
+            "gender", "display_name", "country", "state",
             "city", "bio", "location", "work_images", 
             "category_interest", "years_of_experience", "is_certified",
             "place_of_work", "phone_number", "nin", "date_of_birth",
@@ -108,7 +108,7 @@ class BaseProfileCreateSerializer(serializers.ModelSerializer):
             raise PermissionDenied("You do not have permission to update this profile.")
 
         if work_images_data is not None:
-            serializer = WorkImagesSerializer(data=work_images_data, many=True)
+            serializer = WorkImagesSerializer(data=work_images_data, many=True, context={"request": self.context['request']})
             serializer.is_valid(raise_exception=True)
             serializer.save(profile=instance)
 
@@ -169,7 +169,7 @@ class ProviderProfileUpdateCreateSerializer(serializers.ModelSerializer):
 
         if "profile" in validated_data:
             profile_data = validated_data.pop('profile')
-            serializer = BaseProfileCreateSerializer(profile, data=profile_data, partial=True)
+            serializer = BaseProfileCreateSerializer(profile, data=profile_data, context={"request": self.context['request']}, partial=True)
             serializer.is_valid(raise_exception=True)
             serializer.save()
             
