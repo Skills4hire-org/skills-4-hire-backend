@@ -39,10 +39,10 @@ class AvatarCreateSerializer(serializers.ModelSerializer):
             base_profile = user.profile
 
         try:
-            avatar = Avatar.objects.create(profile=base_profile, **validated_data)
+            avatar = Avatar.objects.update_or_create(profile=base_profile, defaults=validated_data)
         except Exception as e:
             raise Exception(e)
-
+        
         return avatar
 
     def update(self, instance, validated_data):
