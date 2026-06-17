@@ -1,6 +1,6 @@
-
-from django.db import transaction
+from importlib import import_module
 from django.db.models import Avg, Count
+from django.contrib.auth import get_user_model
 
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
@@ -10,13 +10,18 @@ import validators
 from ..base_model import BaseProfile, WorkImages
 from ..customer_models import CustomerModel
 from ..profile_avater.serializers import AvatarDetailSerializer
-from ..profile_services.customer_profile import CustomerService
-from ..profile_services.provider_profile import ProviderProfileServices
-from ..profile_services.utils import get_profile_avatar
 from ..provider_models import ProviderModel
 from ..services.models import ServiceCategory
-
 from ..skills.serializers import ProviderSkillListSerializer
+
+UserModel = get_user_model()
+
+class UserCreateUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserModel
+        fields = [
+            "first_name", "last_name", "phone",
+        ]
 
 def save_base_profile_with_serializer(base_profile, validated_data, request):
     serializer = BaseProfileCreateSerializer(
@@ -61,17 +66,19 @@ class WorkImagesSerializer(serializers.ModelSerializer):
         validated_data.update({"profile": profile})
         return super().create(validated_data)
 
+
 class BaseProfileCreateSerializer(serializers.ModelSerializer):
     work_images = WorkImagesSerializer(many=True, required=False, read_only=True)
     category_interest = serializers.PrimaryKeyRelatedField(
-        queryset=ServiceCategory.objects.all().values_list("service_category_id", flat=True), required=False, allow_null=True,
+        queryset=ServiceCategory.objects.all().values_list("service_category_id", flat=True), required=False,
         many=True
     )
+    user = UserCreateUpdateSerializer(required=False)
     class Meta:
         model = BaseProfile
         fields = [
             "gender", "display_name", "country", "state",
-            "city", "bio", "location", "work_images", 
+            "city", "bio", "location", "work_images", "user",
             "category_interest", "years_of_experience", "is_certified",
             "place_of_work", "phone_number", "nin", "date_of_birth",
             "drivers_lisence", "passport", "certificates"
@@ -102,10 +109,16 @@ class BaseProfileCreateSerializer(serializers.ModelSerializer):
 
     def update(self, instance: BaseProfile, validated_data: dict):
         work_images_data = validated_data.pop("work_images", None)
+        user_data: dict = validated_data.pop("user", None)
 
         user = self.context.get("request").user
         if instance.user != user:
             raise PermissionDenied("You do not have permission to update this profile.")
+
+        if user_data is not None:
+            for attr, value in user_data.items():
+                setattr(user, attr, value)
+            user.save()
 
         if work_images_data is not None:
             serializer = WorkImagesSerializer(data=work_images_data, many=True, context={"request": self.context['request']})
@@ -303,8 +316,7 @@ class CustomerCreateUpdateSerializer(serializers.ModelSerializer):
         model = CustomerModel
         fields = [
             "customer_id", "profile",
-            "website", "city", "country",
-            "industry_name"
+            "website", "industry_name"
         ]
 
     def validate_website(self, value):
@@ -320,24 +332,6 @@ class CustomerCreateUpdateSerializer(serializers.ModelSerializer):
                 value.strip().title()
         return data
 
-
-    @transaction.atomic
-    def create(self, validated_data):
-        user = self.context.get("request").user
-        base_profile = user.profile
-        if "profile" in validated_data:
-            user_base_profile_data = validated_data.get("profile")
-            save_base_profile_with_serializer(
-                base_profile, user_base_profile_data,
-                self.context.get("request")
-            )
-            validated_data.pop("profile")
-        try:
-            user_profile = CustomerService() \
-                .create_customer(base_profile, validated_data)
-        except Exception as e:
-            raise serializers.ValidationError(str(e))
-        return user_profile
 
     def update(self, instance, validated_data):
         user = self.context.get("request").user
@@ -357,35 +351,17 @@ class CustomerCreateUpdateSerializer(serializers.ModelSerializer):
         return updated_profile
 
 class CustomerProfileDetailSerializer(serializers.ModelSerializer):
-    profile = BaseProfileListSerializer()
-    profile_avatar = serializers.SerializerMethodField()
-    country = serializers.SerializerMethodField()
-
+   
+    user = serializers.SerializerMethodField()
     class Meta:
         model = CustomerModel
         fields = [
             "customer_id", 'website',
-            "profile", "industry_name",
-            "created_at", "is_active", "city",
-            "country", "is_verified", "profile_avatar"
+            "user", "industry_name",
         ]
-
-    def get_country(self, obj):
-        return obj.get_country()
-
-    def get_profile_avatar(self, obj):
-        avatar = get_profile_avatar(profile=obj)
-        if avatar is None:
+    def get_user(self, obj):
+        from ...authentication.serializers import UserReadSerializer
+        user = getattr(obj.profile, "user", None)
+        if user is None:
             return None
-        return AvatarDetailSerializer(avatar).data
-
-class CustomerProfilePublicSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = CustomerModel
-        fields = [
-            "customer_id", "profile",
-            "industry_name", "website",
-            "created_at", "is_verified"
-        ]
-
-
+        return UserReadSerializer(user).data

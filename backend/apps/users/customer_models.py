@@ -1,5 +1,4 @@
 from django.db import models
-from django_countries.fields import CountryField
 from django.utils.text import gettext_lazy as _
 import uuid
 
@@ -21,9 +20,6 @@ class CustomerModel(models.Model):
 
     website = models.URLField(blank=True, null=True)
 
-    city = models.CharField(blank=True, null=True)
-    country = CountryField(blank=True, null=True)
-
     industry_name = models.CharField(blank=True, null=True, db_index=True)
 
     total_hires  = models.PositiveIntegerField(default=0)
@@ -42,10 +38,6 @@ class CustomerModel(models.Model):
             models.Index(fields=("is_active",), name="dele_acti_idx"),
             models.Index(fields=("is_active", "is_verified"), name="very_dele_acti_idx")
         ]
-
-    def get_country(self):
-        if self.country:
-            return str(self.country)
 
     def __str__(self):
         return f"CustomerModel('{self.profile.user.full_name}', {self.is_active})"

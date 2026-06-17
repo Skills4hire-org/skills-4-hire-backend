@@ -15,7 +15,7 @@ from ...posts.services_T import return_paginated_view
 from ...posts.serializers.create import PostAttachmentSerializer
 from ..base_model import WorkImages
 from ..serializers.profiles import ProviderProfileUpdateCreateSerializer, BaseProfileListSerializer, \
-    ProviderProfileDetailSerializer, ProviderProfilePublicSerializer, CustomerProfilePublicSerializer, \
+    ProviderProfileDetailSerializer, ProviderProfilePublicSerializer, \
     CustomerCreateUpdateSerializer, CustomerProfileDetailSerializer, CoverPhoto, WorkImagesSerializer
 from ..profile_services.paginations import ProfilePagination
 from ...authentication.serializers import UserReadSerializer
@@ -102,7 +102,7 @@ class ProfileViewSet(viewsets.GenericViewSet):
             if self.action in ("partial_update", "me"):
                 return CustomerCreateUpdateSerializer
             else:
-                return CustomerProfilePublicSerializer
+                return CustomerProfileDetailSerializer
         else:
             raise ValueError("Invalid user obj")
         
