@@ -89,6 +89,6 @@ class ProviderModelAdmin(admin.ModelAdmin):
 
 @admin.register(CustomerModel)
 class CustomerModelAdmin(admin.ModelAdmin):
-    list_display = ['profile__display_name', "industry_name", 'city', 'is_active']
+    list_display = ['profile__display_name', "industry_name", 'is_active']
     list_filter = ['is_active', "profile__display_name"]
     list_per_page = 50

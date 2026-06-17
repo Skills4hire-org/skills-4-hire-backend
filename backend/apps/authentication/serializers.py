@@ -12,7 +12,6 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken, BlacklistedToken, OutstandingToken
 
 from .helpers import validate_email, _get_user_by_email, _get_code_instance_or_none
-from apps.users.serializers.profiles import BaseProfileListSerializer
 import logging
 
 
@@ -344,6 +343,7 @@ class CustomLogoutSerializer(serializers.Serializer):
         return attrs
 
 class UserReadSerializer(serializers.ModelSerializer):
+    from apps.users.serializers.profiles import BaseProfileListSerializer
     profile = BaseProfileListSerializer(read_only=True)
     class Meta:
         model = User
@@ -351,5 +351,5 @@ class UserReadSerializer(serializers.ModelSerializer):
             "user_id", "phone",
             "email", "first_name", "last_name", 
             "is_provider", "is_customer",
-            "is_verified", "profile", 
+            "is_verified", "profile"
         ]   
