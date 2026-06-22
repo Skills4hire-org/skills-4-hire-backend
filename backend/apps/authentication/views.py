@@ -7,7 +7,7 @@ from .serializers import (
     ResendOtpSerializer,
     PasswordResetConfirmSerializer,
     CustomTokenObtainPairSerializer,
-    CustomLogoutSerializer
+    CustomLogoutSerializer, SocialAuthSerializer
 )
 from .utils.helpers import create_otp_for_user
 from .helpers import (
@@ -225,3 +225,13 @@ class LogOutViewSet(viewsets.ModelViewSet):
                 }
             }, status=status.HTTP_400_BAD_REQUEST)
 
+
+class SocialAuthViewSet(viewsets.ModelViewSet):
+    http_method_names = ['post']
+    serializer_class = SocialAuthSerializer
+    permission_classes = [permissions.AllowAny]
+
+    def get_serializer_context(self):
+        data = super().get_serializer_context()
+        data['provider'] = self.kwargs.get("provider")
+        return data

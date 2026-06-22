@@ -37,6 +37,7 @@ dependencies = [
     "email-validator>=2.3.0",
     "factory-boy>=3.3.3",
     "faker>=40.5.1",
+    "google-auth>=2.55.0",
     "gunicorn>=25.1.0",
     "phonenumberslite>=9.0.25",
     "postal-regex>=1.0.0",

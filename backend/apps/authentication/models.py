@@ -68,6 +68,12 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         other fields 
     """
 
+    class AuthProviders(models.TextChoices):
+        SYSTEM = "SYSTEM"
+        GOOGLE = "GOOGLE"
+        FACEBOOK = "FACEBOOK"
+        APPLE = "APPLE"
+
     class RoleChoices(models.TextChoices):
         ADMIN = "ADMIN", "Admin"
         CUSTOMER = "CUSTOMER", "Customer"
@@ -86,10 +92,12 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
                         unique=True, 
                         )
                 
+    password = models.CharField(max_length=125, null=True)
 
     email = models.EmailField(
         unique=True, 
         blank=False, 
+        null=True,
         max_length=100
     )
     phone = PhoneNumberField(max_length=50, blank=True, null=True)
@@ -98,6 +106,7 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
 
     # user roles in [admin, customer, service_provider]
     active_role = models.CharField(max_length=30, choices=RoleChoices.choices, default=None, blank=True, null=True)
+    login_provider = models.CharField(max_length=30, choices=AuthProviders.choices, default=AuthProviders.SYSTEM)
 
      # Boolean fields
     is_provider = models.BooleanField(default=False)

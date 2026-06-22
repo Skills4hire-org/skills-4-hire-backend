@@ -58,7 +58,7 @@ class WorkImagesSerializer(serializers.ModelSerializer):
     def validate_description(self, value):
         if value and len(value) > 255:
             raise serializers.ValidationError("Description exceeded max length")
-        return value.strip().title()
+        return value
     
     def create(self, validated_data):
         user = self.context['request'].user
