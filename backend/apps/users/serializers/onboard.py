@@ -1,4 +1,4 @@
-from rest_framework import serializers
+from rest_framework import serializers, status
 
 from django.utils.text import gettext_lazy as _
 from rest_framework.exceptions import ValidationError

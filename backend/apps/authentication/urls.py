@@ -6,7 +6,7 @@ from .views import (
     PasswordResetRequestViewSet,
     PasswordResetConfirmViewSet,
     token_obtain_pair,
-    LogOutViewSet
+    LogOutViewSet, SocialAuthViewSet
 )
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.routers import DefaultRouter
@@ -27,6 +27,7 @@ refresh_view = TokenRefreshView.as_view()
 
 urlpatterns = [
     path("login/", token_obtain_pair, name="token-obtain"),
+    path('login/<str:provider>/', SocialAuthViewSet.as_view({"post": 'create'})),
     path("refresh/token/", refresh_view, name="refresh-token"),
     path("", include(router.urls)),
 ]

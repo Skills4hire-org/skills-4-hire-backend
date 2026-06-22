@@ -5,6 +5,7 @@ from django.contrib.auth.password_validation import validate_password as _valida
 from django.db import transaction
 from django.utils import  timezone
 from django.db.models import Avg, Count
+from django.db.models import Q
 
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework import serializers
@@ -12,8 +13,12 @@ from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 from rest_framework_simplejwt.tokens import RefreshToken, BlacklistedToken, OutstandingToken
 
 from .helpers import validate_email, _get_user_by_email, _get_code_instance_or_none
-import logging
+from .models import CustomUser
+from .services.auth_services import google_auth, facebook_auth, apple_auth
 
+
+from typing import Optional
+import logging
 
 logger = logging.getLogger(__name__)
 User = get_user_model()
@@ -353,3 +358,65 @@ class UserReadSerializer(serializers.ModelSerializer):
             "is_provider", "is_customer",
             "is_verified", "profile"
         ]   
+
+
+class CustomRefreshToken(RefreshToken):
+    @classmethod
+    def for_user(cls, user):
+        data = super().for_user(user)
+        data['email'] = user.email
+        return data
+
+class SocialAuthSerializer(serializers.Serializer):
+    token = serializers.CharField(write_only=True, required=True)
+
+    def validate(self, data):
+        provider: str = self.context.get("provider")
+        if provider is None:
+            raise serializers.ValidationError("Invalid Request: provider is not present")
+        
+        if provider.upper() not in CustomUser.AuthProviders.values:
+            raise serializers.ValidationError("provider is not in valid options")
+
+        data['provider'] = provider.upper()
+        return data
+    
+
+    def create(self, validated_data):
+        provider = validated_data['provider']
+        token = validated_data['token']
+
+        user_info = None
+
+        if provider == CustomUser.AuthProviders.GOOGLE:
+           user_info = google_auth(token=token)
+        elif provider == CustomUser.AuthProviders.FACEBOOK:
+            user_info = facebook_auth(token=token)
+        elif provider == CustomUser.AuthProviders.APPLE:
+            user_info = apple_auth(token=token)
+        else:
+            raise serializers.ValidationError("invalid Request")
+
+        if not user_info.get("status"):
+            raise serializers.ValidationError(user_info)
+        if not "email" or "phone" in user_info:
+            raise serializers.ValidationError("Phone or email adddress is not present in user info")
+        
+        # sign up either with email or phone nmber
+        try:
+            email = user_info.get("email", None)
+            phone = user_info.get("phone")
+            user, created = CustomUser.objects.get_or_create(
+                Q(email=email) | Q(phone=phone),
+                defaults={
+                    "email":email, 'phone':phone, "username":user_info.get("name"),
+                    "is_active":True, "is_verified":True
+                }
+            )
+
+            refresh = CustomRefreshToken().for_user(user, context=self.context)
+            user_data = UserReadSerializer(user, context=self.context).data
+            response = {"refresh_token": str(refresh), "access_token": str(refresh.access_token), "user_data": user_data}
+            return {"status": True, "data": response}
+        except Exception as exc:
+            raise serializers.ValidationError(str(exc))
