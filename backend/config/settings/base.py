@@ -259,8 +259,8 @@ CELERY_BEAT_SCHEDULE = {
         "schedule": crontab(hour=0, minute=0)
     }
 }
-CORS_ALLOWED_ORIGINS = env('CORS_ALLOWED_ORIGINS').split(",")
 
+CORS_ALLOW_ALL_ORIGINS = True
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOW_HEADERS = [

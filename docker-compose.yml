@@ -21,17 +21,15 @@ services:
     command: ["uv", 'run', "backend/manage.py", "collectstatic", "--noinput"]
 
   web:
-    container_name: skills4Hire
+    container_name: skills5Hire
     depends_on:
       db_migrate:
         condition: service_completed_successfully
     build: .
-    command: [
-      "uv", "run", "gunicorn", "-k", "daphne.awsgi.DaphneProcessWorker", "-b", 
-      "0.0.0.0:8000", "config.asgi:application"
-    ]
+    command: ["uv", "run", "daphne", "-b", "0.0.0.0", "-p", "8000", "config.asgi:application"]
     env_file:
       - .env
+    working_dir: /app/backend/backend
     volumes:
       - static_volume:/vol/static
     restart: "always"
@@ -41,10 +39,12 @@ services:
   celery-worker:
     build: .
     container_name: celery-worker
-    command: ["uv", "run", "celery", "-A", "config", "worker", "--loglevel=info"]
+    command: ["uv", "run", "celery", "-A", "config.celery", "worker", "--loglevel=info"]
+
     env_file:
       - .env
     restart: "unless-stopped"
+    working_dir: /app/backend/backend
 
   celery-beat:
     build: .
@@ -52,7 +52,8 @@ services:
     restart: "unless-stopped"
     env_file:
       - .env
-    command: ["uv", "run", "celery", "-A", "config", "beat", "--loglevel=info"]
+    command: ["uv", "run", "celery", "-A", "config.celery", "beat", "--loglevel=info"]
+    working_dir: /app/backend/backend
 
   nginx:
     build: 
@@ -63,7 +64,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/prod.conf
+      - ./nginx/conf.d/prod.conf:/etc/nginx/conf.d/prod.conf
       - static_volume:/vol/static
     depends_on:
       - web
