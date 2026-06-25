@@ -404,19 +404,19 @@ class SocialAuthSerializer(serializers.Serializer):
         
         # sign up either with email or phone nmber
         try:
-            email = user_info.get("email", None)
-            phone = user_info.get("phone")
-            user, created = CustomUser.objects.get_or_create(
-                Q(email=email) | Q(phone=phone),
-                defaults={
-                    "email":email, 'phone':phone, "username":user_info.get("name"),
-                    "is_active":True, "is_verified":True
-                }
+            email = user_info.get("email")
+            default_kwargs = {
+                "email": email, "username": user_info.get("name"),
+                "is_active": True, "is_verified": True if user_info.get("email_verified") else False
+            }
+            user, created = CustomUser.objects.get_or_create(email=email,
+                defaults=default_kwargs
             )
-
+            user.last_login = timezone.now()
             refresh = CustomRefreshToken().for_user(user)
             user_data = UserReadSerializer(user, context=self.context).data
             response = {"refresh_token": str(refresh), "access_token": str(refresh.access_token), "user_data": user_data}
+            user.save()
             return response
         except Exception as exc:
             raise serializers.ValidationError(str(exc))

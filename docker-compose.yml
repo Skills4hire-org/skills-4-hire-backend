@@ -16,6 +16,10 @@ services:
   collect_static:
     build: .
     container_name: static-files
+    environment:
+      - STATIC_ROOT=/vol/static
+    volumes: 
+      - static_volume: /vol/static
     env_file:
       - .env
     command: ["uv", 'run', "backend/manage.py", "collectstatic", "--noinput"]
@@ -32,6 +36,9 @@ services:
     ]
     env_file:
       - .env
+    
+    environment:
+      - STATIC_ROOT=/vol/static
     volumes:
       - static_volume:/vol/static
     restart: "always"
