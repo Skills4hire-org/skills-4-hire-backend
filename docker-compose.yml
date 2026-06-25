@@ -19,7 +19,7 @@ services:
     environment:
       - STATIC_ROOT=/vol/static
     volumes: 
-      - static_volume: /vol/static
+      - static_volume:/vol/static
     env_file:
       - .env
     command: ["uv", 'run', "backend/manage.py", "collectstatic", "--noinput"]
@@ -70,7 +70,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx.conf:/etc/nginx/conf.d/prod.conf
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/prod.conf
       - static_volume:/vol/static
     depends_on:
       - web
