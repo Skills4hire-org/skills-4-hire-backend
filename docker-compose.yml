@@ -31,8 +31,7 @@ services:
         condition: service_completed_successfully
     build: .
     command: [
-      "uv", "run", "gunicorn", "-k", "daphne.gunicorn.workers.DaphneProcessWorker", "-b", 
-      "0.0.0.0:8000", "config.asgi:application"
+      "uv", "run", "daphne", "-b", "0.0.0.0", "-p", "8000", "config.asgi:application"
     ]
     env_file:
       - .env
@@ -48,6 +47,7 @@ services:
   celery-worker:
     build: .
     container_name: celery-worker
+    working_dir: /app/backend
     command: ["uv", "run", "celery", "-A", "config", "worker", "--loglevel=info"]
     env_file:
       - .env
@@ -57,6 +57,7 @@ services:
     build: .
     container_name: celery-beat
     restart: "unless-stopped"
+    working_dir: /app/backend
     env_file:
       - .env
     command: ["uv", "run", "celery", "-A", "config", "beat", "--loglevel=info"]
