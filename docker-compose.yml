@@ -31,7 +31,7 @@ services:
         condition: service_completed_successfully
     build: .
     command: [
-      "uv", "run", "gunicorn", "-k", "daphne.awsgi.DaphneProcessWorker", "-b", 
+      "uv", "run", "gunicorn", "-k", "daphne.gunicorn.workers.DaphneProcessWorker", "-b", 
       "0.0.0.0:8000", "config.asgi:application"
     ]
     env_file:
@@ -70,7 +70,7 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/conf.d/prod.conf
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/nginx.conf
       - static_volume:/vol/static
     depends_on:
       - web
