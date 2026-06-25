@@ -4,7 +4,7 @@ import dj_database_url
 DEBUG = env("DEBUG", default=False)
 BASE_URL = env("BASE_URL_PROD")
 
-ALLOWED_HOSTS = env("ALLOWED_HOSTS").split(",")
+ALLOWED_HOSTS = ["*"]
 
 CACHES = {
     "default": {

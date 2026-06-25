@@ -26,6 +26,7 @@ services:
 
   web:
     container_name: skills4Hire
+    working_dir: /app/backend/backend
     depends_on:
       db_migrate:
         condition: service_completed_successfully
@@ -46,7 +47,7 @@ services:
   celery-worker:
     build: .
     container_name: celery-worker
-    working_dir: /app/backend
+    working_dir: /app/backend/backend
     command: ["uv", "run", "celery", "-A", "config", "worker", "--loglevel=info"]
     env_file:
       - .env
@@ -56,7 +57,7 @@ services:
     build: .
     container_name: celery-beat
     restart: "unless-stopped"
-    working_dir: /app/backend
+    working_dir: /app/backend/backend
     env_file:
       - .env
     command: ["uv", "run", "celery", "-A", "config", "beat", "--loglevel=info"]
