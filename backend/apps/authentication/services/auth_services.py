@@ -4,14 +4,13 @@ from google.oauth2 import id_token
 from google.auth.transport import requests
 
 request_instance = requests.Request()
-client_id = getattr(settings, 'GOOGLE_CLIENT_ID', "966703990812-96mlggia5msa6cf773jec15rocpfgo7j.apps.googleusercontent.com")
+client_id = getattr(settings, 'GOOGLE_CLIENT_ID')
 
 def verify_google_token(token: str) -> dict[str, any]:
     try:
         response = id_token.verify_oauth2_token(
-            id_token=token, request=request_instance, audience=client_id
+            id_token=token, request=request_instance, audience=str(client_id)
         )
-
         return {
             "status": True, "user_id": response.get("sup"),
             "email": response.get("email"), "name": response.get('name'),
