@@ -47,6 +47,8 @@ build/
 # Static files (if collected into a separate directory during deployment)
 # If your static files are collected into a 'staticfiles' directory, you might want to ignore it.
 *staticfiles/
+./backend/staticfiles
+
 
 # Media files (user-uploaded files)
 media/

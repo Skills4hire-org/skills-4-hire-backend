@@ -414,9 +414,9 @@ class SocialAuthSerializer(serializers.Serializer):
                 }
             )
 
-            refresh = CustomRefreshToken().for_user(user, context=self.context)
+            refresh = CustomRefreshToken().for_user(user)
             user_data = UserReadSerializer(user, context=self.context).data
             response = {"refresh_token": str(refresh), "access_token": str(refresh.access_token), "user_data": user_data}
-            return {"status": True, "data": response}
+            return response
         except Exception as exc:
             raise serializers.ValidationError(str(exc))
