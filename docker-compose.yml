@@ -35,7 +35,6 @@ services:
     ]
     env_file:
       - .env
-    
     environment:
       - STATIC_ROOT=/vol/static
     volumes:
