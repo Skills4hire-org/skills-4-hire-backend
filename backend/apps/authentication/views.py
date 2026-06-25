@@ -235,3 +235,10 @@ class SocialAuthViewSet(viewsets.ModelViewSet):
         data = super().get_serializer_context()
         data['provider'] = self.kwargs.get("provider")
         return data
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        response = serializer.save()
+        return Response(data=response, status=201)
+    

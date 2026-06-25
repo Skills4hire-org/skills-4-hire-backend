@@ -7,7 +7,7 @@ from .services import health, check_docker_update, test_email, get_banks
 # ADMIN view and health checks
 urlpatterns = [
     path('aduser-skills4hire/', admin.site.urls),
-    # path("health/", health, name="health"),
+    path("health/", health, name="health"),
     # path("docker/", check_docker_update, name="docker"),
     # path("email/", test_email, name='test')
     path('banks/', get_banks, name='get_banks')
