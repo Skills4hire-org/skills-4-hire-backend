@@ -4,6 +4,8 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 
+from apps.core.exceptions import api_response, error_response
+
 from .models import PaymentRequestBooking, BookingTransaction
 from .serializers import (Bookings, BookingCreateSerializer,
                           BookingSerializer, AcceptRejectSerializer,
@@ -63,14 +65,12 @@ class BookingViewSet(viewsets.ModelViewSet):
         user = request.user
         status = serializer.validated_data['status']
         if transaction_ready_exists(user, idempotency=idempotency)[0]:
-
-            return Response(
-                status=status.HTTP_409_CONFLICT,
+            return api_response(
                 data={
-                    "status": "success",
-                    'msg': "Found duplicate transaction",
-                    'data': BookingTransactionSerializer(transaction_ready_exists(user, idempotency)[1]).data
-                }
+                    'transaction': BookingTransactionSerializer(transaction_ready_exists(user, idempotency)[1]).data,
+                },
+                message="Found duplicate transaction",
+                status_code=status.HTTP_409_CONFLICT,
             )
         saved_booking = serializer.save()
         try:
@@ -82,7 +82,11 @@ class BookingViewSet(viewsets.ModelViewSet):
             logger.error("Exception while broadcasting message to websocket")
 
         output_serializer = BookingSerializer(saved_booking).data
-        return Response(output_serializer, status=status.HTTP_200_OK)
+        return api_response(
+            data=output_serializer,
+            message="Booking updated successfully",
+            status_code=status.HTTP_200_OK,
+        )
 
     def get_queryset(self):
         """" A base queryset to fetch all booking associated to the request.user"""
@@ -120,13 +124,12 @@ class BookingViewSet(viewsets.ModelViewSet):
     
             logger.info("Dublicate Booking Transaction Found, returning the initial request")
 
-            return Response(
-                status=status.HTTP_200_OK,
+            return api_response(
                 data={
-                    "status": "success",
-                    'msg': "Duplicate Booking, Returning initial transaction",
-                    "data": BookingTransactionSerializer(transaction_ready_exists(user, idempotency)[1]).data
-                }
+                    'transaction': BookingTransactionSerializer(transaction_ready_exists(user, idempotency)[1]).data,
+                },
+                message="Duplicate Booking, returning initial transaction",
+                status_code=status.HTTP_200_OK,
             )
         
         created_booking = serializer.save()
@@ -136,7 +139,11 @@ class BookingViewSet(viewsets.ModelViewSet):
             logger.info(f"Failed to broadcast message to consumer: {exc}")
 
         output_serializer = BookingSerializer(created_booking).data
-        return Response(output_serializer, status=status.HTTP_201_CREATED)
+        return api_response(
+            data=output_serializer,
+            message="Booking created successfully",
+            status_code=status.HTTP_201_CREATED,
+        )
 
 
     @method_decorator(cache_page(60 * 2))
@@ -153,8 +160,15 @@ class BookingViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         if isinstance(instance, Bookings):
             BookingService().delete_booking(instance, request.user)
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        return Response({"detail": "Failed to delete booking instance"}, exception=True,status=status.HTTP_400_BAD_REQUEST)
+            return api_response(
+                data={},
+                message="Booking deleted successfully",
+                status_code=status.HTTP_204_NO_CONTENT,
+            )
+        return error_response(
+            message="Failed to delete booking instance",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
 
         
     @action(methods=['post'], detail=True, url_path='request_payout')
@@ -164,7 +178,11 @@ class BookingViewSet(viewsets.ModelViewSet):
                                          context={'request': request, "booking": booking})
         serializer.is_valid(raise_exception=True)
         output_serializer = serializer.save()
-        return Response(RequestSerializer(output_serializer).data, status=status.HTTP_201_CREATED)
+        return api_response(
+            data=RequestSerializer(output_serializer).data,
+            message="Payment request created successfully",
+            status_code=status.HTTP_201_CREATED,
+        )
     
 
 class BookingPaymentRequestViewSet(RetrieveModelMixin, viewsets.GenericViewSet):
@@ -209,14 +227,17 @@ class BookingPaymentRequestViewSet(RetrieveModelMixin, viewsets.GenericViewSet):
         if transaction_ready_exists(user, idempotency=idempotency)[0]:
             logger.info("Dublicate Transaction Found, returning the initial request")
 
-            return Response(
-                status=status.HTTP_200_OK,
+            return api_response(
                 data={
-                    "status": "success",
-                    'msg': "Duplicate Transaction, Returning initial transaction",
-                    "data": BookingTransactionSerializer(transaction_ready_exists(user, idempotency)[1]).data
-                }
+                    "transaction": BookingTransactionSerializer(transaction_ready_exists(user, idempotency)[1]).data,
+                },
+                message="Duplicate transaction, returning initial request",
+                status_code=status.HTTP_200_OK,
             )
 
         output_serializer = serializer.save()
-        return Response(RequestSerializer(output_serializer).data, status=status.HTTP_200_OK)
+        return api_response(
+            data=RequestSerializer(output_serializer).data,
+            message="Payment request reviewed successfully",
+            status_code=status.HTTP_200_OK,
+        )

@@ -25,8 +25,10 @@ from .utils.template_helpers import (
 
 from rest_framework.views import APIView
 from rest_framework.response import Response
-from rest_framework import status, permissions,viewsets
+from rest_framework import status, permissions, viewsets
 from rest_framework_simplejwt.views import TokenObtainPairView
+
+from apps.core.exceptions import api_response, error_response
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from django.conf import settings
@@ -71,11 +73,12 @@ class RegistrationViewSet(viewsets.ModelViewSet):
 
         registrations_service = RegistrationsService(serializer)
         registration_result = registrations_service.register_service()
-        return Response({
-                "status": "success",
+        return api_response(
+            data={
                 "create_connection_websocket": f"/ws/user/{registration_result.user_id}/",
-                "detail": "Registration successful. Verify your account using the OTP sent to your email"},
-            status=status.HTTP_201_CREATED,
+            },
+            message="Registration successful. Verify your account using the OTP sent to your email",
+            status_code=status.HTTP_201_CREATED,
         )
 
 class AccountVerificationViewSet(viewsets.ModelViewSet):
@@ -92,13 +95,16 @@ class AccountVerificationViewSet(viewsets.ModelViewSet):
             code_instance = _get_code_instance_or_none(code)
             account_verifed = verify_account(code_instance=code_instance, user=code_instance.user)
         except Exception as e:
-            return Response({
-                "status": "failed", "detail": f"account verification Failed : {e}"},
-                status=status.HTTP_400_BAD_REQUEST)
+            return error_response(
+                message=f"Account verification failed: {e}",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
         if account_verifed:
-            return Response({
-                "status": "success", "detail": "Account verification successfully"},
-                status=status.HTTP_200_OK)
+            return api_response(
+                data={},
+                message="Account verification successful",
+                status_code=status.HTTP_200_OK,
+            )
         return None
 
 class ResendOtpViewSet(viewsets.ModelViewSet):
@@ -114,7 +120,7 @@ class ResendOtpViewSet(viewsets.ModelViewSet):
         try:
             user = _get_user_by_email(email)
             if user is None:
-                return Response({"user": "User not found"})
+                raise NotFound("User not found")
             
             code = create_otp_for_user(user)
             context = genrate_context_for_resend_otp(
@@ -123,14 +129,17 @@ class ResendOtpViewSet(viewsets.ModelViewSet):
                 )
             send_email_to_user(context)
 
-            return Response(
-                {"status": "success", "detail": "OTP code sent. check your email address"}, 
-                status=status.HTTP_200_OK)
+            return api_response(
+                data={},
+                message="OTP code sent. Check your email address",
+                status_code=status.HTTP_200_OK,
+            )
         
         except Exception as exc:
-            return Response({
-                "detail": f"Error sending OTP: {exc}"
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return error_response(
+                message=f"Error sending OTP: {exc}",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
 class PasswordResetRequestViewSet(viewsets.ModelViewSet):
     http_method_names = ["post"]
@@ -150,10 +159,15 @@ class PasswordResetRequestViewSet(viewsets.ModelViewSet):
             raise
         send_email = send_email_to_user(context)
         if not send_email.get("success"):
-            return Response({"status": "Failed", "detail": "email notification Failed"})
-        return Response(
-            {"status": "success", "detail": {"message": "Password reset email sent..."}}, 
-            status=status.HTTP_200_OK)
+            return error_response(
+                message="Email notification failed",
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
+        return api_response(
+            data={"message": "Password reset email sent..."},
+            message="Password reset email sent",
+            status_code=status.HTTP_200_OK,
+        )
 
 class PasswordResetConfirmViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.AllowAny]
@@ -179,14 +193,15 @@ class PasswordResetConfirmViewSet(viewsets.ModelViewSet):
 
             blacklist_outstanding_token(user)
         except Exception as e:
-            return Response(
-                {"status": "failed", "detail": f"Error while updating password {e}"},
-                status=status.HTTP_400_BAD_REQUEST
+            return error_response(
+                message=f"Error while updating password: {e}",
+                status_code=status.HTTP_400_BAD_REQUEST,
             )
         
-        return Response(
-            {"status": "success", "detail": "Successfully  updated user password"},
-            status=status.HTTP_200_OK
+        return api_response(
+            data={},
+            message="Successfully updated user password",
+            status_code=status.HTTP_200_OK,
         )
 
 class LoginView(TokenObtainPairView):
@@ -211,19 +226,19 @@ class LogOutViewSet(viewsets.ModelViewSet):
             refresh = RefreshToken(refresh_token)
             refresh.blacklist()
 
-            return Response(
-                {"status": "success", "detail": "Logout successful"},
-                status=status.HTTP_200_OK
+            return api_response(
+                data={},
+                message="Logout successful",
+                status_code=status.HTTP_200_OK,
             )
 
 
-        except Exception  as exc:
-            return Response({
-                "detail": {
-                    "message": "Error occurred while validating log out sessions",
-                    "exceptions": str(exc)
-                }
-            }, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as exc:
+            return error_response(
+                message="Error occurred while validating logout sessions",
+                errors={"exceptions": str(exc)},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
 
 class SocialAuthViewSet(viewsets.ModelViewSet):
@@ -240,5 +255,9 @@ class SocialAuthViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         response = serializer.save()
-        return Response(data=response, status=201)
+        return api_response(
+            data=response,
+            message="Social authentication successful",
+            status_code=status.HTTP_201_CREATED,
+        )
     
