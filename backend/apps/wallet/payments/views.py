@@ -1,6 +1,7 @@
 from rest_framework import viewsets, permissions, status
 from rest_framework.response import Response
 
+from apps.core.exceptions import api_response, error_response
 
 from ..serializers import (
     BankAccountSerializer, RessolveBankSerializer,
@@ -47,22 +48,24 @@ class BankAccountViewSet(viewsets.ModelViewSet):
 
         if existing:
             logger.info("Found Existing bank account")
-            return Response({
-                "status": True,
-                "details": "Found Bank Account",
-                "data": BankAccountSerializer(existing).data
-            })
+            return api_response(
+                data={
+                    "found": True,
+                    "bank_account": BankAccountSerializer(existing).data,
+                },
+                message="Found bank account",
+                status_code=status.HTTP_200_OK,
+            )
 
 
         bank_account = serializer.save()
 
-        return Response(
-            {
-                "status": True,
-                "message": "Bank account added successfully.",
-                "data": BankAccountSerializer(bank_account).data,
+        return api_response(
+            data={
+                "bank_account": BankAccountSerializer(bank_account).data,
             },
-            status=status.HTTP_201_CREATED,
+            message="Bank account added successfully.",
+            status_code=status.HTTP_201_CREATED,
         )
 
 class TransferViewSet(viewsets.ModelViewSet):
@@ -86,17 +89,22 @@ class TransferViewSet(viewsets.ModelViewSet):
         ).first()
         if existing and existing.recipient_code is not None:
             logger.info("Found Existing bank account")
-            return Response({
-                "status": True,
-                "details": "Found Bank Account",
-                "data": BankAccountSerializer(existing).data
-            })
+            return api_response(
+                data={
+                    "found": True,
+                    "bank_account": BankAccountSerializer(existing).data,
+                },
+                message="Found bank account",
+                status_code=status.HTTP_200_OK,
+            )
         
         instance = serializer.save()
-        return  Response({
-            "status": True,
-            "details": "Transfer code added",
-            "data": BankAccountSerializer(instance).data
-        })
+        return api_response(
+            data={
+                "bank_account": BankAccountSerializer(instance).data,
+            },
+            message="Transfer code added",
+            status_code=status.HTTP_201_CREATED,
+        )
     
 

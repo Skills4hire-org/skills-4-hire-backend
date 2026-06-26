@@ -105,6 +105,9 @@ REST_FRAMEWORK = {
     #     'rest_framework.filters.OrderingFilter',
     # ),
     'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
+    'DEFAULT_RENDERER_CLASSES': (
+        'apps.core.renderers.StandardizedJSONRenderer',
+    ),
     'DEFAULT_THROTTLE_CLASSES': (
         'rest_framework.throttling.AnonRateThrottle',
         'rest_framework.throttling.UserRateThrottle',
@@ -113,9 +116,9 @@ REST_FRAMEWORK = {
         'anon': env('THROTTLE_RATE_ANON', default='100/hour'),
         'user': env('THROTTLE_RATE_USER', default='1000/hour'),
     },
-    'DEFAULT_PAGINATION_CLASS.': {
-        'PAGE_SIZE': env('DEFAULT_PAGE_SIZE', default=20, cast=int),
-    }
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': env('DEFAULT_PAGE_SIZE', default=20, cast=int),
+    'EXCEPTION_HANDLER': 'apps.core.exceptions.custom_exception_handler',
 }
 
 from datetime import timedelta

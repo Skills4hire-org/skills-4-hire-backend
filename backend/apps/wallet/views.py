@@ -4,6 +4,8 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
+from apps.core.exceptions import api_response, error_response
+
 from .serializers import WalletDetailSerializer, DepositSerializer,\
       WalletTransactionDetailSerializer, WithDrawalSerializer, WalletTransactionSummarySerializer
 from .models import Wallet, WalletTransaction, WebhookEvent
@@ -57,7 +59,11 @@ class WalletViewSet(viewsets.GenericViewSet):
 
         u_wallet = self.get_queryset()
         serialize_wallet = self.get_serializer(u_wallet)
-        return Response(serialize_wallet.data, status=status.HTTP_200_OK)
+        return api_response(
+            data=serialize_wallet.data,
+            message="Wallet fetched successfully",
+            status_code=status.HTTP_200_OK,
+        )
     
 class WalletTransactionViewSet(viewsets.GenericViewSet):
 
@@ -108,7 +114,11 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
         page = self.paginate_queryset(queryset=queryset)
         serializer = WalletTransactionSummarySerializer(queryset, many=True)
         if page is None:
-            return Response(serializer.data, status=200)
+            return api_response(
+                data=serializer.data,
+                message="Wallet transactions fetched successfully",
+                status_code=status.HTTP_200_OK,
+            )
         
         page_serializer = WalletTransactionSummarySerializer(page, many=True).data
         return self.get_paginated_response(page_serializer)
@@ -127,20 +137,24 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
 
         if existing_transaction:
             logger.info("Duplicate Transaction found for this request")
-            return Response({
-                "status":"failed",
-                'message': "Duplicated transaction, returning existing transaction",
-                'data': WalletTransactionDetailSerializer(existing_transaction).data
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return error_response(
+                message="Duplicated transaction, returning existing transaction",
+                errors={
+                    "transaction": WalletTransactionDetailSerializer(existing_transaction).data,
+                },
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         processed_transaction  = serializer.save()
 
         out_serializer = WalletTransactionDetailSerializer(processed_transaction).data
-        return Response({
-            "status": True,
-            "details": "Tranasction in process",
-            "data": out_serializer
-        })
+        return api_response(
+            data={
+                "transaction": out_serializer,
+            },
+            message="Transaction in process",
+            status_code=status.HTTP_200_OK,
+        )
 
 
     @action(methods=['post'], detail=False, url_path="deposit")
@@ -158,20 +172,21 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
 
         if existing_transaction:
             logger.info("Duplicate Transaction found for this request")
-            return Response({
-                "status":"failed",
-                'message': "Duplicated transaction, returning existing transaction",
-                'data': WalletTransactionDetailSerializer(existing_transaction).data
-            }, status=status.HTTP_400_BAD_REQUEST)
+            return error_response(
+                message="Duplicated transaction, returning existing transaction",
+                errors={
+                    "transaction": WalletTransactionDetailSerializer(existing_transaction).data,
+                },
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         saved_data  = serializer.save()
 
         if "wallet_transaction" not in saved_data:
             logger.info("failed to fetch transaction")
-            return Response({
-                "status": "failed",
-                'message': "failed to fetch transaction",
-            }, status=status.HTTP_400_BAD_REQUEST
+            return error_response(
+                message="Failed to fetch transaction",
+                status_code=status.HTTP_400_BAD_REQUEST,
             )
         
         wallet_transaction = saved_data['wallet_transaction']
@@ -180,13 +195,12 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
         
         logger.info("Deposit initialized %s", wallet_transaction.pk)
 
-        return Response(
-            {
-                "status": "success",
-                "message": "Deposit initiated successfully.",
-                "data":  process_transction,
+        return api_response(
+            data={
+                "transaction": process_transction,
             },
-            status=status.HTTP_201_CREATED,
+            message="Deposit initiated successfully.",
+            status_code=status.HTTP_201_CREATED,
         )
 
 

@@ -59,12 +59,6 @@ class WorkImagesSerializer(serializers.ModelSerializer):
         if value and len(value) > 255:
             raise serializers.ValidationError("Description exceeded max length")
         return value
-    
-    def create(self, validated_data):
-        user = self.context['request'].user
-        profile = getattr(user, "profile")
-        validated_data.update({"profile": profile})
-        return super().create(validated_data)
 
 
 class BaseProfileCreateSerializer(serializers.ModelSerializer):
@@ -254,8 +248,8 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
 
         def get_services(self, obj):
             from ..services.serializers import ServiceListSerializer
-            primary_service = obj.services.filter(is_active=True, is_default=True).last()
-            serializer = ServiceListSerializer(primary_service)
+            primary_service = obj.services.filter(is_active=True, is_default=True)[:4]
+            serializer = ServiceListSerializer(primary_service, many=True)
             return serializer.data
         
         def get_comments(self, obj):
@@ -268,9 +262,9 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
         def get_posts(self, obj):
             from ...posts.serializers.read import PostDetailSerializer
             user = obj.profile.user
-            user_posts = user.posts.filter(is_active=True, is_deleted=False).last()
-            serializer = PostDetailSerializer(user_posts, context={'request': self.context['request']})
-            return [serializer.data]
+            user_posts = user.posts.filter(is_active=True, is_deleted=False).order_by("-created_at")[:3]
+            serializer = PostDetailSerializer(user_posts, context={'request': self.context['request']}, many=True)
+            return serializer.data
 
         def get_endorsement_count(self, obj):
             endorsement = obj.receiver_endorse.filter(is_active=True)

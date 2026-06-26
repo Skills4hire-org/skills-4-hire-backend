@@ -19,6 +19,7 @@ from ..serializers.profiles import ProviderProfileUpdateCreateSerializer, BasePr
     CustomerCreateUpdateSerializer, CustomerProfileDetailSerializer, CoverPhoto, WorkImagesSerializer
 from ..profile_services.paginations import ProfilePagination
 from ...authentication.serializers import UserReadSerializer
+from ...core.exceptions import api_response
 
 from uuid import UUID
 
@@ -112,7 +113,11 @@ class ProfileViewSet(viewsets.GenericViewSet):
         serializer = CoverPhoto(instance=user_base_profile, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         cover_letter = serializer.save()
-        return Response(data={"status": True, 'message': "profile cover photo updated successfully"}, status=200)
+        return api_response(
+            data={},
+            message="Profile cover photo updated successfully",
+            status_code=200,
+        )
 
     @action(methods=['get', 'patch'], detail=False, url_path="me")
     def me(self, request, *args, **kwargs):
@@ -124,15 +129,27 @@ class ProfileViewSet(viewsets.GenericViewSet):
         elif user.is_customer:
             profile = user.profile.customer_profile
         else:
-            return Response(data=UserReadSerializer(user).data, status=status.HTTP_200_OK)
+            return api_response(
+                data=UserReadSerializer(user).data,
+                message="Profile fetched successfully",
+                status_code=status.HTTP_200_OK,
+            )
         
         if request.method == "GET":
             if user.is_provider:
                 serializer = ProviderProfileDetailSerializer(profile, context={'request': request})
-                return Response(data=serializer.data, status=status.HTTP_200_OK)
+                return api_response(
+                    data=serializer.data,
+                    message="Profile fetched successfully",
+                    status_code=status.HTTP_200_OK,
+                )
             else:
                 serializer = CustomerProfileDetailSerializer(profile, context={"request": request})
-                return Response(data=serializer.data, status=status.HTTP_200_OK)
+                return api_response(
+                    data=serializer.data,
+                    message="Profile fetched successfully",
+                    status_code=status.HTTP_200_OK,
+                )
         else:
             serializer = self.get_serializer(
                 profile, data=request.data,
@@ -140,7 +157,11 @@ class ProfileViewSet(viewsets.GenericViewSet):
             )
             serializer.is_valid(raise_exception=True)
             updated_profile = serializer.save()
-            return Response({"status": True, "detail": "Profile updated"}, status=status.HTTP_200_OK)
+            return api_response(
+                data={},
+                message="Profile updated",
+                status_code=status.HTTP_200_OK,
+            )
         
 
 class WorkImagesViewSet(viewsets.ModelViewSet):
@@ -161,6 +182,17 @@ class WorkImagesViewSet(viewsets.ModelViewSet):
                 profile=self.request.user.profile
                 )
                 .select_related("profile")
+        )
+
+    def create(self, request, *args, **kwargs):
+        # overider create function to allow bulk upload 
+        serializer = self.get_serializer(data=request.data, many=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save(profile=request.user.profile)
+        return api_response(
+            data={},
+            message="Profile images added",
+            status_code=status.HTTP_200_OK,
         )
     
     @action(methods=["get"], detail=False, url_path="user/(?P<user_id>[^/.]+)/images")
