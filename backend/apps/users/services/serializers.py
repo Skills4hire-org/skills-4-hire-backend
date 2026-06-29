@@ -25,7 +25,7 @@ class ServiceAttachmentSerializer(serializers.ModelSerializer):
 class ServiceCreateSerializer(serializers.ModelSerializer):
     attachments = ServiceAttachmentSerializer(many=True, required=False)
     category_id = serializers.PrimaryKeyRelatedField(
-        queryset=ServiceCategory.objects.all(), required=True
+        queryset=ServiceCategory.objects.all(), required=False
     )
     
     class Meta:
