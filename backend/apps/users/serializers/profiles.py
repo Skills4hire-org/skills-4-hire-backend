@@ -47,7 +47,7 @@ class WorkImagesSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkImages
         fields = [
-            "image_url", "description", "public_id"
+            "work_image_id", "image_url", "description", "public_id"
         ]
 
     def validate_image_url(self, value):
@@ -123,7 +123,7 @@ class BaseProfileCreateSerializer(serializers.ModelSerializer):
         return super().update(instance, validated_data)
 
 class BaseProfileListSerializer(serializers.ModelSerializer):  
-    avatar = AvatarDetailSerializer(read_only=True)
+    avatar = AvatarDetailSerializer(read_only=True, default={})
     provider_id = serializers.SerializerMethodField()
     customer_id = serializers.SerializerMethodField()
     class Meta:

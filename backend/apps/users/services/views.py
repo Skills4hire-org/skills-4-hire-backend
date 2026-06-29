@@ -13,7 +13,8 @@ from .models import Service, ServiceCategory
 from .pagination import ServicePagination
 from .permissions import IsOwnerOrReadOnly, IsServiceProvider
 from .serializers import ServiceCreateSerializer, ServiceListSerializer, ServiceCategorySerializer
-
+from ...posts.services_T import return_paginated_view
+from ...core.exceptions import api_response, error_response
 
 class ServiceCategoryViewSet(viewsets.ModelViewSet):
     http_method_names = ['get']
@@ -32,8 +33,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
     filterset_fields = {
         "name": ["icontains"],
         "is_active": ["exact"],
-        "min_charge": ["gte", "lte"],
-        "max_charge": ["gte", "lte"],
+        "charge": ["gte", "lte"],
         "category__name": ["icontains"],
     }
 
@@ -70,7 +70,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
         instance.deleted_at = timezone.now()
         instance.is_active = False
         instance.save(update_fields=["deleted_at", "is_active", "updated_at"])
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return api_response(status_code=status.HTTP_204_NO_CONTENT)
 
     @method_decorator(cache_page(60 * 5))
     @action(methods=['get'], detail=False)
@@ -78,17 +78,10 @@ class ServiceViewSet(viewsets.ModelViewSet):
         try:
             user_profile = request.user.profile.provider_profile
         except Exception as e:
-            raise ValidationError(f"Error: {e}")
+            return error_response(message=str(e), errors=e)
         queryset = self.filter_queryset(self.get_queryset()).filter(profile=user_profile)
         if queryset is None:
-            return Response({"empty": "no services "}, status=status.HTTP_200_OK)
+            return api_response(data={}, message="success")
 
-        page = self.paginate_queryset(queryset)
-
-        if page is not None:
-            serializer = self.get_serializer(page, many=True)
-            return self.get_paginated_response(serializer.data)
-
-        serializer = self.get_serializer(queryset, many=True).data
-        return Response(serializer, status=status.HTTP_200_OK)
+        return return_paginated_view(self, queryset)
     

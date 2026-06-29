@@ -36,6 +36,17 @@ class IsProfileOwnerOrReadOnly(BasePermission):
         if request.method in SAFE_METHODS:
             return True
         return obj.profile.user == request.user
+    
+
+class IsWorkImageOwnerOrReadOnly(BasePermission):
+    
+    def has_object_permission(self, request, view, obj):
+        if request.method in SAFE_METHODS:
+            return True
+        return obj.profile.user == request.user
+    
+    def has_permission(self, request, view):
+        return request.user and request.user.is_authenticated
 
     
         

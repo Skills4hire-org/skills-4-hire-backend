@@ -1,18 +1,14 @@
 import validators
 from rest_framework import serializers
-from rest_framework.exceptions import NotFound
 
 from .models import Avatar
-from ..base_model import BaseProfile
-from ...core.utils.py import get_or_none
 
 
 class AvatarCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Avatar
         fields = [
-            'avatar', 'avatar_public_id',
-            'description'
+            'avatar', 'avatar_public_id', 'description'
         ]
 
     default_error_messages = {
@@ -26,33 +22,12 @@ class AvatarCreateSerializer(serializers.ModelSerializer):
         return value
 
     def create(self, validated_data):
-
-        base_profile = None
-
-        if "base_profile_id" in validated_data:
-            base_pk = validated_data.pop("base_profile_id")
-            base_profile = get_or_none(BaseProfile, pk=base_pk)
-            if base_profile is None:
-                raise NotFound("profile not found")
-        else:
-            user = self.context.get("request").user
-            base_profile = user.profile
-
+        base_profile = self.context.get("profile", None)
         try:
             avatar = Avatar.objects.update_or_create(profile=base_profile, defaults=validated_data)
         except Exception as e:
-            raise Exception(e)
-        
+            raise serializers.ValidationError(e)
         return avatar
-
-    def update(self, instance, validated_data):
-        user = self.context.get("request").user
-        validated_data.pop("base_profile_id")
-        for key, value in validated_data.items():
-            if hasattr(instance, key):
-                setattr(instance, key, value)
-        instance.save(update_fields=[validated_data.keys()])
-        return instance
 
 
 class AvatarDetailSerializer(serializers.ModelSerializer):
