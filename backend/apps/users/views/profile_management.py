@@ -19,7 +19,10 @@ from ..serializers.profiles import ProviderProfileUpdateCreateSerializer, BasePr
     CustomerCreateUpdateSerializer, CustomerProfileDetailSerializer, CoverPhoto, WorkImagesSerializer
 from ..profile_services.paginations import ProfilePagination
 from ...authentication.serializers import UserReadSerializer
-from ...core.exceptions import api_response
+from ...core.exceptions import api_response, error_response
+from ..base_model import BaseProfile
+from ..profile_avater.serializers import AvatarCreateSerializer
+from ..permissions import IsWorkImageOwnerOrReadOnly
 
 from uuid import UUID
 
@@ -89,7 +92,7 @@ class ProfileSearchView(viewsets.ModelViewSet):
 
 class ProfileViewSet(viewsets.GenericViewSet):
     permission_classes =  [IsProfileOwnerOrReadOnly]
-    http_method_names =  ['get', 'patch']
+    http_method_names =  ['get', 'patch', "delete", "post"]
 
     def get_serializer_class(self):
         user = self.request.user
@@ -106,18 +109,47 @@ class ProfileViewSet(viewsets.GenericViewSet):
                 return CustomerProfileDetailSerializer
         else:
             raise ValueError("Invalid user obj")
+
+    @action(methods=["post", "delete"], detail=False, url_path="avatar") 
+    def profile_picture(self, request, *args, **kwargs):
+        base_profile: BaseProfile = request.user.profile
+        if request.method in ("post", "POST"):
+            # either update a picture or add a new one
+            serializer = AvatarCreateSerializer(data=request.data, context={"profile": base_profile})
+            serializer.is_valid(raise_exception=True)
+            data = serializer.save()
+            return api_response(
+                data=serializer.validated_data,
+                message="Profile photo updated successfully",
+                status_code=200,
+            )
+        else:
+            avater = getattr(base_profile, "avatar", None)
+            if avater is None:
+                return error_response(message="No profile is assciated to this account", status_code=status.HTTP_404_NOT_FOUND)
+            avater.delete()
+            return api_response(data={}, message="success", status_code=status.HTTP_204_NO_CONTENT)
         
-    @action(methods=['patch'], detail=False, url_path="cover-photo")
+    @action(methods=['patch', "delete"], detail=False, url_path="cover-photo")
     def upload_cover_photo(self, request, *args, **kwargs):
-        user_base_profile = request.user.profile
-        serializer = CoverPhoto(instance=user_base_profile, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
-        cover_letter = serializer.save()
-        return api_response(
-            data={},
-            message="Profile cover photo updated successfully",
-            status_code=200,
-        )
+        if request.method in ("patch", "PATCH"):
+            user_base_profile = request.user.profile
+            serializer = CoverPhoto(instance=user_base_profile, data=request.data, partial=True)
+            serializer.is_valid(raise_exception=True)
+            cover_letter = serializer.save()
+            return api_response(
+                data=serializer.validated_data,
+                message="Profile cover photo updated successfully",
+                status_code=200,
+            )
+        else:
+            base_profile: BaseProfile = request.user.profile
+            try:
+                base_profile.cover_photo = {}
+                base_profile.save()
+                return api_response(data={}, status_code=status.HTTP_204_NO_CONTENT)
+            except Exception as error:
+                return error_response(message="Invalid profile", errors=error, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(methods=['get', 'patch'], detail=False, url_path="me")
     def me(self, request, *args, **kwargs):
@@ -165,8 +197,9 @@ class ProfileViewSet(viewsets.GenericViewSet):
         
 
 class WorkImagesViewSet(viewsets.ModelViewSet):
-    http_method_names = ['post', "get"]
+    http_method_names = ['post', "get", "patch", "delete"]
     pagination_class = ProfilePagination
+    permission_classes = [IsWorkImageOwnerOrReadOnly]
 
     def get_serializer_class(self):
         if self.action == "user_images":

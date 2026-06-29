@@ -24,48 +24,27 @@ class ServiceAttachmentSerializer(serializers.ModelSerializer):
 
 class ServiceCreateSerializer(serializers.ModelSerializer):
     attachments = ServiceAttachmentSerializer(many=True, required=False)
-    category_id = serializers.UUIDField(required=False, allow_null=True)
+    category_id = serializers.PrimaryKeyRelatedField(
+        queryset=ServiceCategory.objects.all(), required=True
+    )
     
     class Meta:
         model = Service
         fields = [
-            "category_id",
-            "attachments",
-            "service_id",
-            "name", 
-            "years_of_experience",
-            "description",
-            "min_charge",
-            "max_charge",
-            "is_default",
+            "category_id", "attachments",
+            "name",  "years_of_experience",
+            "description", "charge", "is_default",
         ]
 
-    def validate_category_id(self, value):
-        # validate the category id and return the category instance if present else None
-        if value is None:
-            return None
-        try:
-            category = ServiceCategory.objects.get(service_category_id=value)
-            return category
-        except ServiceCategory.DoesNotExist:
-            raise serializers.ValidationError("Invalid category_id provided.")
-        
     def validate_name(self, value: str) -> str:
         if not value or not value.strip():
             raise serializers.ValidationError("name must not be empty.")
         return value.strip().title()  # Normalize to title case for consistency
 
-    def validate(self, attrs: dict) -> dict:
-        min_charge = attrs.get("min_charge", None)
-        max_charge = attrs.get("max_charge", None)
-
-        if min_charge is not None and max_charge is not None and min_charge > max_charge:
-            raise serializers.ValidationError(
-                {"min_charge": "min_charge must be less than or equal to max_charge."}
-            )
-
-        return attrs
-
+    def validate_charge(self, value: float):
+        if value < 0:
+            raise serializers.ValidationError("Value cannot be negative")
+        return value
 
     def create(self, validated_data: dict) -> Service:
         attachments_data = validated_data.pop("attachments", [])
@@ -93,7 +72,6 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
         if category is not None:
             validated_data["category"] = category
 
-        # Update scalar fields
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
@@ -126,8 +104,7 @@ class ServiceListSerializer(serializers.ModelSerializer):
         model = Service
         fields = [
             "service_id",
-            "name", "description",
-            "min_charge", "max_charge",
+            "name", "description", "charge",
             "is_default", "years_of_experience",
             "is_active", "created_at", 
             "attachments", "category"

@@ -6,7 +6,6 @@ from django.core.exceptions import ValidationError
 from ..provider_models import ProviderModel
 
 class ServiceCategory(models.Model):
-
     service_category_id = models.UUIDField(
         primary_key=True, default=uuid.uuid4, 
         editable=False, unique=True, db_index=True
@@ -44,10 +43,8 @@ class Service(models.Model):
     )
     name = models.CharField(max_length=255)
     description = models.TextField(null=True, blank=True)
-    min_charge = models.DecimalField(max_digits=12, decimal_places=2, null=True)
-    max_charge = models.DecimalField(max_digits=12, decimal_places=2, null=True)
-    years_of_experience = models.IntegerField(default=0)
-
+    charge = models.DecimalField(decimal_places=2, max_digits=8, null=True, blank=True)
+    years_of_experience = models.IntegerField(default=0, null=True, blank=True)
     is_default = models.BooleanField(default=False)
     is_verified = models.BooleanField(default=True)
     is_active = models.BooleanField(default=True)
@@ -65,11 +62,6 @@ class Service(models.Model):
         ]
 
     def clean(self):
-        if self.min_charge is not None and self.max_charge is not None:
-            if self.min_charge > self.max_charge:
-                raise ValidationError(
-                    {"min_charge": "min_charge must be less than or equal to max_charge."}
-                )
         if self.name:
             self.name = self.name.strip().title()
         super().clean()

@@ -88,9 +88,10 @@ class WorkImages(models.Model):
     """ 
         A model to store work images for service professionals, linked to the BaseProfile
     """
+    work_image_id = models.UUIDField(max_length=25, default=uuid.uuid4, unique=True, primary_key=True)
     profile = models.ForeignKey(BaseProfile, on_delete=models.CASCADE, related_name="work_images")
-    image_url = models.URLField(max_length=200, blank=True, null=True)
-    public_id = models.CharField(max_length=255, blank=True)
+    image_url = models.URLField(max_length=200, null=False, blank=False, default="")
+    public_id = models.CharField(max_length=255, null=False, blank=False, default="")
     description = models.CharField(max_length=255, blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

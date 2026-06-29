@@ -65,7 +65,7 @@ class ServiceCategoryAdmin(admin.ModelAdmin):
 @admin.register(Service)
 class ServiceAdmin(admin.ModelAdmin):
     list_display = ["profile__profile__display_name", "name",
-                    "min_charge", "max_charge", "is_default",
+                    "charge", "is_default",
                     "is_active", "created_at", "category__name"]
     
     list_filter = ['is_active']
