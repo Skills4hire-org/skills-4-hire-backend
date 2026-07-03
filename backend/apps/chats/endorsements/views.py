@@ -3,6 +3,8 @@ from rest_framework.response import Response
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError, PermissionDenied
 
+from apps.core.exceptions import api_response, error_response
+
 from .serializers import (
     EndorsementCreateSerializer, EndorsementSerializer,
     get_or_none, ProviderModel, EndorsementDetailSerializer
@@ -45,7 +47,11 @@ class EndorsementViewSet(viewsets.ModelViewSet):
         saved_endorsement = serializer.save()
         output_serializer = EndorsementSerializer(saved_endorsement)
         
-        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+        return api_response(
+            data=output_serializer.data,
+            message="Endorsement created successfully",
+            status_code=status.HTTP_201_CREATED,
+        )
     
     def partial_update(self, request, *args, **kwargs):
         instance = self.get_object()
@@ -53,8 +59,11 @@ class EndorsementViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
 
         updated_endorsement = serializer.save()
-        return Response(EndorsementSerializer(updated_endorsement).data, 
-                        status=status.HTTP_200_OK)
+        return api_response(
+            data=EndorsementSerializer(updated_endorsement).data,
+            message="Endorsement updated successfully",
+            status_code=status.HTTP_200_OK,
+        )
     
     def perform_destroy(self, instance):
         instance.is_active = False
@@ -72,7 +81,11 @@ class EndorsementViewSet(viewsets.ModelViewSet):
             raise PermissionDenied()
         self.perform_hide(instacne=endorsement_obj)
 
-        return Response(status=status.HTTP_200_OK)
+        return api_response(
+            data={},
+            message="Endorsement hidden successfully",
+            status_code=status.HTTP_200_OK,
+        )
 
 
 class EndorsementDetailViewSet(viewsets.ModelViewSet):

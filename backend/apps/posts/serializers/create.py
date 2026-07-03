@@ -50,7 +50,7 @@ def create_bulk_post_attachements(instance: Post = None, attachments: list[dict[
                     PostAttachment(
                         post=instance,  
                         comment=comment,
-                        thumbnail_url=generate_thumbnails(data['image_url']) if data['attachment_type'].upper() == PostAttachment.Types.VIDEO else None,
+                        thumbnail_url=generate_thumbnails(data['attachmentURL']) if data['attachment_type'].upper() == PostAttachment.Types.VIDEO else None,
                         **data) 
 
                     for data in attachments
@@ -120,8 +120,8 @@ class PostCreateSerializer(serializers.ModelSerializer):
         duration = validated_data.pop("duration", None)
         tags = validated_data.pop("tags", [])
 
-        user = self.context['request'].user
-
+        request = self.context.get("request")
+        user = request.user
         if duration:
              start_date, end_date = get_date(duration)
              post_instance = create_post(
@@ -142,6 +142,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
         if tags:
             post_instance.tags.set(tags)
 
+        
         return post_instance
 
     def update(self, instance, validated_data):

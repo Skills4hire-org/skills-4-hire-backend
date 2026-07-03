@@ -2,6 +2,8 @@ from rest_framework import viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.core.exceptions import api_response, error_response
+
 from .models import ReferralCode, ReferralTransactions
 from .serializers import (
     ReferralCodeSerializer, ReferralWithdrawalSerializer,
@@ -27,7 +29,11 @@ class ReferralViewSet(viewsets.GenericViewSet):
     def referral(self, request, *args, **kwargs):
         qs = self.get_queryset()
         serializer = self.get_serializer(qs)
-        return Response(status=200, data={"status": True, "details": serializer.data})
+        return api_response(
+            data={"referrals": serializer.data},
+            message="Referral code retrieved successfully",
+            status_code=status.HTTP_200_OK,
+        )
 
 class ReferralTransactionViewSet(viewsets.ModelViewSet):
 
@@ -50,25 +56,25 @@ class ReferralTransactionViewSet(viewsets.ModelViewSet):
             user=request.user, idempotency_key=idempotency_key
         ).first()
 
-        if  existing: 
+        if existing: 
             logger.info(
-                "Found existing transaction for this referral with drawal"
+                "Found existing transaction for this referral withdrawal"
             )
             serializer = ReferralWithdrawalListSerializer(existing)
-            return Response({
-                "status": False,
-                "details": "Found Existing Transaction",
-                "data": serializer.data
-            })
+            return api_response(
+                data={"transaction": serializer.data},
+                message="Found existing referral transaction",
+                status_code=status.HTTP_200_OK,
+            )
         
         save_instance = serializer.save()
 
         serializer = ReferralWithdrawalListSerializer(save_instance)
-        return Response({
-            "status": True,
-            "detaial": "Transfer Initialized",
-            "data": serializer.data
-        })
+        return api_response(
+            data={"transaction": serializer.data},
+            message="Referral transfer initialized",
+            status_code=status.HTTP_201_CREATED,
+        )
 
 
 

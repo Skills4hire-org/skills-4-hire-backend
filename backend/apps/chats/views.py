@@ -13,8 +13,10 @@ from django.db import transaction
 
 from rest_framework import viewsets, status, generics, filters, mixins
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied, NotFound
+from rest_framework.exceptions import PermissionDenied, NotFound, ValidationError
 from rest_framework.response import Response
+
+from apps.core.exceptions import api_response, error_response
 from rest_framework.permissions import IsAuthenticated, IsAdminUser
 
 from django.shortcuts import get_object_or_404
@@ -135,7 +137,11 @@ class ConversationViewSet(
         })
 
         output_serializer = ConversationSerializer(conversation, context={'request': request})
-        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+        return api_response(
+            data=output_serializer.data,
+            message="Conversation created successfully",
+            status_code=status.HTTP_201_CREATED,
+        )
 
     def list(self, request, *args, **kwargs):
         """
@@ -169,7 +175,11 @@ class ConversationViewSet(
             mark_messages_as_read(conversation, request.user)
 
             serializer = ConversationDetailSerializer(conversation)
-            return Response(serializer.data)
+            return api_response(
+                data=serializer.data,
+                message="Conversation details retrieved successfully",
+                status_code=status.HTTP_200_OK,
+            )
         else:
             serializer = MessageCreateSerializer(
                 data=request.data,
@@ -187,7 +197,11 @@ class ConversationViewSet(
             })
 
             output_serializer = MessageSerializer(message)
-            return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+            return api_response(
+                data=output_serializer.data,
+                message="Message sent successfully",
+                status_code=status.HTTP_201_CREATED,
+            )
 
 # Support Views
 
@@ -201,15 +215,19 @@ class OpenSupportRoomView(generics.GenericAPIView):
 
         try:
             support_room = get_or_create_support_room(request.user)
-            return Response(
-                {
+            return api_response(
+                data={
                     'room_id': str(support_room.conversation_id),
                     'ws_url': f'/ws/chat/{support_room.conversation_id}/'
                 },
-                status=status.HTTP_200_OK
+                message="Support room opened successfully",
+                status_code=status.HTTP_200_OK,
             )
         except Exception as exc:
-            return Response(status=400, data={"status": False, "details": str(exc)})
+            return error_response(
+                message=str(exc),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
 class SupportInboxView(generics.ListAPIView):
     permission_classes = [IsAdminUser]
@@ -250,7 +268,11 @@ class MarkMessagesReadView(generics.GenericAPIView):
             raise PermissionDenied()
 
         updated_count = mark_messages_as_read(support_room, request.user)
-        return Response({'marked_as_read': updated_count}, status=status.HTTP_200_OK)
+        return api_response(
+            data={'marked_as_read': updated_count},
+            message="Messages marked as read",
+            status_code=status.HTTP_200_OK,
+        )
 
 class SupportRoomMessagesView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
@@ -277,14 +299,15 @@ class SupportRoomMessagesView(generics.GenericAPIView):
         messages = list(queryset[offset:offset + limit])
         serializer = MessageListSerializer(messages, many=True)
 
-        return Response(
-            {
+        return api_response(
+            data={
                 'count': queryset.count(),
                 'page': page,
                 'limit': limit,
                 'results': serializer.data,
             },
-            status=status.HTTP_200_OK
+            message="Support room messages retrieved successfully",
+            status_code=status.HTTP_200_OK,
         )
 
 class MessageViewSet(viewsets.ModelViewSet):
@@ -326,7 +349,7 @@ class MessageViewSet(viewsets.ModelViewSet):
                 log_action(
                     "deleted_message", self.request.user, {"message_id": instance.pk}
                 )
-        return Response(status=204)
+        return None
 
 class NegotiationViewSet(viewsets.ModelViewSet):
     permission_classes = [NegotiationParticipantPermission]
@@ -366,13 +389,17 @@ class NegotiationViewSet(viewsets.ModelViewSet):
             })
 
         response = NegotiationSerializer(negotiation)
-        return  Response(response.data, status=status.HTTP_201_CREATED)
+        return api_response(
+            data=response.data,
+            message="Negotiation created successfully",
+            status_code=status.HTTP_201_CREATED,
+        )
 
     def get_object(self):
         negotiation_pk = self.kwargs.get("pk", )
 
         if negotiation_pk is None:
-            return Response({"status": "failed", "msg": "no_negotiation_pk"}, status=status.HTTP_400_BAD_REQUEST)
+            raise ValidationError("No negotiation pk provided")
 
         user = self.request.user
 
@@ -406,7 +433,11 @@ class NegotiationViewSet(viewsets.ModelViewSet):
             }
         )
         response = NegotiationSerializer(instance)
-        return Response(response.data, status=status.HTTP_200_OK)
+        return api_response(
+            data=response.data,
+            message="Negotiation status updated successfully",
+            status_code=status.HTTP_200_OK,
+        )
 
     @action(methods=['post'], url_path="accept", detail=True)
     def accept(self, request, *args, **kwargs, ):
@@ -427,8 +458,18 @@ class NegotiationViewSet(viewsets.ModelViewSet):
             raise PermissionDenied()
         history = negotiation.histories.all()[:20]
         result = return_paginated_view(self, history)
-        if "next" or "previous" not in result:
-            serializer = self.get_serializer(history, many=True)
-            return Response(serializer.data, status=status.HTTP_200_OK)
-        return result
+        if isinstance(result, Response):
+            return result
+        if isinstance(result, dict) and ("next" in result or "previous" in result):
+            return api_response(
+                data=result,
+                message="Negotiation history retrieved successfully",
+                status_code=status.HTTP_200_OK,
+            )
+        serializer = self.get_serializer(history, many=True)
+        return api_response(
+            data=serializer.data,
+            message="Negotiation history retrieved successfully",
+            status_code=status.HTTP_200_OK,
+        )
 
