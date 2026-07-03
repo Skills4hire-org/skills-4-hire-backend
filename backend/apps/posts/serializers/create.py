@@ -194,7 +194,7 @@ class CommentCreateSerializer(serializers.ModelSerializer):
             comment_instance = CommentService()
             comment = comment_instance.add_comment(post=post, user=user, message=validated_data['message'])
             if attachments:
-              create_bulk_post_attachements(None, attachments, comment_instance)
+              create_bulk_post_attachements(None, attachments, comment)
         except Exception as e:
             raise Exception(e)
 
