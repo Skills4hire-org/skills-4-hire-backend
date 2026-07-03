@@ -1,12 +1,13 @@
 from rest_framework import serializers
 from .models import Service, ServiceAttachment, ServiceCategory
+from ...core.utils.py import generate_thumbnails
 
 
 class ServiceAttachmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceAttachment
-        fields = ["image_id", "image_url", "image_public_id", "created_at"]
-        read_only_fields = ["image_id", "created_at"]
+        fields = ["image_id", "image_url", "image_public_id", "type", "thumbnail_url", "created_at"]
+        read_only_fields = ["image_id", "created_at", "thumbnail_url"]
 
     def validate_image_url(self, value: str) -> str:
         """
@@ -60,7 +61,13 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
 
         if attachments_data:
             ServiceAttachment.objects.bulk_create(
-                [ServiceAttachment(service=service, **attachment) for attachment in attachments_data]
+                [
+                    ServiceAttachment(
+                        service=service, 
+                        thumbnail_url=generate_thumbnails(attachment['image_url']) if attachment['type'].lower() == "video" else None,
+                        **attachment
+                    ) 
+                    for attachment in attachments_data]
             )
 
         return service
@@ -82,7 +89,13 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
 
             # Bulk-insert the fresh set
             ServiceAttachment.objects.bulk_create(
-                [ServiceAttachment(service=instance, **attachment) for attachment in attachments_data]
+                [
+                    ServiceAttachment(
+                        service=instance, 
+                        thumbnail_url=generate_thumbnails(attachment['image_url']) if attachment['type'].lower() == "video" else None,
+                        **attachment
+                    ) 
+                    for attachment in attachments_data]
             )
 
         return instance

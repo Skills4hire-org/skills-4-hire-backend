@@ -92,6 +92,8 @@ class WorkImages(models.Model):
     profile = models.ForeignKey(BaseProfile, on_delete=models.CASCADE, related_name="work_images")
     image_url = models.URLField(max_length=200, null=False, blank=False, default="")
     public_id = models.CharField(max_length=255, null=False, blank=False, default="")
+    type = models.CharField(max_length=50, blank=False, null=True)
+    thumbnail_url = models.URLField(max_length=255, null=True, blank=True)
     description = models.CharField(max_length=255, blank=True, null=True)
 
     created_at = models.DateTimeField(auto_now_add=True)

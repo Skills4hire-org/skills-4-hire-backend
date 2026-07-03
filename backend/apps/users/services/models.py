@@ -1,8 +1,5 @@
-
 import uuid
 from django.db import models
-from django.core.exceptions import ValidationError
-
 from ..provider_models import ProviderModel
 
 class ServiceCategory(models.Model):
@@ -88,6 +85,8 @@ class ServiceAttachment(models.Model):
         on_delete=models.CASCADE,
     )
     image_url = models.URLField(max_length=2048)
+    thumbnail_url = models.URLField(max_length=2048, null=True, blank=True)
+    type = models.CharField(max_length=50, null=True, blank=True)
     image_public_id = models.CharField(max_length=512)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -100,3 +99,8 @@ class ServiceAttachment(models.Model):
 
     def __str__(self):
         return f"Attachment {self.image_id} for service {self.service.pk}"
+    
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+    

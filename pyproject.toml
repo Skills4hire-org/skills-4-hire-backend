@@ -40,6 +40,7 @@ dependencies = [
     "google-auth>=2.55.0",
     "gunicorn>=25.1.0",
     "phonenumberslite>=9.0.25",
+    "pillow>=12.3.0",
     "postal-regex>=1.0.0",
     "psycopg2-binary>=2.9.11",
     "pytest>=9.0.2",

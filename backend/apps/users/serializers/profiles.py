@@ -13,6 +13,7 @@ from ..profile_avater.serializers import AvatarDetailSerializer
 from ..provider_models import ProviderModel
 from ..services.models import ServiceCategory
 from ..skills.serializers import ProviderSkillListSerializer
+from ...core.utils.py import generate_thumbnails
 
 UserModel = get_user_model()
 
@@ -47,8 +48,11 @@ class WorkImagesSerializer(serializers.ModelSerializer):
     class Meta:
         model = WorkImages
         fields = [
-            "work_image_id", "image_url", "description", "public_id"
+            "work_image_id", "image_url", 
+            "description", "public_id", 
+            "created_at", "type", "thumbnail_url"
         ]
+        read_only_fields = ['created_at', "work_image_id", "thumbnail_url"]
 
     def validate_image_url(self, value):
         if value and not validators.url(value):
@@ -60,6 +64,10 @@ class WorkImagesSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError("Description exceeded max length")
         return value
 
+    def create(self, validated_data):
+        instance: WorkImages = super().create(validated_data)
+        instance.thumbnail_url = generate_thumbnails(instance.image_url) if instance.type.lower() == "video" and instance.image_url else None
+        return instance
 
 class BaseProfileCreateSerializer(serializers.ModelSerializer):
     work_images = WorkImagesSerializer(many=True, required=False, read_only=True)
@@ -248,7 +256,7 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
 
         def get_services(self, obj):
             from ..services.serializers import ServiceListSerializer
-            primary_service = obj.services.filter(is_active=True, is_default=True)[:4]
+            primary_service = obj.services.filter(is_active=True).order_by("-created_at")[:4]
             serializer = ServiceListSerializer(primary_service, many=True)
             return serializer.data
         

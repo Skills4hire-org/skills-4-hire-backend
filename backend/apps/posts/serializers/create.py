@@ -13,6 +13,8 @@ from rest_framework.exceptions import PermissionDenied
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from ...core.utils.py import generate_thumbnails
+
 class PostAttachmentSerializer(serializers.ModelSerializer):
     class Meta:
         model = PostAttachment
@@ -20,11 +22,11 @@ class PostAttachmentSerializer(serializers.ModelSerializer):
             "post_attachment_id",
             "attachment_type",
             "attachmentURL", "public_id",
-            "created_at"
+            "created_at", "thumbnail_url"
         ]
         read_only_fields = [
             "post_attachment_id",
-            "created_at"
+            "created_at", "thumbnail_url"
         ]
 
     def validate_attachment_type(self, value):
@@ -40,6 +42,22 @@ class PostAttachmentSerializer(serializers.ModelSerializer):
         if not is_valid:
             raise serializers.ValidationError(_(f"{url}"))
         return  url
+    
+
+def create_bulk_post_attachements(instance: Post = None, attachments: list[dict[str, any]] = [], comment: Comment = None):
+    result = PostAttachment.objects.bulk_create(
+                [
+                    PostAttachment(
+                        post=instance,  
+                        comment=comment,
+                        thumbnail_url=generate_thumbnails(data['image_url']) if data['attachment_type'].upper() == PostAttachment.Types.VIDEO else None,
+                        **data) 
+
+                    for data in attachments
+                ]
+            )
+
+    return result
     
 class PostCreateSerializer(serializers.ModelSerializer):
     attachments = PostAttachmentSerializer(many=True, required=False)
@@ -119,9 +137,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
             )
         # Create related PostMedia records (if any)
         if post_attachments:
-            PostAttachment.objects.bulk_create(
-                [PostAttachment(post=post_instance, **data) for data in post_attachments]
-            )
+            create_bulk_post_attachements(post_instance, post_attachments)
         
         if tags:
             post_instance.tags.set(tags)
@@ -138,10 +154,8 @@ class PostCreateSerializer(serializers.ModelSerializer):
         tags = validated_data.pop("tags", [])
 
         if attachments:
-            attachment = instance.attachment
-            for data in attachments:
-                attachment.get_or_create(post=instance, **data)
-
+            instance.attachments.delete()
+            create_bulk_post_attachements(instance, attachments)
         if tags:
             instance.tags.set(tags)
 
@@ -179,12 +193,7 @@ class CommentCreateSerializer(serializers.ModelSerializer):
             comment_instance = CommentService()
             comment = comment_instance.add_comment(post=post, user=user, message=validated_data['message'])
             if attachments:
-                PostAttachment.objects.bulk_create(
-                [PostAttachment(
-                    comment=comment, attachment_type=data['attachment_type'], 
-                    attachmentURL=data['attachmentURL']
-                    ) for data in attachments]
-            )
+              create_bulk_post_attachements(None, attachments, comment_instance)
         except Exception as e:
             raise Exception(e)
 
@@ -194,14 +203,9 @@ class CommentCreateSerializer(serializers.ModelSerializer):
         instance.message = validated_data.get("message", instance.message)
 
         if "attachments" in validated_data:
-            instance_attachment = instance.attachments.all().delete()
+            instance.attachments.delete()
             attachments = validated_data.pop("attachments")
-            PostAttachment.objects.bulk_create([
-                PostAttachment(comment=instance, **data)
-                for data in attachments
-            ])
-
-        
+            create_bulk_post_attachements(None, attachments, instance)
         super().update(instance, validated_data)
     
         return instance
