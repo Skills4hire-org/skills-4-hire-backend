@@ -2,6 +2,7 @@
 from rest_framework import permissions, status, viewsets
 from rest_framework.response import Response
 
+from apps.core.exceptions import api_response, error_response
 from .models import UserAddress
 from .services.pagination import AddressPagination
 from .services.permissions import IsAddressOwnerOrReadOnly
@@ -57,5 +58,8 @@ class AddressViewSet(viewsets.ModelViewSet):
         saved_address = serializer.save()
         output_serializer  = AddressSerializer(saved_address)
 
-        return Response({"status": "success", "data": output_serializer.data},
-                        status=status.HTTP_201_CREATED)
+        return api_response(
+            data=output_serializer.data,
+            message="Address created successfully",
+            status_code=status.HTTP_201_CREATED,
+        )

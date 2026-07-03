@@ -2,6 +2,8 @@ from rest_framework import viewsets, permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from apps.core.exceptions import api_response, error_response
+
 from .serializers import NotificationReadSerializer, Notification
 from .paginations import NotificationPagination
 from .permissions import IsNotificationOwnerOrAdmin
@@ -50,7 +52,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         if isinstance(instance, Notification):
             instance.delete()
-            return Response(status=status.HTTP_204_NO_CONTENT)
+            return None
         return False
     
     @method_decorator(transaction.atomic)
@@ -59,9 +61,11 @@ class NotificationViewSet(viewsets.ModelViewSet):
         instance = self.get_object()
         if isinstance(instance, Notification):
             instance.mark_as_read()
-            return Response({
-                "status": "success", "detail": f"Notification instance {instance.pk} is marked as read"},
-                status=status.HTTP_200_OK)
+            return api_response(
+                data={"notification_id": str(instance.pk)},
+                message=f"Notification instance {instance.pk} marked as read",
+                status_code=status.HTTP_200_OK,
+            )
         
 
 

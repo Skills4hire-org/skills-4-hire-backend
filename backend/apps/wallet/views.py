@@ -213,13 +213,20 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
 
         if not paystack_service._verify_signature(request):
             logger.info("Invalid signature for payment")
-            return Response(status=status.HTTP_403_FORBIDDEN)
+            return error_response(
+                message="Invalid webhook signature",
+                status_code=status.HTTP_403_FORBIDDEN,
+            )
         
         try:
             payload = json.loads(request.body)
         except json.JSONDecodeError as exc:
             logger.warning(f"Paystack Webhoonk: Failed {str(exc)}")
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+            return error_response(
+                message="Invalid webhook payload",
+                errors={"detail": str(exc)},
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
         event = payload.get("event", "")
         data = payload.get("data")
@@ -228,7 +235,11 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
 
         if payment_reference is None:
             logger.info("Paystack Webhook has no event, %s", event)
-            return Response(status=status.HTTP_200_OK)
+            return api_response(
+                data={},
+                message="Webhook received with no actionable reference",
+                status_code=status.HTTP_200_OK,
+            )
         
         webhook_event, created = WebhookEvent.objects.get_or_create(
                 reference=payment_reference, 
@@ -241,7 +252,11 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
 
         if not created:
                 logger.info("Webhook Found for this event %s", event)
-                return Response(status=status.HTTP_200_OK, data={'msg': "Duplicate webhook found"})
+                return api_response(
+                    data={'msg': "Duplicate webhook found"},
+                    message="Duplicate webhook event",
+                    status_code=status.HTTP_200_OK,
+                )
 
         try:
             webhook_event.status = WebhookEvent.Status.PROCESSING
@@ -264,7 +279,11 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
                 webhook_event.status = WebhookEvent.Status.PROCESSED
                 webhook_event.processed_at = timezone.now()
                 webhook_event.save(update_fields=["status", "processed_at"])
-                return Response(status=200)
+                return api_response(
+                    data={},
+                    message="Webhook event processed without handler",
+                    status_code=status.HTTP_200_OK,
+                )
             
             handler.delay(data)
             webhook_event.status = WebhookEvent.Status.PROCESSED
@@ -278,7 +297,11 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
             webhook_event.error  = str(exc)
             webhook_event.save(update_fields=["status", "error"])
     
-        return Response(status=200)
+        return api_response(
+            data={},
+            message="Webhook received successfully",
+            status_code=status.HTTP_200_OK,
+        )
 
 
 

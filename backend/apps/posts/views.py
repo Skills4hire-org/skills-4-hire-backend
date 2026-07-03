@@ -16,6 +16,8 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound, PermissionDenied
 from rest_framework.generics import ListAPIView
 
+from apps.core.exceptions import api_response, error_response
+
 
 from .models import Post, Comment, UserPostInteraction, Repost
 from .serializers.create import (
@@ -37,6 +39,7 @@ from .services_T import  (
 )
 from .services.recommendation_service import RecommendationService
 from apps.bookings.permissions import  IsCustomer
+from ..core.exceptions import api_response, error_response
 
 import uuid
 
@@ -128,34 +131,10 @@ class PostViewSet(viewsets.ModelViewSet):
         serializer = self.get_serializer(data=request.data, context={'request': request})
         serializer.is_valid(raise_exception=True)
         validated_data = serializer.validated_data
-
         post_type = validated_data['post_type']
-        try:
-            saved_instance = serializer.save()
-            
-            return_instance = None
-            
-            if post_type == Post.PostType.GENERAL:
-                return_instance = GeneralPostSerializer(saved_instance)
-            elif post_type == Post.PostType.SERVICE:
-                return_instance = ServicePostSerializer(saved_instance)
-            else: 
-                return_instance = JobPostSerializer(saved_instance)
-
-        except Exception as e:
-            logger.info(str(e))
-            sts: str = "Failed"
-            msg = str(e)
-            code = status.HTTP_400_BAD_REQUEST
-        else:
-            sts: str = "success"
-            msg="Post created"
-            code = status.HTTP_201_CREATED
-
-        return  Response(
-            data={"status": sts, "msg": msg, "detail": return_instance.data}, status=code
-        )
-
+        saved_instance = serializer.save()
+        return  api_response(data=GeneralPostSerializer(saved_instance, context={"request": request}).data, message="post created", status_code=201)
+    
     @method_decorator(transaction.atomic)
     def update(self, request, *args, **kwargs):
         """Wrap updates in a transaction and prefer partial updates where appropriate."""
@@ -190,7 +169,11 @@ class PostViewSet(viewsets.ModelViewSet):
             msg = f"liked post: {post.pk}"
             code=201
 
-        return Response({"status": sts, "detail": msg}, status=code)
+        return api_response(
+            data={"detail": msg},
+            message="Post like action completed",
+            status_code=code,
+        )
 
     @action(methods=["delete"], detail=True, url_path="unlike")
     def unlike_post(self, request, *args, **kwargs):
@@ -212,7 +195,11 @@ class PostViewSet(viewsets.ModelViewSet):
             msg="Unliked Post: "+ str(post.pk),
             sts="success",
             code=200
-        return Response({"status": sts, "msg": msg}, status=code)
+        return api_response(
+            data={"msg": msg},
+            message="Post unlike action completed",
+            status_code=code,
+        )
 
 
     @action(methods=["post"], detail=True, url_path="repost")
@@ -228,13 +215,20 @@ class PostViewSet(viewsets.ModelViewSet):
 
         try:
             repost = serializer.save()
-            return Response({"status": True, "details": RepostListSerializer(repost).data}, status=201)
+            return api_response(
+                data={"details": RepostListSerializer(repost).data},
+                message="Post reposted successfully",
+                status_code=status.HTTP_201_CREATED,
+            )
         except Exception as e:
             logger.info(str(e))
             msg = str(e)
             sts = "failed"
             code = 400  
-        return Response({"status": sts, "message": msg}, status=code)
+        return error_response(
+            message=msg,
+            status_code=code,
+        )
         
     @method_decorator(cache_page(timeout=60 * 5))
     @action(methods=['get'], url_path="reposts", detail=True)
@@ -247,7 +241,10 @@ class PostViewSet(viewsets.ModelViewSet):
                         "repost_id", "reposted_by", "comment").order_by("-created_at")
             
         except Exception as e:
-            return  Response({"status": "failed", "msg": str(e)}, status=400)
+            return error_response(
+                message=str(e),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
         return  return_paginated_view(self, reposts)
 
     @action(methods=['get'], detail=False, url_path="user/(?P<user_id>[^/.]+)/posts")
@@ -310,9 +307,16 @@ class CommentViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         try:
             comment = serializer.save()
-            return  Response({"status": True, "detail": CommentListSerializer(comment).data }, status=201)
+            return api_response(
+                data={"detail": CommentListSerializer(comment).data},
+                message="Comment created successfully",
+                status_code=status.HTTP_201_CREATED,
+            )
         except Exception as e:
-            return Response({"status": False, "details": str(e)}, status=400)
+            return error_response(
+                message=str(e),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
         
     @transaction.atomic
     def update(self, request, *args, **kwargs):
@@ -326,7 +330,11 @@ class CommentViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 
-        return  Response(serializer.data)
+        return api_response(
+            data=serializer.data,
+            message="Comment updated successfully",
+            status_code=status.HTTP_200_OK,
+        )
 
     @transaction.atomic
     def partial_update(self, request, *args, **kwargs):
@@ -335,7 +343,11 @@ class CommentViewSet(viewsets.ModelViewSet):
     def destroy(self, request, *args, **kwargs):
         _, instance  = self.get_object()
         self.perform_destroy(instance)
-        return Response(status=204)
+        return api_response(
+            data={},
+            message="Comment deleted successfully",
+            status_code=status.HTTP_204_NO_CONTENT,
+        )
 
     def perform_destroy(self, instance):
         if not instance.can_edit(self.request.user):
@@ -350,7 +362,11 @@ class CommentViewSet(viewsets.ModelViewSet):
     def retrieve(self, request, *args, **kwargs):
         _, comment = self.get_object()
         serializer = self.get_serializer(comment)
-        return Response({"status": True, "details": serializer.data}, status=200)
+        return api_response(
+            data={"details": serializer.data},
+            message="Comment retrieved successfully",
+            status_code=status.HTTP_200_OK,
+        )
 
     @action(methods=["post"], detail=True, url_path="replies")
     def create_replies(self, request, *args, **kwargs):
@@ -363,10 +379,17 @@ class CommentViewSet(viewsets.ModelViewSet):
         service = CommentService()
         try:
             new_comment = service.add_comment(post=post, parent=comment, user=user, message=data['message'])
-            return Response({"status": True, "details": CommentListSerializer(new_comment).data}, status=201)
+            return api_response(
+                data={"details": CommentListSerializer(new_comment).data},
+                message="Reply created successfully",
+                status_code=status.HTTP_201_CREATED,
+            )
 
         except Exception as e:
-            return Response({"status": False, "details": str(e)}, status=400)
+            return error_response(
+                message=str(e),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
     @method_decorator(cache_page(60))
     @action(methods=['get'], detail=True, url_path="list-replies")
@@ -402,7 +425,11 @@ class CommentLikeViewSet(viewsets.GenericViewSet):
             serializer = CommentListSerializer(page, many=True, context={"request": request})
             return self.get_paginated_response(serializer.data)
         serializer = CommentListSerializer(comments, many=True, context={'request': request})
-        return Response(data=serializer.data, status=200)
+        return api_response(
+            data=serializer.data,
+            message="User comments retrieved successfully",
+            status_code=status.HTTP_200_OK,
+        )
     
 
     @action(methods=["POST"], detail=True, url_path='like')
@@ -414,9 +441,16 @@ class CommentLikeViewSet(viewsets.GenericViewSet):
             with transaction.atomic():
                 like = like_service.like_comment(comment, request.user)
 
-            return Response({"status": True, "details": f"Liked comment with id: {str(comment.pk)}"})
+            return api_response(
+                data={"details": f"Liked comment with id: {str(comment.pk)}"},
+                message="Comment liked successfully",
+                status_code=status.HTTP_200_OK,
+            )
         except Exception as exc:
-            return Response({"status": False, "details": str(exc)}, status=400)
+            return error_response(
+                message=str(exc),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
 
     @action(methods=['DELETE'], detail=True, url_path="unlike")
@@ -428,7 +462,10 @@ class CommentLikeViewSet(viewsets.GenericViewSet):
 
             return Response(status=204)
         except Exception as exc:
-            return Response({"status": True, "details": str(exc)})
+            return error_response(
+                message=str(exc),
+                status_code=status.HTTP_400_BAD_REQUEST,
+            )
 
 class FeedListView(ListAPIView):
     """
@@ -509,9 +546,9 @@ class FeedListView(ListAPIView):
             )
         except Exception as e:
             logger.error(f"Error generating feed for user {request.user.id}: {e}")
-            return Response(
-                {'error': 'Failed to generate feed'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            return error_response(
+                message='Failed to generate feed',
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         
         # Record a 'view' interaction for each post in the feed
@@ -609,9 +646,9 @@ class PostInteractionViewSet(viewsets.ViewSet):
         # Get interaction type from request
         interaction_type = request.data.get('interaction_type', None)
         if interaction_type not in [choice[0] for choice in UserPostInteraction.InteractionType.choices]:
-            return Response(
-                {'error': f'Invalid interaction_type: {interaction_type}'},
-                status=status.HTTP_400_BAD_REQUEST
+            return error_response(
+                message=f'Invalid interaction_type: {interaction_type}',
+                status_code=status.HTTP_400_BAD_REQUEST,
             )
         
         try:
@@ -636,19 +673,21 @@ class PostInteractionViewSet(viewsets.ViewSet):
                 # Update post engagement count
                 self._update_engagement_count(post)
                 
-                return Response({
-                    'status': 'success',
-                    'interaction_id': str(interaction.interaction_id),
-                    'interaction_type': interaction_type,
-                    'message': f'Interaction recorded: {interaction_type}',
-                    'created': created
-                }, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+                return api_response(
+                    data={
+                        'interaction_id': str(interaction.interaction_id),
+                        'interaction_type': interaction_type,
+                        'created': created,
+                    },
+                    message=f'Interaction recorded: {interaction_type}',
+                    status_code=status.HTTP_201_CREATED if created else status.HTTP_200_OK,
+                )
                 
         except Exception as e:
             logger.error(f"Error recording interaction for user {request.user.id}, post {post_id}: {e}")
-            return Response(
-                {'error': 'Failed to record interaction'},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            return error_response(
+                message='Failed to record interaction',
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
     
     @staticmethod
