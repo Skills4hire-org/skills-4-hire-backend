@@ -308,7 +308,7 @@ class CommentViewSet(viewsets.ModelViewSet):
         try:
             comment = serializer.save()
             return api_response(
-                data={"detail": CommentListSerializer(comment).data},
+                data={"detail": CommentListSerializer(comment, context={"request": request}).data},
                 message="Comment created successfully",
                 status_code=status.HTTP_201_CREATED,
             )
@@ -380,7 +380,7 @@ class CommentViewSet(viewsets.ModelViewSet):
         try:
             new_comment = service.add_comment(post=post, parent=comment, user=user, message=data['message'])
             return api_response(
-                data={"details": CommentListSerializer(new_comment).data},
+                data={"details": CommentListSerializer(new_comment, context={'request': request}).data},
                 message="Reply created successfully",
                 status_code=status.HTTP_201_CREATED,
             )
