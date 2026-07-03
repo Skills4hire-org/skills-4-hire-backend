@@ -96,7 +96,7 @@ class CommentListSerializer(serializers.ModelSerializer):
 
     total_replies = serializers.IntegerField(read_only=True)
     total_likes = serializers.IntegerField(read_only=True)
-    attachments = PostAttachmentSerializer(read_only=True)
+    attachments = PostAttachmentSerializer(read_only=True,  many=True)
     user = UserReadSerializer(read_only=True)
     is_liked = serializers.SerializerMethodField()
     is_replied = serializers.SerializerMethodField()
