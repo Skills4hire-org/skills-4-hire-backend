@@ -221,9 +221,9 @@ class WorkImagesViewSet(viewsets.ModelViewSet):
         # overider create function to allow bulk upload 
         serializer = self.get_serializer(data=request.data, many=True)
         serializer.is_valid(raise_exception=True)
-        serializer.save(profile=request.user.profile)
+        result = serializer.save(profile=request.user.profile)
         return api_response(
-            data={},
+            data=WorkImagesSerializer(result, many=True).data,
             message="Profile images added",
             status_code=status.HTTP_200_OK,
         )

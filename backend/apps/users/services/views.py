@@ -60,7 +60,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
         Return only non-deleted services, with optimised joins.
         """
         return (
-            Service.objects.filter(is_active=True, deleted_at__isnull=True)
+            Service.objects.filter(is_active=True)
             .select_related("profile", "category")
             .prefetch_related("attachments")
         )

@@ -176,9 +176,9 @@ class PostAttachment(models.Model):
     " Post attachment list photo, file, videos"
 
     class Types(models.TextChoices):
-        VIDEO = "VIDEO", "Video"
-        PHOTO = "PHOTO", "Photo"
-        FILE = "FILE", "File"
+        VIDEO = "VIDEO"
+        PHOTO = "PHOTO"
+        FILE = "FILE"
 
     post_attachment_id = models.UUIDField(
         max_length=20,
@@ -192,6 +192,7 @@ class PostAttachment(models.Model):
     post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name="attachments", blank=True, null=True)
     attachmentURL = models.URLField(max_length=200, null=True, blank=True)
     public_id = models.CharField(max_length=50, null=True, blank=True)
+    thumbnail_url = models.URLField(max_length=255, null=True, blank=True)
     comment = models.ForeignKey(Comment, on_delete=models.CASCADE, null=True, blank=True, related_name="attachments")
 
     created_at = models.DateTimeField(auto_now_add=True)
