@@ -46,7 +46,7 @@ def generate_thumbnails(url: str, start: int = 3, duration: int = 5, format: str
         transform_str = f"so_{start},du_{duration},fl_animated/"
         anchor = "/video/upload/" # every cloudinary url carries this
         if anchor not in url:
-            logger.debug("Invalid cloudinary structure")
+            logger.info("Invalid cloudinary structure")
             raise ValueError("Invalid Cloudinary structure")
 
         parts = url.split(anchor)

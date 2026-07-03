@@ -67,6 +67,7 @@ class WorkImagesSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         instance: WorkImages = super().create(validated_data)
         instance.thumbnail_url = generate_thumbnails(instance.image_url) if instance.type.lower() == "video" and instance.image_url else None
+        instance.save(update_fields=['thumbnail_url'])
         return instance
 
 class BaseProfileCreateSerializer(serializers.ModelSerializer):
