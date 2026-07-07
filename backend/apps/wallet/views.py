@@ -87,7 +87,7 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
         if self.action == 'withdraw':
             return WithDrawalSerializer
 
-        return None
+        return WalletTransactionSummarySerializer
     
 
     def get_queryset(self):

@@ -284,18 +284,22 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
             return total_endorsement['total']
 
 class ProviderProfilePublicSerializer(serializers.ModelSerializer):
-    profile = BaseProfileListSerializer(read_only=True)
+    user = serializers.SerializerMethodField()
     avg_rating = serializers.SerializerMethodField()
     total_reviews = serializers.SerializerMethodField()
-    skills = ProviderSkillListSerializer(read_only=True,  many=True)
 
     class Meta:
         model = ProviderModel
         fields = [
-            "provider_id", "profile", "professional_title",
-            "avg_rating", "total_reviews", "skills", 
+            "provider_id", "user", "professional_title",
+            "avg_rating", "total_reviews", 
             "overview", "headline"
         ]
+    
+    def get_user(self, obj: ProviderModel):
+        from ...authentication.serializers import UserReadSerializer
+        user = obj.profile.user
+        return UserReadSerializer(user).data
 
     def get_avg_rating(self, obj: ProviderModel):
         

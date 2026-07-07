@@ -6,7 +6,7 @@ class IsNotificationOwnerOrAdmin(BasePermission):
         user = request.user
         if user.is_superuser or user.is_staff:
             return True
-        elif obj.user == user:
+        elif obj.receiver == user:
             return True
         return False
     

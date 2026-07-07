@@ -69,6 +69,6 @@ def create_referral_code(sender, instance, created, **kwargs):
             logger.info("referral code created")
     except Exception as exc:
         logger.error(str(exc))
-        return 
+        pass
     
 

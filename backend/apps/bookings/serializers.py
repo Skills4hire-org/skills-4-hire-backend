@@ -188,7 +188,7 @@ class AcceptRejectSerializer(serializers.Serializer):
 class BookingSerializer(serializers.ModelSerializer):
     customer = UserReadSerializer(read_only=True)
     provider = ProviderProfilePublicSerializer(read_only=True)
-    attachments = BookingAttachmentSerializer(read_only=True)
+    attachments = BookingAttachmentSerializer(read_only=True, many=True)
     address = AddressSerializer(read_only=True)
     class Meta:
         model = Bookings
@@ -206,9 +206,10 @@ class BookingDetailSerializer(serializers.ModelSerializer):
     provider = ProviderProfilePublicSerializer(read_only=True)
     cancelled_by = UserReadSerializer(read_only=True)
     accepted_by = UserReadSerializer(read_only=True)
-    attachments = BookingAttachmentSerializer(read_only=True)
-    address = AddressSerializer(read_only=True)
+    attachments = BookingAttachmentSerializer(read_only=True, many=True)
+    address = AddressSerializer(read_only=True, many=True)
     provider_pay = serializers.SerializerMethodField()
+
     class Meta:
         model = Bookings
         fields = [
@@ -222,7 +223,7 @@ class BookingDetailSerializer(serializers.ModelSerializer):
         ]
 
     def get_provider_pay(self, obj):
-        return str(obj.price - obj.platform_fee)
+        return str(obj.price - obj.platform_fee) or "0.00"
 
 class PaymentRequestSerializer(serializers.ModelSerializer):
     attachments_payment_request = BookingAttachmentSerializer(many=True, required=True)

@@ -78,6 +78,7 @@ INSTALLED_APPS = [
     "django_countries",
     "channels",
     'anymail',
+    'drf_spectacular',
 
     # local apps
     'apps.authentication.apps.AuthenticationConfig',
@@ -92,7 +93,16 @@ INSTALLED_APPS = [
 
 ]
 
+
+SPECTACULAR_SETTINGS = {
+    'TITLE': 'Your Project API Documentation',
+    'DESCRIPTION': 'API endpoints for Skills4Hire.',
+    'VERSION': '1.0.0',
+    'SERVE_INCLUDE_SCHEMA': False,
+}
+
 REST_FRAMEWORK = {
+    'DEFAULT_SCHEMA_CLASS': 'drf_spectacular.openapi.AutoSchema',
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),

@@ -45,6 +45,11 @@ class ProfileSearchView(viewsets.ModelViewSet):
         Build search queryset for Provider profiles.
         Uses ?q= query parameter with Django Q objects for OR-based search.
         """
+        # Prevent executing complex queryset logic during schema generation
+        # (swagger_fake_view) which runs without a real request/user.
+        if getattr(self, "swagger_fake_view", False):
+            return ProviderModel.objects.none()
+
         queryset = ProviderModel.objects.select_related(
             'profile', 'profile__user'
         ).prefetch_related(
@@ -95,20 +100,26 @@ class ProfileViewSet(viewsets.GenericViewSet):
     http_method_names =  ['get', 'patch', "delete", "post"]
 
     def get_serializer_class(self):
-        user = self.request.user
-        if user.is_provider:
+        # During schema introspection there may be no authenticated user.
+        # Return a sensible default serializer to allow schema generation.
+        if getattr(self, "swagger_fake_view", False):
+            return ProviderProfilePublicSerializer
+
+        user = getattr(self.request, "user", None)
+        if not getattr(user, "is_authenticated", False):
+            return ProviderProfilePublicSerializer
+
+        if getattr(user, "is_provider", False):
             if self.action in ("partial_update", "me"):
                 return ProviderProfileUpdateCreateSerializer
-            else:
-                return ProviderProfilePublicSerializer
+            return ProviderProfilePublicSerializer
 
-        elif user.is_customer:
+        if getattr(user, "is_customer", False):
             if self.action in ("partial_update", "me"):
                 return CustomerCreateUpdateSerializer
-            else:
-                return CustomerProfileDetailSerializer
-        else:
-            raise ValueError("Invalid user obj")
+            return CustomerProfileDetailSerializer
+
+        raise ValueError("Invalid user obj")
 
     @action(methods=["post", "delete"], detail=False, url_path="avatar") 
     def profile_picture(self, request, *args, **kwargs):

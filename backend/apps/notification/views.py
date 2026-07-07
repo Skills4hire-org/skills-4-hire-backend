@@ -18,7 +18,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
     queryset = (
         Notification.objects.filter(is_deleted=False)\
             .order_by("-created_at")\
-            .select_related("user")
+            .select_related("sender", "receiver")
     )
     serializer_class = NotificationReadSerializer
     pagination_class = NotificationPagination
@@ -39,7 +39,7 @@ class NotificationViewSet(viewsets.ModelViewSet):
         if user.is_superuser or user.is_staff:
             return qs
         else:
-           return qs.filter(user=user)
+           return qs.filter(receiver=user)
 
     @method_decorator(cache_page(60 * 5))
     def list(self, request, *args, **kwargs):

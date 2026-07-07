@@ -16,25 +16,32 @@ class FavouriteViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ("create", "partial_update"):
             return FavouriteAddSerializer
-        
+
         if self.action in ("list", "retrieve"):
-            if self.request.user.is_provider:
+            if getattr(self.request.user, "is_provider", False):
                 return FavoriteProviderSerializer
-            else:
-                return FavouriteListSerialzer
+            return FavouriteListSerialzer
+
+        return FavouriteListSerialzer
 
     def get_queryset(self):
         user = self.request.user
+        if getattr(self, "swagger_fake_view", False) or not getattr(user, "is_authenticated", False):
+            return Favourite.objects.none()
+
         queryset = Favourite.objects\
             .select_related("owner")\
             .prefetch_related("providers")
         
-        if user.is_customer:
+        if getattr(user, "is_customer", False):
             queryset = queryset.filter(owner=user)
-        elif user.is_provider:
-            queryset = queryset.filter(providers=user.profile.provider_profile)
+        elif getattr(user, "is_provider", False):
+            provider_profile = getattr(user.profile, "provider_profile", None)
+            if provider_profile is None:
+                return Favourite.objects.none()
+            queryset = queryset.filter(providers=provider_profile)
         else:
-            return queryset
+            return Favourite.objects.none()
 
         return queryset
 
