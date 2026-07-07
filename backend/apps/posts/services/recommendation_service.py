@@ -16,6 +16,7 @@ The service follows a three-layer architecture:
 """
 
 import logging
+import random
 from datetime import timedelta
 from django.utils import timezone
 from django.db.models import QuerySet, Max
@@ -59,6 +60,27 @@ class RecommendationService:
         self.user = user
         self.user_profile = getattr(user, 'profile', None)
         
+    def randomize_post(
+            self,
+            category: str = None, location: str = None,
+            exclude_seen: bool = True, include_offers: bool = True,
+            limit: int = 20, offset: int = 0
+    ) -> list:
+        """
+        Ramdomize post for users with no trust score and early birds 
+
+        Returns a list of post ramdomize based on user params
+        """
+
+        candidate  = self._get_candidates(category, exclude_seen, include_offers)
+        if candidate is None:
+            return []
+
+        posts  = [{"post": data for data in candidate}]
+        # paginate the response
+        paginated = posts[offset: offset + limit]
+        return random.shuffle(paginated)
+
     def get_feed(
         self,
         category: str = None,

@@ -11,6 +11,7 @@ from .services.utils import generate_reference_key
 from .tasks import process_transfer_task
 from ..authentication.serializers import UserReadSerializer
 
+import decimal
 import logging
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,7 @@ class ReferralCodeSerializer(serializers.ModelSerializer):
             status__in=[Referral.Status.PENDING, Referral.Status.CONVERTED]
             ).count()
         
-        return float(user_referrals_count * commision)
+        return decimal.Decimal(float(user_referrals_count * commision))
 
 class ReferralWithdrawalSerializer(serializers.ModelSerializer):
 

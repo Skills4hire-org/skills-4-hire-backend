@@ -37,14 +37,18 @@ class AddressViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        if getattr(self, "swagger_fake_view", False) or not getattr(user, "is_authenticated", False):
+            return UserAddress.objects.none()
+
+        profile = getattr(user, "profile", None)
+        if profile is None:
+            return UserAddress.objects.none()
 
         queryset = UserAddress.objects \
             .select_related("user_profile") \
-            .filter(user_profile=user.profile) \
+            .filter(user_profile=profile) \
             .order_by('-created_at')
 
-        if queryset is None:
-            return UserAddress.objects.none()
         return queryset
 
     @method_decorator(cache_page(60 * 15))

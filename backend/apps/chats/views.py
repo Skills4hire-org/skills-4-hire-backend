@@ -11,7 +11,7 @@ Handles all conversation-related operations:
 
 from django.db import transaction
 
-from rest_framework import viewsets, status, generics, filters, mixins
+from rest_framework import viewsets, status, generics, filters, mixins, serializers
 from rest_framework.decorators import action
 from rest_framework.exceptions import PermissionDenied, NotFound, ValidationError
 from rest_framework.response import Response
@@ -102,6 +102,8 @@ class ConversationViewSet(
         - Order by most recent activity
         """
         user = self.request.user
+        if getattr(self, "swagger_fake_view", False) or not getattr(user, "is_authenticated", False):
+            return Conversation.objects.none()
 
         queryset = Conversation.objects.filter(
             Q(participant_one=user) | Q(participant_two=user)
@@ -207,6 +209,7 @@ class ConversationViewSet(
 
 class OpenSupportRoomView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
+    serializer_class = serializers.Serializer
     http_method_names = ['post']
     def post(self, request, *args, **kwargs):
         
@@ -276,6 +279,7 @@ class MarkMessagesReadView(generics.GenericAPIView):
 
 class SupportRoomMessagesView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
+    serializer_class = MessageListSerializer
 
     def get(self, request, room_id, *args, **kwargs):
         support_room = get_object_or_404(
@@ -317,7 +321,7 @@ class MessageViewSet(viewsets.ModelViewSet):
 
     def get_serializer_class(self):
 
-        if self.action in ("partial_update"):
+        if self.action in ("partial_update",):
             return MessageCreateSerializer
         return MessageSerializer
 
@@ -368,6 +372,9 @@ class NegotiationViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        if getattr(self, "swagger_fake_view", False) or not getattr(user, "is_authenticated", False):
+            return Negotiations.objects.none()
+
         queryset = Negotiations.objects.filter(
             sender=user,
         ).select_related("conversation", "sender", "job_post")

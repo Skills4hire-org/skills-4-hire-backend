@@ -79,15 +79,16 @@ class PostViewSet(viewsets.ModelViewSet):
         if self.action in ('create', 'update', 'partial_update'):
             return PostCreateSerializer
         if self.action in ("list", "retrieve", "user_posts"):
-            if user.is_provider:
+            if getattr(user, "is_provider", False):
                 return JobPostSerializer
-            else:
-                return PostDetailSerializer  
-        
+            return PostDetailSerializer
+
         if self.action == 'repost_post':
             return RepostSerializer
         if self.action == "get_reposts":
             return RepostListSerializer
+
+        return PostDetailSerializer
     
     def get_permissions(self):
         if self.action == "offers":
@@ -106,6 +107,9 @@ class PostViewSet(viewsets.ModelViewSet):
             likes_count=Count("likes", filter=Q(likes__is_active=True), distinct=True),
             reposts_count=Count("repost_records", filter=Q(repost_records__is_active=True), distinct=True)
         ).order_by("-created_at")
+
+        if getattr(self, "swagger_fake_view", False) or not getattr(user, "is_authenticated", False):
+            return updated_qs
 
         if "include_offers" in self.request.query_params:
             include_offers = self.request.query_params['include_offers']
@@ -401,6 +405,7 @@ class CommentViewSet(viewsets.ModelViewSet):
 
 class CommentLikeViewSet(viewsets.GenericViewSet):
 
+    serializer_class = CommentListSerializer
     http_method_names = ["post", "delete", "get"]
     permission_classes = [permissions.IsAuthenticated]
     pagination_class = CustomPostPagination
@@ -414,6 +419,7 @@ class CommentLikeViewSet(viewsets.GenericViewSet):
     def get_serializer_class(self):
         if self.action == "user_comments":
             return CommentListSerializer
+        return CommentListSerializer
 
     @method_decorator(cache_page(60))
     @action(methods=['get'], detail=False, url_path="user/(?P<user_id>[^/.]+)/comments")
@@ -496,7 +502,7 @@ class FeedListView(ListAPIView):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = [
         "amount", "post_type", "country", "state", "city",
-        "post_title", "tags__name", ""
+        "post_title", "tags__name"
     ]
     
     def get_queryset(self):
@@ -535,6 +541,7 @@ class FeedListView(ListAPIView):
         recommendation_service = RecommendationService(user=request.user)
         
         # Generate feed
+        
         try:
             feed_posts = recommendation_service.get_feed(
                 category=category,
@@ -551,17 +558,24 @@ class FeedListView(ListAPIView):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         
+        if len(feed_posts) < 1:
+            feed_posts = recommendation_service.randomize_post(
+                category=category, location=location,
+                exclude_seen=exclude_seen, include_offers=include_offers,
+                limit=limit, offset=offset
+            )
+
         # Record a 'view' interaction for each post in the feed
         # (This tracks feed impressions for algorithm improvement)
         self._record_feed_impressions(request.user, feed_posts)
-        
+    
         # Serialize the results with recommendation scores
-        filtered_post = self.filter_queryset(feed_posts)
-        page = self.paginate_queryset(filtered_post)
+        # filtered_post = self.filter_queryset(feed_posts)
+        page = self.paginate_queryset(feed_posts)
         serialized_posts = []
         for item in page:
             post = item['post']
-            recommendation_score = item['score']
+            recommendation_score = item.get("score", 0.0)
             
             serializer = FeedPostSerializer(
                 post,
@@ -573,6 +587,7 @@ class FeedListView(ListAPIView):
             serialized_posts.append(serializer.data)
 
         return self.get_paginated_response(serialized_posts)
+
     
     def _record_feed_impressions(self, user, feed_posts: list):
         """
@@ -627,6 +642,9 @@ class PostInteractionViewSet(viewsets.ViewSet):
     """
     
     permission_classes = [permissions.IsAuthenticated]
+    # Provide a minimal serializer so drf-spectacular can infer operation schemas
+    from rest_framework import serializers as _drf_serializers
+    serializer_class = _drf_serializers.Serializer
     
     @action(detail=True, methods=['post'], url_path='interact')
     def interact(self, request, post_id=None):

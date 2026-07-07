@@ -105,7 +105,10 @@ class AccountVerificationViewSet(viewsets.ModelViewSet):
                 message="Account verification successful",
                 status_code=status.HTTP_200_OK,
             )
-        return None
+        return error_response(
+            message="Account verification failed",
+            status_code=status.HTTP_400_BAD_REQUEST,
+        )
 
 class ResendOtpViewSet(viewsets.ModelViewSet):
     http_method_names = ["post"]

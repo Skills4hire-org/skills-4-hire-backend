@@ -29,7 +29,7 @@ class EndorsementViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ("create", 'partial_update'):
             return EndorsementCreateSerializer
-        return None
+        return EndorsementSerializer
     
     def get_permissions(self):
         if self.action in ("create", 'partial_update'):
@@ -99,7 +99,7 @@ class EndorsementDetailViewSet(viewsets.ModelViewSet):
             return EndorsementSerializer
         if self.action == 'retrieve':
             return EndorsementDetailSerializer
-        return None
+        return EndorsementSerializer
     
     def get_user_endorsements(self, provider_profile):
         user = self.request.user
@@ -119,6 +119,9 @@ class EndorsementDetailViewSet(viewsets.ModelViewSet):
             return endorsements.filter(is_hidden=False)
     
     def get_queryset(self):
+        if getattr(self, "swagger_fake_view", False) or not getattr(self.request.user, "is_authenticated", False):
+            return Endorsements.objects.none()
+
         profile_pk = self.request.query_params.get("profile_uuid")
 
         if profile_pk is None:

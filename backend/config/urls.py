@@ -3,6 +3,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from .services import health, check_docker_update, test_email, get_banks
+from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 # ADMIN view and health checks
 urlpatterns = [
@@ -10,13 +11,12 @@ urlpatterns = [
     path("health/", health, name="health"),
     # path("docker/", check_docker_update, name="docker"),
     # path("email/", test_email, name='test')
-    path('banks/', get_banks, name='get_banks')
+    path('banks/', get_banks, name='get_banks'),
+
+    path('api/schema/', SpectacularAPIView.as_view(), name='schema'),
+    path('api/docs/', SpectacularSwaggerView.as_view(url_name='schema'), name='swagger-ui'),
+
 ]
-# Project Documentation
-# urlpatterns += [
-#     path("docs/", get_swagger_view().with_ui("swagger", cache_timeout=0), name="swagger-documentation"),
-#     path("re_docs/", get_swagger_view().with_ui("redoc", cache_timeout=0), name="redoc-documentation"),
-# ]
 
 # App level url config
 urlpatterns += [

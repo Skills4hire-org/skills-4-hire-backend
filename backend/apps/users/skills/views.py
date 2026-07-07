@@ -60,15 +60,19 @@ class ProviderSkillViewSet(viewsets.ModelViewSet):
         Optimized queryset:
         1. Only returns skills for the logged-in provider.
         """
-        user = self.request.user
+        user = getattr(self.request, 'user', None)
 
-        if user.is_customer:
+        # During schema introspection there is no authenticated user.
+        if getattr(self, "swagger_fake_view", False) or not getattr(user, "is_authenticated", False):
             return ProviderSkill.objects.none()
-        
+
+        if getattr(user, "is_customer", False):
+            return ProviderSkill.objects.none()
+
         profile = getattr(user.profile, "provider_profile", None)
         if profile is None:
             return ProviderSkill.objects.none()
-        
+
         queryset = (
             ProviderSkill.active_objects.filter(
                 provider_profile=profile
