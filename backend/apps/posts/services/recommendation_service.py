@@ -78,8 +78,8 @@ class RecommendationService:
 
         posts  = [{"post": data for data in candidate}]
         # paginate the response
-        paginated = posts[offset: offset + limit]
-        return random.shuffle(paginated)
+        paginated = random.shuffle(posts[offset: offset + limit])
+        return paginated or []
 
     def get_feed(
         self,
