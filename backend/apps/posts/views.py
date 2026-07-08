@@ -558,7 +558,7 @@ class FeedListView(ListAPIView):
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
         
-        if len(feed_posts) < 1:
+        if len(feed_posts) < 1 or feed_posts is None:
             feed_posts = recommendation_service.randomize_post(
                 category=category, location=location,
                 exclude_seen=exclude_seen, include_offers=include_offers,
@@ -601,15 +601,16 @@ class FeedListView(ListAPIView):
             feed_posts: List of dicts with 'post' key
         """
         try:
-            for item in feed_posts:
-                post = item['post']
-                # Only create if not already exists (unique constraint)
-                UserPostInteraction.objects.get_or_create(
-                    user=user,
-                    post=post,
-                    interaction_type=UserPostInteraction.InteractionType.VIEW,
-                    defaults={'created_at': timezone.now()}
-                )
+            if len(feed_posts) > 0:
+                for item in feed_posts:
+                    post = item['post']
+                    # Only create if not already exists (unique constraint)
+                    UserPostInteraction.objects.get_or_create(
+                        user=user,
+                        post=post,
+                        interaction_type=UserPostInteraction.InteractionType.VIEW,
+                        defaults={'created_at': timezone.now()}
+                    )
                 
         except Exception as e:
             # Don't fail the feed request if impression tracking fails
