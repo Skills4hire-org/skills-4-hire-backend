@@ -507,7 +507,7 @@ class FeedListView(ListAPIView):
     Example:
         GET /api/posts/feed/?category=plumbing&location=Lagos&limit=20
     """
-    CACHE_TTL_SECONDS = 60 * 10
+    CACHE_TTL_SECONDS = 60 * 5
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = FeedPostSerializer
     pagination_class = CustomPostPagination
