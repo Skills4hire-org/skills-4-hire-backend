@@ -146,7 +146,8 @@ class RecommendationService:
         
         # Layer 3: Ranking + Active User Boost
         ranked_posts = self._rank_and_boost(scored_posts)
-        return ranked_posts
+
+        return random.shuffle(ranked_posts)
     
 
     def _get_candidates(self, category: str = None, exclude_seen: bool = True, include_offers: bool = False) -> QuerySet:
