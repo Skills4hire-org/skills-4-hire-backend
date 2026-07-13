@@ -226,29 +226,33 @@ class RepostSerializer(serializers.ModelSerializer):
         return  value.strip()
 
     def create(self, validated_data):
-
+        repost = None
         user = self.context['request'].user
         post = self.context['post'] 
 
         if Repost.objects.filter(reposted_by=user, original_post=post).exists():
-            raise serializers.ValidationError("You already reposted this post")
-        
-        if not post.is_reposted:
-            post.is_reposted = True
-        try:
+            repost = Repost.objects.get(reposted_by=user, original_post=post)
+            if repost.is_active:
+                raise serializers.ValidationError("You already reposted this post")
+            else:
+                repost.is_active = True
+            repost.save(update_fields=['is_active', 'updated_at'])
+
+        else:
             validated_data.update({
                 "reposted_by": user,
                 "original_post": post,
             })
-        
             repost = super().create(validated_data)
-            post.save()
 
-            if "comment" in validated_data:
-                Post.objects.create(
-                    user=user, post_content=validated_data['comment'], 
-                    post_type=Post.PostType.GENERAL
-                )
+        if not post.is_reposted:
+            post.is_reposted = True
+        try: 
+            Post.objects.create(
+                user=user, post_content=validated_data.get('comment', None), 
+                post_type=post.post_type
+            )
+            post.save()
         except Exception as e:
             raise serializers.ValidationError(e)
         return repost

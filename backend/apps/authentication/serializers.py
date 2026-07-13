@@ -71,7 +71,7 @@ class RegistrationsSerializer(serializers.Serializer):
         exist in the database and complies with company domain restrictions.
         """
         if User.objects.filter(phone=value).exists():
-            raise serializers.ValidationError("Invalid phone number. try logging in instead", code="phone_exists")
+            raise serializers.ValidationError("Phone already exists", code="phone_exists")
         return value
     
     def validate_email(self, value:str):
@@ -94,7 +94,7 @@ class RegistrationsSerializer(serializers.Serializer):
         email = value.strip().lower()
         valid_email = validate_email(email)
         if User.objects.filter(email=valid_email).exists():
-            raise serializers.ValidationError(_("Invalid email address. try logging in instead"), code="email_exists")
+            raise serializers.ValidationError(_("email already exists"), code="email_exists")
         
         return valid_email
 

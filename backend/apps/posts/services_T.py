@@ -68,10 +68,22 @@ class LikeService:
 
     
     def like_comment(self, comment, user):
-        if self.check_already_liked_comment(user, comment):
-            raise PermissionDenied("You already liked this comment")
-        like = Likes.objects.create(user=user, comment=comment)
-        return like
+        like = None
+        try:
+            if self.check_already_liked_comment(user, comment):
+                raise PermissionDenied("You already liked this comment")
+            
+            if Likes.objects.filter(user=user, comment=comment).exists():
+                like = Likes.objects.get(user=user, comment=comment)
+                like.is_active = True
+                like.save(update_fields=['is_active'])
+            else:
+                like = Likes.objects.create(user=user, comment=comment)
+            
+            return like
+        except Exception as error:
+            raise Exception(error)
+        
     
     def unlike_comment(self, comment, user):
         if not self.check_already_liked_comment(user, comment):
@@ -87,10 +99,17 @@ class LikeService:
 
     @transaction.atomic
     def create_like_post(self, post, user, **kwargs):
+        new_like = None
+
         if self.check_already_liked_post(user, post):
             raise PermissionDenied("You already liked this post")
         try:
-            new_like = Likes.objects.create(user=user, post=post)
+            if Likes.objects.filter(user=user, post=post).exists():
+                new_like = Likes.objects.get(user=user, post=post)
+                new_like.is_active = True
+                new_like.save(update_fields=['is_active'])
+            else:
+                new_like = Likes.objects.create(user=user, post=post)
         except Exception as e:
             raise Exception(e)
         return  new_like

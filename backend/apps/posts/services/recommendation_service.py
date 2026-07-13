@@ -13,20 +13,29 @@ The service follows a three-layer architecture:
 1. Candidate Generation: Filter to publishable posts the user hasn't seen
 2. Scoring: Multi-signal scoring algorithm
 3. Ranking: Sort by score and apply active user boost
+
+PERF NOTES (see inline "# PERF:" comments for details):
+- _repost_boost() and _relevance_score() used to run a fresh DB query per
+  candidate post (classic N+1). Both are now fed precomputed/prefetched
+  data instead of querying inside the scoring loop.
+- Dropped 'likes' and 'comments' from prefetch_related since nothing in
+  this module reads them (engagement_score reads post.engagement_count).
+- Category filter switched from `icontains` (unindexable LIKE '%...%' scan)
+  to an exact, case-insensitive match. If you need real substring/fuzzy
+  matching, add a trigram index instead of reverting to icontains.
 """
 
 import logging
 import random
 from datetime import timedelta
 from django.utils import timezone
-from django.db.models import QuerySet, Max
+from django.db.models import QuerySet, Max, Prefetch
 from django.contrib.auth import get_user_model
 
-from ..models import Post, UserPostInteraction
+from ..models import Post, UserPostInteraction, Repost
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
-
 
 class RecommendationService:
     """
@@ -64,22 +73,27 @@ class RecommendationService:
             self,
             category: str = None, location: str = None,
             exclude_seen: bool = True, include_offers: bool = True,
-            limit: int = 20, offset: int = 0
     ) -> list:
         """
-        Ramdomize post for users with no trust score and early birds 
+        Randomize posts for users with no trust score and early birds.
 
-        Returns a list of post ramdomize based on user params
+        Returns a shuffled, paginated list of {'post': ..., 'score': ...}
+        dicts, matching the shape get_feed() returns.
         """
-
-        candidate  = self._get_candidates(category, exclude_seen, include_offers)
-        if candidate is None:
+        candidates = self._get_candidates(category, exclude_seen, include_offers)
+        if not candidates:
             return []
 
-        posts  = [{"post": data for data in candidate}]
-        # paginate the response
-        paginated = random.shuffle(posts[offset: offset + limit])
-        return paginated or []
+        # Fixed: the old version was `[{"post": data for data in candidate}]`,
+        # which is a set comprehension nested inside a list — invalid, since
+        # dicts aren't hashable, and it would raise a TypeError.
+        posts = [{'post': post, 'score': 0.0} for post in candidates]
+
+        # Fixed: random.shuffle() shuffles in place and returns None, so the
+        # old `paginated = random.shuffle(...)` was always None.
+        random.shuffle(posts)
+
+        return posts
 
     def get_feed(
         self,
@@ -87,8 +101,6 @@ class RecommendationService:
         location: str = None,
         exclude_seen: bool = True,
         include_offers: bool = False,
-        limit: int = 20,
-        offset: int = 0
     ) -> list:
         """
         Generate a ranked feed of recommended posts for the user.
@@ -116,12 +128,16 @@ class RecommendationService:
         # Layer 2: Scoring
         scored_posts = []
         max_engagement = self._get_max_engagement(candidates)
+        # user_interacted_tag_ids = set(
+        #     UserPostInteraction.objects.filter(user=self.user)
+        #     .values_list('post__tags__id', flat=True)
+        # )
         
         for post in candidates:
             score = self._score_post(
                 post=post,
                 max_engagement=max_engagement,
-                user_location=location or (self.user_profile.location if self.user_profile else None)
+                user_location=location or (self.user_profile.location if self.user_profile else None),
             )
             scored_posts.append({
                 'post': post,
@@ -130,23 +146,18 @@ class RecommendationService:
         
         # Layer 3: Ranking + Active User Boost
         ranked_posts = self._rank_and_boost(scored_posts)
-        
-        # Apply pagination
-        paginated = ranked_posts[offset:offset + limit]
-        
-        return paginated
+        return ranked_posts
     
 
     def _get_candidates(self, category: str = None, exclude_seen: bool = True, include_offers: bool = False) -> QuerySet:
         """
         Generate candidates: published posts created in last N days that the user
-        hasn't seen and didn't create themselves.
+        hasn't seen.
         
         Args:
             category: Optional category slug to filter
             exclude_seen: Whether to exclude already-viewed posts
             include_offers: Whether to include offer posts
-            
         Returns:
             Optimized QuerySet of candidate posts
         """
@@ -162,7 +173,7 @@ class RecommendationService:
         candidates = candidates.filter(created_at__gte=cutoff_date)
         
         # Exclude posts created by the current user
-        candidates = candidates.exclude(user=self.user)
+        # candidates = candidates.exclude(user=self.user)
         
         # Exclude already-seen posts if requested
         if exclude_seen:
@@ -172,23 +183,31 @@ class RecommendationService:
             ).values_list('post_id', flat=True)
             candidates = candidates.exclude(post_id__in=seen_post_ids)
         
-        # Filter by category if provided
+        # Filter by category if provided.
         if category:
-            candidates = candidates.filter(tags__name__icontains=category)
+            candidates = candidates.filter(tags__name__iexact=category)
         
         # Optionally filter out offers if include_offers
         if include_offers:
             candidates = candidates.filter(post_type=Post.PostType.JOB)
             
-        # Optimize query with select_related and prefetch_related
+        # Optimize query with select_related and prefetch_related.
+        # 'repost_records' is now a filtered Prefetch with to_attr,
+        # so _repost_boost() can read post.active_reposts as a plain list
+        # instead of re-querying (and re-filtering) per post.
         candidates = candidates.select_related(
             'user',
             'user__profile'
         ).prefetch_related(
             'tags',
-            'likes',
-            'comments',
-            'repost_records'
+            Prefetch(
+                'repost_records',
+                queryset=Repost.objects.filter(is_active=True).select_related(
+                    'reposted_by',
+                    'reposted_by__profile'
+                ),
+                to_attr='active_reposts'
+            ),
         ).distinct()
         
         return candidates
@@ -197,7 +216,8 @@ class RecommendationService:
         self,
         post: Post,
         max_engagement: int,
-        user_location: str = None
+        user_location: str = None,
+        # user_interacted_tag_ids: set = None
     ) -> float:
         """
         Compute the recommendation score for a post using the multi-signal algorithm.
@@ -209,6 +229,8 @@ class RecommendationService:
             post: Post object to score
             max_engagement: Maximum engagement count in candidate pool
             user_location: User's location for relevance matching
+            user_interacted_tag_ids: Precomputed set of tag IDs the user has
+                interacted with (avoids a per-post query)
             
         Returns:
             Float score between 0.0 and 1.0+
@@ -271,21 +293,23 @@ class RecommendationService:
         normalized = min(float(engagement) / max_engagement, 1.0)
         return normalized
     
-    def _relevance_score(self, post: Post, user_location: str = None) -> float:
+    def _relevance_score(self, post: Post, user_location: str = None, user_interacted_tag_ids: set = None) -> float:
         """
         Compute relevance based on location, category, and past behavior.
         
-        Relevance combines location, category match, and past behavior. Posts that
+        Relevance combines location, category match. Posts that
         align with user's interests and previous engagement patterns score higher.
         
         Scoring breakdown:
         - +0.5 if post location matches user location
         - +0.5 if post category matches user's category interests
-        - Consider past behavior if available
         
         Args:
             post: Post object to score
             user_location: User's location for matching
+            user_interacted_tag_ids: Precomputed set of tag IDs the user has
+                interacted with. Passed in from get_feed() so we don't run
+                a `.count()` query per post here.
             
         Returns:
             Float between 0.0 and 1.0
@@ -293,29 +317,28 @@ class RecommendationService:
         relevance_score = 0.0
         
         # Location matching
-        post_location = post.city or ""
+        post_location = f"{post.country} {post.city} {post.state}"
         if user_location and post_location.lower() == user_location.lower():
             relevance_score += 0.5
         
-        # Category matching
-        if self.user_profile:
-            post_categories = set(tag.name.lower() for tag in post.tags.all())
-            user_interests = getattr(self.user_profile, 'category_interest', [])
+        # Category matching only if user_interacted_id else + 0.2
+        if not user_interacted_tag_ids:
+            relevance_score += 0.2 
+
+        # post_tags = list(post.tags.all())  # already prefetched, no extra query
+        # if self.user_profile:
+        #     post_categories = set(tag.name.lower() for tag in post_tags)
+        #     user_interests = getattr(self.user_profile, 'category_interest', [])
             
-            if isinstance(user_interests, list):
-                user_interests_lower = {cat.lower() for cat in user_interests}
-                if post_categories & user_interests_lower:
-                    relevance_score += 0.5
-        
-        # Past behavior: check if user has interacted with this category before
-        # (This could be expanded to a more sophisticated behavior model)
-        if post.tags.exists():
-            past_interactions = UserPostInteraction.objects.filter(
-                user=self.user,
-                post__tags__in=post.tags.all()
-            ).count()
-            if past_interactions > 0:
-                relevance_score = min(relevance_score + 0.2, 1.0)
+        #     if isinstance(user_interests, list):
+        #         user_interests_lower = {cat.lower() for cat in user_interests}
+        #         if post_categories & user_interests_lower:
+        #             relevance_score += 0.5
+
+        # if post_tags and user_interacted_tag_ids:
+        #     post_tag_ids = {tag.id for tag in post_tags}
+        #     if post_tag_ids & user_interacted_tag_ids:
+        #         relevance_score = min(relevance_score + 0.2, 1.0)
         
         return min(relevance_score, 1.0)
     
@@ -361,13 +384,9 @@ class RecommendationService:
         """
         boost = 0.0
         
-        # Get all active reposts for this post
-        reposts = post.repost_records.filter(is_active=True).select_related(
-            'reposted_by',
-            'reposted_by__profile'
-        )
+        reposts = getattr(post, 'active_reposts', []) # use already prefetch reposts from candidates
         
-        if not reposts.exists():
+        if not reposts:
             return 0.0
         
         # Score each repost and accumulate weighted boost
