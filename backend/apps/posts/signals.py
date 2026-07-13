@@ -217,7 +217,7 @@ def update_trust_score_on_review(sender, instance, created, **kwargs):
     except Exception as e:
         logger.error(f"Error updating trust score on rating creation: {e}")
                                 
-def update_user_last_active(sender, instance, created, **kwargs):
+def update_user_last_active(sender, instance, created = None, **kwargs):
     """
     Update user's last_active timestamp on any interaction.
     

@@ -1,73 +1,86 @@
-from faker import Faker
 import random
 import uuid
-
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from django.utils import timezone
-
+from django.db import transaction
+from faker import Faker
 from ...models import Post, Comment
 
 UserModel = get_user_model()
 
 class Command(BaseCommand):
-    help = "Populate Post database"
-    faker = Faker()
-    posts_types = Post.PostType.values
-    users = UserModel.objects.all()
+    help = "Populate Post and Comment database with realistic fake data"
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.NOTICE("Starting Tasks. Post Population"))
-        if self.users is None:
-            self.stdout.write(self.style.HTTP_NOT_FOUND("User queryset not found"))
-            return
+        faker = Faker()
+        users = UserModel.objects.all()
         
-        if self.posts_types is None:
-            self.posts_types = ["GENERAL", "JOB", "SERVICE"]
+        if not users.exists():
+            self.stdout.write(self.style.ERROR("No users found in the database. Please create users first."))
+            return
 
-        amount_of_posts = 5_500
-        batches = 700
+        try:
+            post_types = Post.PostType.values
+        except AttributeError:
+            post_types = ["GENERAL", "JOB", "SERVICE"]
 
-        temp_post_storage = list()
+        amount_of_posts = 5500
+        batch_size = 700
+        temp_post_storage = []
 
-        for i in range(amount_of_posts):
-            self.stdout.write(self.style.NOTICE(f"Creating Post: {i + 1}"))
-            
-            post = Post(post_id=uuid.uuid4(), post_content=self.faker.text(max_nb_chars=20),
-                        user=random.choice(self.users), post_type=random.choice(self.posts_types),
-                        amount=random.randint(1000, 10000), start_date=self.faker.date_time(tzinfo=timezone.get_current_timezone()), 
-                        end_date=self.faker.date_time(tzinfo=timezone.get_current_timezone()))
-            
-            temp_post_storage.append(post)
-            if len(temp_post_storage) == batches:
-                self.stdout.write(self.style.NOTICE(f"Saving batch of {batches} posts"))
-                Post.objects.bulk_create(temp_post_storage)
-                temp_post_storage.clear()
-        if temp_post_storage:
-            self.stdout.write(self.style.NOTICE(f"Saving remaining {len(temp_post_storage)} posts"))
-            Post.objects.bulk_create(temp_post_storage)
-            temp_post_storage.clear()
+        self.stdout.write(self.style.MIGRATE_HEADING(f"Starting execution: Generating {amount_of_posts} posts..."))
 
-        amount_of_comments = 700 #per post
-        posts = Post.objects.all()[:100]
-        self.stdout.write(self.style.NOTICE("Starting Comment tasks"))
-        comment_sto = []
-        for post in posts:
-            for i in range(amount_of_comments):
-                self.stdout.write(self.style.NOTICE(f"Running Task {i + 1}"))
-                comment = Comment(
-                    user=random.choice(self.users),
-                    post=post,
-                    message=self.faker.text(max_nb_chars=50)
+        with transaction.atomic():
+            for i in range(amount_of_posts):
+                # Generate logical start and end dates
+                start = faker.date_time_between(start_date="-30d", end_date="now", tzinfo=timezone.get_current_timezone())
+                end = faker.date_time_between(start_date="now", end_date="+30d", tzinfo=timezone.get_current_timezone())
+                
+                post_content = f"{faker.catch_phrase()}! {faker.paragraph(nb_sentences=3)}"
+
+                post = Post(
+                    post_id=uuid.uuid4(),
+                    post_content=post_content,
+                    user=random.choice(users),
+                    post_type=random.choice(post_types),
+                    amount=random.randint(1000, 10000),
+                    start_date=start,
+                    end_date=end
                 )
-                comment_sto.append(comment)
-                if len(comment_sto) == amount_of_comments:
-                    self.stdout.write(self.style.NOTICE(f"Populating Batch {post.pk}: \nComments: {len(comment_sto)} comments"))
-                    Comment.objects.bulk_create(comment_sto)
-                    comment_sto.clear()
-        self.stdout.write(self.style.SUCCESS("Comment Tasks Done"))
+                temp_post_storage.append(post)
 
+                # Batch save posts
+                if len(temp_post_storage) == batch_size:
+                    Post.objects.bulk_create(temp_post_storage)
+                    self.stdout.write(self.style.NOTICE(f"Successfully bulk saved {len(temp_post_storage)} posts."))
+                    temp_post_storage.clear()
 
+            # Save remaining posts
+            if temp_post_storage:
+                Post.objects.bulk_create(temp_post_storage)
+                self.stdout.write(self.style.NOTICE(f"Successfully bulk saved remaining {len(temp_post_storage)} posts."))
+                temp_post_storage.clear()
 
+        # Comment Generation Section
+        comments_per_post = 15 # Reduced from 700 to keep database size healthy, change back if needed
+        sampled_posts = Post.objects.all()[:100]
+        comment_storage = []
 
+        self.stdout.write(self.style.MIGRATE_HEADING(f"Starting execution: Generating comments for {len(sampled_posts)} posts..."))
 
+        with transaction.atomic():
+            for post in sampled_posts:
+                for _ in range(comments_per_post):
+                    comment = Comment(
+                        user=random.choice(users),
+                        post=post,
+                        message=faker.sentence(nb_words=12) # Reasonable comment length
+                    )
+                    comment_storage.append(comment)
+                
+                # Bulk insert comments per post to keep memory clear
+                Comment.objects.bulk_create(comment_storage)
+                comment_storage.clear()
+                
+            self.stdout.write(self.style.SUCCESS("All tasks finished successfully!"))

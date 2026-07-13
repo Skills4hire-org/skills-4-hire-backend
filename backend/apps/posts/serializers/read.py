@@ -9,9 +9,9 @@ from  ...users.services.serializers import ServiceCategorySerializer
 
 
 class GeneralPostSerializer(serializers.ModelSerializer):
-    comments_count = serializers.IntegerField(source='comments.count', read_only=True)
-    likes_count = serializers.IntegerField(source='likes.count', read_only=True)
-    reposts_count = serializers.IntegerField(source='repost_records.count', read_only=True)
+    comments_count = serializers.SerializerMethodField(read_only=True)
+    likes_count = serializers.SerializerMethodField(read_only=True)
+    reposts_count = serializers.SerializerMethodField(read_only=True)
     attachments = PostAttachmentSerializer(many=True, read_only=True)
     tags = ServiceCategorySerializer(read_only=True, many=True)
     is_liked = serializers.SerializerMethodField()
@@ -30,6 +30,18 @@ class GeneralPostSerializer(serializers.ModelSerializer):
             "comments_count", "likes_count", "reposts_count",
             "is_liked", "is_commented", "is_reposted", "duration", "post_status"
         ]
+
+    def get_reposts_count(self, obj):
+        post_reposts = obj.repost_records.filter(is_active=True).count()
+        return post_reposts
+    
+    def get_comments_count(self, obj):
+        post_comments: int = obj.comments.filter(is_active=True, is_deleted=False).count()
+        return post_comments
+    
+    def get_likes_count(self, obj):
+        post_likes: int = obj.likes.filter(is_active=True).count()
+        return post_likes
     
     def get_duration(self, obj):
         if obj.start_date and obj.end_date:
@@ -83,7 +95,6 @@ class JobPostSerializer(GeneralPostSerializer):
             "is_reposted", 'user'
         ]
     
-
 class PostDetailSerializer(GeneralPostSerializer):
     user = UserReadSerializer(read_only=True)
     class Meta(GeneralPostSerializer.Meta):

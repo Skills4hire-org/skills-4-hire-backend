@@ -3,6 +3,7 @@ from typing import Any
 
 from django.db import transaction
 from django.utils.decorators import method_decorator
+from django.core.cache import cache
 from django.views.decorators.cache import cache_page
 from django_filters.rest_framework import DjangoFilterBackend
 from django.contrib.auth import get_user_model
@@ -40,8 +41,10 @@ from .services_T import  (
 from .services.recommendation_service import RecommendationService
 from apps.bookings.permissions import  IsCustomer
 from ..core.exceptions import api_response, error_response
+from ..core.utils.py import get_or_none
 
 import uuid
+import hashlib
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -121,11 +124,11 @@ class PostViewSet(viewsets.ModelViewSet):
                 updated_qs = list_posts(user, updated_qs)
         return updated_qs
 
+    @method_decorator(cache_page(60 * 5))
     def list(self, request, *args, **kwargs):
         """List posts (cached for a short period)."""
         return super().list(request, *args, **kwargs)
 
-    @method_decorator(cache_page(60 * 5))
     def retrieve(self, request, *args, **kwargs):
         return  super().retrieve(request, *args, **kwargs)
 
@@ -201,38 +204,47 @@ class PostViewSet(viewsets.ModelViewSet):
             code=200
         return api_response(
             data={"msg": msg},
-            message="Post unlike action completed",
-            status_code=code,
-        )
-
-
-    @action(methods=["post"], detail=True, url_path="repost")
-    def repost_post(self, request, *args, **kwargs):
-        post_instance = self.get_object()
-
-        serializer = self.get_serializer(
-            data=request.data, context={
-                'post': post_instance, "request": request
-                }
-        )
-        serializer.is_valid(raise_exception=True)
-
-        try:
-            repost = serializer.save()
-            return api_response(
-                data={"details": RepostListSerializer(repost).data},
-                message="Post reposted successfully",
-                status_code=status.HTTP_201_CREATED,
-            )
-        except Exception as e:
-            logger.info(str(e))
-            msg = str(e)
-            sts = "failed"
-            code = 400  
-        return error_response(
             message=msg,
             status_code=code,
         )
+
+
+    @action(methods=["post", "delete"], detail=True, url_path="repost")
+    def repost_post(self, request, *args, **kwargs):
+        post_instance = self.get_object()
+        if request.method == "DELETE":
+            repost = get_or_none(Repost, original_post=post_instance, reposted_by=request.user, is_active=True)
+            if repost is None: 
+                return api_response({}, message="Invalid Request", status=404)
+            
+            # set is_active = False
+            repost.is_active = False
+            repost.save(update_fields=['is_active', 'updated_at'])
+            return api_response({}, message=f"[repost deleted] successfully unreposted {post_instance.pk}")
+        else:
+            serializer = self.get_serializer(
+                data=request.data, context={
+                    'post': post_instance, "request": request
+                    }
+            )
+            serializer.is_valid(raise_exception=True)
+
+            try:
+                repost = serializer.save()
+                return api_response(
+                    data={"details": RepostListSerializer(repost).data},
+                    message="Post reposted successfully",
+                    status_code=status.HTTP_201_CREATED,
+                )
+            except Exception as e:
+                logger.info(str(e))
+                msg = str(e)
+                sts = "failed"
+                code = 400  
+            return error_response(
+                message=msg,
+                status_code=code,
+            )
         
     @method_decorator(cache_page(timeout=60 * 5))
     @action(methods=['get'], url_path="reposts", detail=True)
@@ -495,7 +507,7 @@ class FeedListView(ListAPIView):
     Example:
         GET /api/posts/feed/?category=plumbing&location=Lagos&limit=20
     """
-    
+    CACHE_TTL_SECONDS = 60 * 10
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = FeedPostSerializer
     pagination_class = CustomPostPagination
@@ -513,80 +525,76 @@ class FeedListView(ListAPIView):
         """
         return Post.objects.none()
     
+    @staticmethod
+    def _build_cache_key(user_id: str):
+        key = f"{user_id}"
+        return hashlib.sha3_256(key.encode("utf-8")).hexdigest()
+
     def list(self, request, *args, **kwargs):
-        """
-        Override list() to use the recommendation service instead of standard queryset filtering.
-        
-        Args:
-            request: HTTP request with optional query parameters
-            
-        Returns:
-            Response with paginated list of recommended posts
-        """
-        # Parse query parameters
-        category = request.query_params.get('category', None)
-        location = request.query_params.get('location', None)
-        exclude_seen = request.query_params.get('exclude_seen', False)
-        include_offers = request.query_params.get('include_offers', False)
-        
+ 
         try:
-            limit = min(int(request.query_params.get('limit', 20)), 50)
-            page = max(int(request.query_params.get('page', 1)), 1)
-            offset = (page - 1) * limit
-        except (ValueError, TypeError):
-            limit = 20
-            offset = 0
-        
-        # Get recommendation service instance
-        recommendation_service = RecommendationService(user=request.user)
-        
-        # Generate feed
-        
-        try:
+            category = request.query_params.get('category', None)
+            location = request.query_params.get('location', None)
+            exclude_seen = request.query_params.get('exclude_seen', False)
+            include_offers = request.query_params.get('include_offers', False)
+
+            cache_key = self._build_cache_key(request.user.pk)
+            try:
+                cached_response = cache.get(cache_key)
+            except Exception as error:
+                logger.warning(f"Feed cache read failed for key {cache_key}: {error}")
+                cached_response = None
+
+            if cached_response is not None:
+                logger.info(f"Returning Cached Response for Key {cache_key}")
+                return api_response(data=cached_response)
+
+            recommendation_service = RecommendationService(user=request.user)
             feed_posts = recommendation_service.get_feed(
                 category=category,
                 location=location,
                 exclude_seen=exclude_seen,
                 include_offers=include_offers,
-                limit=limit,
-                offset=offset
             )
+
+            if not feed_posts:
+                feed_posts = recommendation_service.randomize_post(
+                    category=category, location=location,
+                    exclude_seen=exclude_seen, include_offers=include_offers,
+                )
+
+            # self._record_feed_impressions(request.user, feed_posts)
+            page = self.paginate_queryset(feed_posts)
+            serialized_posts = []
+            for item in page:
+                post = item['post']
+                recommendation_score = item.get("score", 0.0)
+                serializer = FeedPostSerializer(
+                    post,
+                    context={
+                        'request': request,
+                        'recommendation_score': recommendation_score
+                    }
+                )
+                serialized_posts.append(serializer.data)
+
+            paginated_response = self.get_paginated_response(serialized_posts)
+
+            # Cache writes should never be able to take the endpoint down either.
+            try:
+                cache.set(cache_key, paginated_response.data, self.CACHE_TTL_SECONDS)
+                logger.info(f"Cached Response for key {cache_key}")
+            except Exception as error:
+                logger.warning(f"Feed cache write failed for key {cache_key}: {error}")
+
+            return api_response(data=paginated_response.data)
+
         except Exception as e:
             logger.error(f"Error generating feed for user {request.user.id}: {e}")
             return error_response(
                 message='Failed to generate feed',
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        
-        if len(feed_posts) < 1 or feed_posts is None:
-            feed_posts = recommendation_service.randomize_post(
-                category=category, location=location,
-                exclude_seen=exclude_seen, include_offers=include_offers,
-                limit=limit, offset=offset
-            )
-
-        # Record a 'view' interaction for each post in the feed
-        # (This tracks feed impressions for algorithm improvement)
-        self._record_feed_impressions(request.user, feed_posts)
-    
-        # Serialize the results with recommendation scores
-        # filtered_post = self.filter_queryset(feed_posts)
-        page = self.paginate_queryset(feed_posts)
-        serialized_posts = []
-        for item in page:
-            post = item['post']
-            recommendation_score = item.get("score", 0.0)
-            
-            serializer = FeedPostSerializer(
-                post,
-                context={
-                    'request': request,
-                    'recommendation_score': recommendation_score
-                }
-            )
-            serialized_posts.append(serializer.data)
-
-        return self.get_paginated_response(serialized_posts)
 
     
     def _record_feed_impressions(self, user, feed_posts: list):

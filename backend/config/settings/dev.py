@@ -42,7 +42,6 @@ CACHES = {
     }
 }
 
-# Uncomment below to use Redis (ensure Redis is running on the port specified)
 # CACHES = {
 #     "default": {
 #         "BACKEND": "django_redis.cache.RedisCache",

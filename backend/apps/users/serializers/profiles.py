@@ -135,13 +135,22 @@ class BaseProfileListSerializer(serializers.ModelSerializer):
     avatar = AvatarDetailSerializer(read_only=True, default={})
     provider_id = serializers.SerializerMethodField()
     customer_id = serializers.SerializerMethodField()
+    professional_title = serializers.SerializerMethodField() # add professional title for provider if present
+
     class Meta:
         model = BaseProfile
         fields = [
-            "gender", "display_name", "trust_score",
+            "professional_title", "gender", "display_name", "trust_score",
             "country", "city", "state", "location", "created_at", "avatar",
             "customer_id", "provider_id", "cover_photo"
         ]
+
+    def get_professional_title(self, obj):
+        user = obj.user
+        if not user.is_provider:
+            return None
+        title = getattr(obj.provider_profile, "professional_title", '')
+        return title
 
     def get_provider_id(self, obj):
         user = obj.user
