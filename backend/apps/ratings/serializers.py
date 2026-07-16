@@ -97,7 +97,7 @@ class ReviewUpdateSerializer(serializers.ModelSerializer):
     
 class ReviewDetailSerializer(serializers.ModelSerializer):
     reviewed_by = UserReadSerializer(read_only=True)
-    provider_profile = ProviderProfilePublicSerializer(read_only=True)
+    # provider_profile = ProviderProfilePublicSerializer(read_only=True)
 
     class Meta:
         model = ProfileReview

@@ -90,7 +90,7 @@ INSTALLED_APPS = [
     "apps.notification.apps.NotificationConfig",
     'apps.chats.apps.ChatsConfig',
     'apps.referral.apps.ReferralConfig',
-
+    'apps.admin.apps.AdminConfig'
 ]
 
 
@@ -251,26 +251,26 @@ CELERY_RESULT_SERIALIZER = "json"
 timezone = 'Africa/Lagos'
 
 CELERY_BEAT_SCHEDULE = {
-    "delete_otp": {
-        "task": "apps.authentication.services.tasks.auto_delete_otp",
-        "schedule": crontab(minute="*/5")
-    },
-    "auto_delete_exp_outstanding_jwt": {
-        "task": "apps.authentication.services.tasks.clean_up_expired_jwt",
-        "schedule": crontab(hour=0, minute=0)
-    },
+    # "delete_otp": {
+    #     "task": "apps.authentication.services.tasks.auto_delete_otp",
+    #     "schedule": crontab(minute="*/5")
+    # },
+    # "auto_delete_exp_outstanding_jwt": {
+    #     "task": "apps.authentication.services.tasks.clean_up_expired_jwt",
+    #     "schedule": crontab(hour=0, minute=0)
+    # },
     # "auto_update_roles": {
     #     "task": "apps.users.tasks.auto_update_role",
     #     "schedule": crontab(minute=1)
     # },
-    "auto_update_pending_referrals": {
-        "task": "apps.referral.tasks.process_referral_conversion_task",
-        "schedule": crontab(hour=0, minute=0) # run daily at midnight
-    },
-    "auto_update_trust_score": {
-        "task": "apps.bookings.tasks.auto_update_trust_score",
-        "schedule": crontab(hour=0, minute=0)
-    }
+    # "auto_update_pending_referrals": {
+    #     "task": "apps.referral.tasks.process_referral_conversion_task",
+    #     "schedule": crontab(hour=0, minute=0) # run daily at midnight
+    # },
+    # "auto_update_trust_score": {
+    #     "task": "apps.bookings.tasks.auto_update_trust_score",
+    #     "schedule": crontab(hour=0, minute=0)
+    # }
 }
 
 CORS_ALLOW_ALL_ORIGINS = True

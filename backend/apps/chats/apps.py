@@ -7,5 +7,3 @@ class ChatsConfig(AppConfig):
 
     def ready(self):
         from .endorsements import signals
-        from . import signals
-        

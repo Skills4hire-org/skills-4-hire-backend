@@ -42,8 +42,6 @@ from .serializers import (
 from .core.permissions import IsParticipant, NegotiationParticipantPermission, IsMessageSenderOrReadOnly
 from .core.pagination import ConversationPagination, MessagePagination
 from .services.support_service import (
-    get_or_create_support_room,
-    get_all_support_rooms,
     mark_messages_as_read,
 )
 from apps.core.utils.py import log_action, get_or_none
@@ -206,25 +204,24 @@ class ConversationViewSet(
             )
 
 # Support Views
-
 class OpenSupportRoomView(generics.GenericAPIView):
+    from ..admin.support_disputes.serializers import OpenTicketSerializer, SupportConversationSerializer
+
     permission_classes = [IsAuthenticated]
-    serializer_class = serializers.Serializer
+    serializer_class = OpenTicketSerializer
     http_method_names = ['post']
-    def post(self, request, *args, **kwargs):
-        
+
+    def post(self, request, *args, **kwargs): 
         if request.user.is_staff:
             raise PermissionDenied('Staff users cannot open a customer support room.')
-
         try:
-            support_room = get_or_create_support_room(request.user)
+            serializer = self.get_serializer(data=request.data, context={'request': request})
+            serializer.is_valid(raise_exception=True)
+            message = serializer.save()
+            log_action("conversation_created", request.user, {"support_room": True})
             return api_response(
-                data={
-                    'room_id': str(support_room.conversation_id),
-                    'ws_url': f'/ws/chat/{support_room.conversation_id}/'
-                },
-                message="Support room opened successfully",
-                status_code=status.HTTP_200_OK,
+                data=self.SupportConversationSerializer(message).data,
+                status_code=201
             )
         except Exception as exc:
             return error_response(
@@ -232,25 +229,6 @@ class OpenSupportRoomView(generics.GenericAPIView):
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
-class SupportInboxView(generics.ListAPIView):
-    permission_classes = [IsAdminUser]
-    serializer_class = SupportRoomSerializer
-    pagination_class = ConversationPagination
-
-    def get_queryset(self):
-        queryset = get_all_support_rooms()
-        unread = self.request.query_params.get('unread')
-        search = self.request.query_params.get('search')
-
-        if unread and unread.lower() == 'true':
-            queryset = queryset.filter(unread_count__gt=0)
-
-        if search:
-            queryset = queryset.filter(
-                participant_one__is_staff=False, participant_two__profile__display_name=search
-            )
-
-        return queryset
 
 class MarkMessagesReadView(generics.GenericAPIView):
     permission_classes = [IsAuthenticated]
@@ -274,43 +252,6 @@ class MarkMessagesReadView(generics.GenericAPIView):
         return api_response(
             data={'marked_as_read': updated_count},
             message="Messages marked as read",
-            status_code=status.HTTP_200_OK,
-        )
-
-class SupportRoomMessagesView(generics.GenericAPIView):
-    permission_classes = [IsAuthenticated]
-    serializer_class = MessageListSerializer
-
-    def get(self, request, room_id, *args, **kwargs):
-        support_room = get_object_or_404(
-            Conversation,
-            conversation_id=room_id,
-            room_type=Conversation.RoomType.SUPPORT
-        )
-        if not request.user.is_staff and not support_room.has_participant(request.user):
-            raise PermissionDenied()
-
-        limit = min(int(request.query_params.get('limit', 50)), 100)
-        page = max(int(request.query_params.get('page', 1)), 1)
-        offset = (page - 1) * limit
-
-        queryset = Message.objects.filter(
-            conversation=support_room,
-            is_active=True
-        ).select_related('sender').order_by('created_at')
-
-        mark_messages_as_read(support_room, request.user)
-        messages = list(queryset[offset:offset + limit])
-        serializer = MessageListSerializer(messages, many=True)
-
-        return api_response(
-            data={
-                'count': queryset.count(),
-                'page': page,
-                'limit': limit,
-                'results': serializer.data,
-            },
-            message="Support room messages retrieved successfully",
             status_code=status.HTTP_200_OK,
         )
 
