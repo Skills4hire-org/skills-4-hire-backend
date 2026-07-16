@@ -8,9 +8,7 @@ from .views import (
     NegotiationViewSet,
     MessageViewSet,
     OpenSupportRoomView,
-    SupportInboxView,
     MarkMessagesReadView,
-    SupportRoomMessagesView,
 )
 from .endorsements.urls import endorsement_urlpatterns
 
@@ -33,18 +31,9 @@ urlpatterns += [
     path('support/open/',
          OpenSupportRoomView.as_view(),
          name='support-open'),
-
-    path('support/inbox/',
-         SupportInboxView.as_view(),
-         name='support-inbox'),
-
     path('support/read/',
          MarkMessagesReadView.as_view(),
          name='support-mark-read'),
-
-    path('support/<uuid:room_id>/messages/',
-         SupportRoomMessagesView.as_view(),
-         name='support-messages'),
 ]
 
 urlpatterns += endorsement_urlpatterns
