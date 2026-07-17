@@ -26,7 +26,7 @@ class ReferralService:
             return {"status": False, "message": "code must be prsent" }
 
         try:
-            code_instance = ReferralCode.objects.select_related("owner").get(code=code.strip())
+            code_instance = ReferralCode.objects.get(code=code.strip())
         except ReferralCode.DoesNotExist:
             return {"status": False, "message": "code not found"}
         
