@@ -330,8 +330,9 @@ class CommentViewSet(viewsets.ModelViewSet):
             )
         except Exception as e:
             return error_response(
-                message=str(e),
-                status_code=status.HTTP_400_BAD_REQUEST,
+                message="Internal Server Error",
+                errors=str(e),
+                status_code=500,
             )
         
     @transaction.atomic

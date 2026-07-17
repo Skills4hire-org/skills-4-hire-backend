@@ -172,7 +172,7 @@ class PostCreateSerializer(serializers.ModelSerializer):
         return instance
 
 class CommentCreateSerializer(serializers.ModelSerializer):
-    attachments = PostAttachmentSerializer(many=True, required=False)
+    attachments = PostAttachmentSerializer(many=True, required=False, default=list)
     class Meta:
         model = Comment
         fields = [
@@ -189,7 +189,7 @@ class CommentCreateSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         post = self.context.get("post")
 
-        attachments = validated_data.pop("attachments")
+        attachments = validated_data.pop("attachments", None)
         try:
             comment_instance = CommentService()
             comment = comment_instance.add_comment(post=post, user=user, message=validated_data['message'])

@@ -12,7 +12,7 @@ class GeneralPostSerializer(serializers.ModelSerializer):
     comments_count = serializers.SerializerMethodField(read_only=True)
     likes_count = serializers.SerializerMethodField(read_only=True)
     reposts_count = serializers.SerializerMethodField(read_only=True)
-    attachments = PostAttachmentSerializer(many=True, read_only=True)
+    attachments = serializers.SerializerMethodField()
     tags = ServiceCategorySerializer(read_only=True, many=True)
     is_liked = serializers.SerializerMethodField()
     is_commented = serializers.SerializerMethodField()
@@ -31,6 +31,12 @@ class GeneralPostSerializer(serializers.ModelSerializer):
             "is_liked", "is_commented", "is_reposted", "duration", "post_status"
         ]
 
+    def get_attachments(self, obj):
+        if obj.attachments.exists():
+            attachments = obj.attachments.all()
+            return PostAttachmentSerializer(attachments, many=True)
+        return None
+    
     def get_reposts_count(self, obj):
         post_reposts = obj.repost_records.filter(is_active=True).count()
         return post_reposts
@@ -107,7 +113,7 @@ class CommentListSerializer(serializers.ModelSerializer):
 
     total_replies = serializers.IntegerField(read_only=True)
     total_likes = serializers.IntegerField(read_only=True)
-    attachments = PostAttachmentSerializer(read_only=True,  many=True)
+    attachments = serializers.SerializerMethodField()
     user = UserReadSerializer(read_only=True)
     is_liked = serializers.SerializerMethodField()
     is_replied = serializers.SerializerMethodField()
@@ -119,6 +125,12 @@ class CommentListSerializer(serializers.ModelSerializer):
             "total_likes", "message", "attachments",
             'parent', "created_at", "is_liked", "is_replied"
         ]
+
+    def get_attachments(self, obj):
+        if obj.attachments.exists():
+            attachments = obj.attachments.all()
+            return PostAttachmentSerializer(attachments, many=True)
+        return None
 
     def get_is_liked(self, obj):
         user = self.context['request'].user
