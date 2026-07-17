@@ -207,10 +207,8 @@ class CommentCreateSerializer(serializers.ModelSerializer):
             instance.attachments.delete()
             attachments = validated_data.pop("attachments")
             create_bulk_post_attachements(None, attachments, instance)
-        super().update(instance, validated_data)
-    
-        return instance
-    
+        return super().update(instance, validated_data)
+
 class RepostSerializer(serializers.ModelSerializer):
     
     class Meta:

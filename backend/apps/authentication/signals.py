@@ -55,7 +55,6 @@ def auto_create_wallet(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=User)
 def create_referral_code(sender, instance, created, **kwargs):
-    logger.info("Starting Task to referral code creation")
     if not created:
         return 
     

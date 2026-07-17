@@ -384,36 +384,34 @@ class CommentViewSet(viewsets.ModelViewSet):
             status_code=status.HTTP_200_OK,
         )
 
-    @action(methods=["post"], detail=True, url_path="replies")
+    @action(methods=["post", "get"], detail=True, url_path="replies")
     def create_replies(self, request, *args, **kwargs):
         user = request.user
-        serializer = self.get_serializer(
-            data=request.data, context={"request": request})
-        serializer.is_valid(raise_exception=True)
-        post, comment = self.get_object()
-        data = serializer.validated_data
-        service = CommentService()
-        try:
-            new_comment = service.add_comment(post=post, parent=comment, user=user, message=data['message'])
-            return api_response(
-                data={"details": CommentListSerializer(new_comment, context={'request': request}).data},
-                message="Reply created successfully",
-                status_code=status.HTTP_201_CREATED,
-            )
+        if request.method == "POST":
+            serializer = self.get_serializer(
+                data=request.data, context={"request": request})
+            serializer.is_valid(raise_exception=True)
+            post, comment = self.get_object()
+            data = serializer.validated_data
+            service = CommentService()
+            try:
+                new_comment = service.add_comment(post=post, parent=comment, user=user, message=data['message'])
+                return api_response(
+                    data={"details": CommentListSerializer(new_comment, context={'request': request}).data},
+                    message="Reply created successfully",
+                    status_code=status.HTTP_201_CREATED,
+                )
 
-        except Exception as e:
-            return error_response(
-                message=str(e),
-                status_code=status.HTTP_400_BAD_REQUEST,
-            )
-
-    @method_decorator(cache_page(60))
-    @action(methods=['get'], detail=True, url_path="list-replies")
-    def list_replies(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        post, comment_base = self.get_object()
-        nested_comments = queryset.filter(parent=comment_base)
-        return return_paginated_view(self, nested_comments)
+            except Exception as e:
+                return error_response(
+                    message=str(e),
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                )
+        else:
+            queryset = self.filter_queryset(self.get_queryset())
+            post, comment_base = self.get_object()
+            nested_comments = queryset.filter(parent=comment_base)
+            return return_paginated_view(self, nested_comments)
 
 class CommentLikeViewSet(viewsets.GenericViewSet):
 
