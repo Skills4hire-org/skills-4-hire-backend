@@ -15,6 +15,9 @@ from rest_framework_simplejwt.tokens import RefreshToken, BlacklistedToken, Outs
 from .helpers import validate_email, _get_user_by_email, _get_code_instance_or_none
 from .models import CustomUser
 from .services.auth_services import google_auth, facebook_auth, apple_auth
+from .utils.helpers import (create_otp_for_user)
+from .helpers import send_email_to_user, logger
+from .utils.template_helpers import genrate_context_for_otp
 
 
 from typing import Optional
@@ -93,11 +96,16 @@ class RegistrationsSerializer(serializers.Serializer):
         """ 
         email = value.strip().lower()
         valid_email = validate_email(email)
-        if User.objects.filter(email=valid_email).exists():
-            raise serializers.ValidationError(_("email already exists"), code="email_exists")
-        
+        user = User.objects.filter(email=valid_email)
+        if user.exists():
+            if user.is_verified and user.is_active:
+                raise serializers.ValidationError(_("email already exists"), code="email_exists")
+            else:
+                # fallback to resending email when a user account isn't verified yet
+                code = create_otp_for_user(user)
+                context = genrate_context_for_otp(code=code, email=user.email, full_name=user.full_name)
+                send_email_to_user(context)
         return valid_email
-
 
     def validate(self, attrs):
         """
