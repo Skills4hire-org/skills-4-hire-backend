@@ -1,5 +1,6 @@
 from importlib import import_module
 from django.db.models import Avg, Count
+from django.utils import timezone
 from django.contrib.auth import get_user_model
 
 from rest_framework import serializers
@@ -40,6 +41,7 @@ class CoverPhoto(serializers.Serializer):
     def update(self, instance: BaseProfile,  validated_data: dict):
         if not "image_url" in validated_data and "publid_id" in validated_data:
             raise serializers.ValidationError("required fields are not present")
+        validated_data.update({"created_at": str(timezone.now())})
         instance.cover_photo = validated_data
         instance.save()
         return instance 
