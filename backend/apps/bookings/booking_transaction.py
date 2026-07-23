@@ -4,15 +4,17 @@ from rest_framework.exceptions import ValidationError
 
 from django.db import transaction
 from django.db.models import Q
-from uuid import UUID
+from uuid import UUID, uuid4
 import logging
 
 from ..notification.consumers import broadcast_notification
 
 logger = logging.getLogger(__name__)
 
-def process_transaction(booking_id: UUID, action, idempotency_key, status: bool):
+def process_transaction(booking_id: UUID, action, status: bool):
     
+    idempotency_key = str(uuid4())
+
     if action not in BookingTransaction.Type.values:
         raise ValueError("in valid action object")
     

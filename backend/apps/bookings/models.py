@@ -12,7 +12,6 @@ from decimal import Decimal
 
 User = get_user_model()
 
-
 class Bookings(models.Model):
     
     class BookingStatus(models.TextChoices):
@@ -29,7 +28,7 @@ class Bookings(models.Model):
     provider = models.ForeignKey(ProviderModel, on_delete=models.CASCADE, related_name="bookings")
     address = models.ForeignKey(UserAddress, on_delete=models.CASCADE, related_name="booking_address", blank=True,
                                 null=True)
-
+    location = models.CharField(max_length=255, blank=True, null=True)
     is_remote = models.BooleanField(default=False)
     cancelled_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="booking_cancelled", null=True, blank=True)
     accepted_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="booking_accepted", blank=True,null=True)

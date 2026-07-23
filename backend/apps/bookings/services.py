@@ -70,31 +70,26 @@ class BookingService:
         transaction_status = False
         idempotency_key = validated_data.pop("idempotency_key")
         with transaction.atomic():
-            try:
-                booking = Bookings.objects.create(customer=customer, provider=provider, 
-                                                **validated_data)
-                # deduct user wallet under the same atomicity, is either the booking is
-                # created and user wallet deducted or everything fails
-                booking_price = booking.price
+            booking = Bookings.objects.create(customer=customer, provider=provider, 
+                                            **validated_data)
+            # deduct user wallet under the same atomicity, is either the booking is
+            # created and user wallet deducted or everything fails
+            booking_price = booking.price
 
-                booking_fee = Bookings().get_booking_fee(amount=booking_price)
-                booking.platform_fee = booking_fee
-                booking.save()
-                
-                deduct_balance = WalletService().deduct_user_balance(customer, booking_price)
+            booking_fee = Bookings().get_booking_fee(amount=booking_price)
+            booking.platform_fee = booking_fee
+            booking.save()
             
-                lock_deducted_balance = lock_booking(booking=booking, amount=booking_price)
+            WalletService().deduct_user_balance(customer, booking_price)
+        
+            lock_deducted_balance = lock_booking(booking=booking, amount=booking_price)
 
-                if not lock_deducted_balance.is_released:
-                    booking.booking_status = Bookings.BookingStatus.FUNDED
+            if not lock_deducted_balance.is_released:
+                booking.booking_status = Bookings.BookingStatus.FUNDED
 
-                
-                transaction_status = True  # Mark as successful only if everything succeeds
-                
-            except Exception as e:
-                logger.exception(f"Failed to create booking: {e}", exc_info=True)
-                transaction_status = False
-                raise
+            
+            transaction_status = True  # Mark as successful only if everything succeeds
+            
 
             if booking:
                 process_transaction(

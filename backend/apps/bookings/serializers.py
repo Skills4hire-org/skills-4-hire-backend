@@ -36,23 +36,19 @@ class BookingAttachmentSerializer(serializers.ModelSerializer):
 
 class BookingCreateSerializer(serializers.ModelSerializer):
     address = AddressCreateSerializer(required=False)
-    provider_id = serializers.UUIDField(required=False)
     attachments = BookingAttachmentSerializer(many=True, required=False)
-    idempotency_key = serializers.UUIDField(required=False)
 
     class Meta:
         model = Bookings
         fields = [
-            'address', "provider_id",
-            "price", "notes",
-            "descriptions", "start_date",
+            'address', "provider", "price", "notes",
+            "descriptions", "start_date", "location",
             "end_date", "currency", "is_remote",
-            "requirements", 'attachments', 'idempotency_key'
+            "requirements", 'attachments',
         ]
 
     def validate(self, attrs):
         if attrs.get("start_date") or attrs.get("end_date"):
-
             if attrs["end_date"] <= attrs["start_date"]:
                 raise serializers.ValidationError("'end_date' cannot be less than 'start_date'")
             elif attrs["start_date"].date() < timezone.now().date():
@@ -78,17 +74,11 @@ class BookingCreateSerializer(serializers.ModelSerializer):
 
         if not is_customer(request):
             raise serializers.ValidationError("User is not a customer")
-
-        provider_pk = validated_data['provider_id']
-        provider_profile = get_or_none(ProviderModel, pk=provider_pk)
-
-        if provider_profile is None:
-            raise NotFound("profile not found for provider")
-
+        
         address = validated_data.pop("address", None)
         attachment = validated_data.pop("attachments", None)
-        validated_data.pop("provider_id")
-
+        provider_profile = validated_data.pop('provider')
+        
         if address is not None:
             address, created = UserAddress.objects.get_or_create(
                 user_profile=request.user.profile, **address,

@@ -22,7 +22,7 @@ class UserAddress(models.Model):
 
     city = models.CharField(max_length=100)
     state = models.CharField(max_length=100)
-    postal_code = models.CharField(max_length=20, null=True)
+    postal_code = models.CharField(max_length=20, null=True, blank=True)
     country = models.CharField(max_length=100)
     is_default = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -34,7 +34,7 @@ class UserAddress(models.Model):
             models.UniqueConstraint(fields=['postal_code', "user_profile"], name='unique_postal_code')
         ]
     def __str__(self):
-        return f"UserAddress: {self.user_profile.user.full_name} - {self.postal_code}"
+        return f"UserAddress: {self.user_profile.user.full_name} - {self.postal_code or None}"
 
     @staticmethod
     def validate_postal_code(code) -> bool:
@@ -45,10 +45,12 @@ class UserAddress(models.Model):
         return True
 
     def clean(self):
-        if not UserAddress().validate_postal_code(self.postal_code):
-            logger.debug("Postal code not valid")
-            raise ValueError("postal code is invalid")
-
+        if self.postal_code:
+            if not UserAddress().validate_postal_code(self.postal_code):
+                logger.debug("Postal code not valid")
+                raise ValueError("postal code is invalid")
+        super().clean()
+    
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
