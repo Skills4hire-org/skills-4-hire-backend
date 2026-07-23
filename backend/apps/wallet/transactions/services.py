@@ -3,12 +3,11 @@ from django.utils import timezone
 
 from ..models import WalletTransaction
 from ..exceptions import DuplicateTransactionError
-from ..services import WalletService
+
 
 class WalletTransactionService:
-
     def create_wallet_transaction(self, amount, user, wallet, **validated_data):
-
+        from ..state import WalletService
         try:
             if WalletTransaction.objects.filter(idempotency_key=validated_data['idempotency_key']).first():
                 raise DuplicateTransactionError()
@@ -41,6 +40,7 @@ class WalletTransactionService:
         return withdrawal
     
     def process_failed_withdrawal(self, withdrawal):
+        from ..state import WalletService
         if not isinstance(withdrawal, WalletTransaction):
             return { "status": False, "message": "not a valid with drawal instance"}
         
@@ -57,6 +57,6 @@ class WalletTransactionService:
 
         return withdrawal
 
-
+wallet_transaction = WalletTransactionService()
 
 

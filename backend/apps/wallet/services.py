@@ -1,11 +1,13 @@
 
 from django.forms import ValidationError
 from django.db import transaction, DatabaseError
+from django.utils import timezone
 
 from .models import User, Wallet, LockedWallet, BankAccount
 from ..bookings.models import Bookings
 
 from decimal import Decimal
+import uuid
 
 @transaction.atomic
 def lock_booking(booking, amount):
@@ -37,7 +39,7 @@ def refund_booking(booking, amount):
         raise ValidationError("Price mismatch. can't release inconsistent pricing")
     
     user_to_credit = locked_wallet.booking.customer
-    credit_wallet = WalletService().credit_user_wallet(user_to_credit, amount)
+    WalletService().credit_user_wallet(user_to_credit, amount)
 
     locked_wallet.is_released = True
     locked_wallet.save(update_fields=['is_released'])
@@ -52,27 +54,32 @@ class WalletService:
 
     @staticmethod
     def deduct_user_balance(user, amount):
+        from .state import wallet_transaction
 
         user_wallet = user.wallet
-
-        if not user_wallet:
-            raise ValidationError("no wallet instance for user")
-        
         user_wallet.balance -= Decimal(amount)
         user_wallet.save(update_fields=["balance"])
 
+        wallet_transaction.create_wallet_transaction(
+            amount=amount, user=user, wallet=user_wallet, 
+            type="WITHDRAW", completed_at=timezone.now(),
+            reference=uuid.uuid4(), status='COMPLETED'
+        )
         return user_wallet
 
     @staticmethod
     def credit_user_wallet(user, amount):
-        user_wallet = user.wallet
+        from .state import wallet_transaction
 
-        if not user_wallet: 
-            raise ValidationError("no wallet instance for user")
-        
+        user_wallet = user.wallet
         user_wallet.balance += Decimal(amount)
         user_wallet.save(update_fields=["balance"])
 
+        wallet_transaction.create_wallet_transaction(
+            amount=amount, user=user, wallet=user_wallet, 
+            type="DEPOSIT", completed_at=timezone.now(),
+            reference=uuid.uuid4(), status='COMPLETED'
+        )
         return user_wallet
 
     @staticmethod

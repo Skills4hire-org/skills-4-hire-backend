@@ -3,7 +3,7 @@ services:
   redis:
     image: redis:7-alpine
     restart: always
-    expose: 
+    expose:
       - "6379"
 
   db_migrate:
@@ -11,21 +11,21 @@ services:
     container_name: db-migrate
     env_file:
       - .env
-    command: ["uv", 'run', "backend/manage.py", "migrate", "--noinput"]
+    command: ["uv", "run", "backend/manage.py", "migrate", "--noinput"]
 
   collect_static:
     build: .
     container_name: static-files
     environment:
       - STATIC_ROOT=/vol/static
-    volumes: 
+    volumes:
       - static_volume:/vol/static
     env_file:
       - .env
-    command: ["uv", 'run', "backend/manage.py", "collectstatic", "--noinput"]
+    command: ["uv", "run", "backend/manage.py", "collectstatic", "--noinput"]
 
-  web:
-    container_name: skills4Hire
+  web1: &web_base
+    container_name: skills4Hire-web1
     working_dir: /app/backend/backend
     depends_on:
       db_migrate:
@@ -41,8 +41,16 @@ services:
     volumes:
       - static_volume:/vol/static
     restart: "always"
-    expose: 
+    expose:
       - "8000"
+
+  web2:
+    <<: *web_base
+    container_name: skills4Hire-web2
+
+  web3:
+    <<: *web_base
+    container_name: skills4Hire-web3
 
   celery-worker:
     build: .
@@ -63,7 +71,7 @@ services:
     command: ["uv", "run", "celery", "-A", "config", "beat", "--loglevel=info"]
 
   nginx:
-    build: 
+    build:
       context: ./nginx
       dockerfile: Dockerfile
     container_name: nginx_server
@@ -76,7 +84,9 @@ services:
       - ./certbot/www:/var/www/certbot
       - static_volume:/vol/static
     depends_on:
-      - web
+      - web1
+      - web2
+      - web3
     restart: unless-stopped
 
   certbot:

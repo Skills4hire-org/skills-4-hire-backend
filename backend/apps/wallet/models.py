@@ -3,9 +3,7 @@ from django.contrib.auth import get_user_model
 from django.utils.translation import gettext_lazy as _
 
 import uuid
-from decimal import Decimal
 
-from apps.users.provider_models import ProviderModel
 from ..bookings.models import Bookings
 
 User = get_user_model()
@@ -128,8 +126,8 @@ class WalletTransaction(models.Model):
         default=Status.PENDING
         )
     
-    idempotency_key = models.UUIDField(max_length=50, null=False, blank=False)
-    reference_key = models.CharField(max_length=50, null=False, blank=True)
+    idempotency_key = models.UUIDField(max_length=50, null=True, blank=False)
+    reference_key = models.CharField(max_length=50, null=True, blank=True)
     transfer_code = models.CharField(max_length=50, null=True)
 
     metadata = models.JSONField(default=dict, blank=True)
