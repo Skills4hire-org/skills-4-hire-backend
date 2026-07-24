@@ -23,7 +23,7 @@ DATABASES = {
         'default': dj_database_url.config(
             default=env("DATABASE_URL_PROD"),
             ssl_require=True,
-            conn_max_age=300
+            conn_max_age=60
         )
     }
 
