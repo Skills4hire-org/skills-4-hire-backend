@@ -5,6 +5,7 @@ services:
     restart: always
     expose:
       - "6379"
+    mem_limit: 50M
 
   db_migrate:
     build: .
@@ -27,6 +28,11 @@ services:
   web1: &web_base
     container_name: skills4Hire-web1
     working_dir: /app/backend/backend
+    deploy:
+      resources:
+        limits:
+          memory: 250M
+    mem_limit: 250M
     depends_on:
       db_migrate:
         condition: service_completed_successfully
@@ -44,31 +50,31 @@ services:
     expose:
       - "8000"
 
-  web2:
-    <<: *web_base
-    container_name: skills4Hire-web2
+  # web2:
+  #   <<: *web_base
+  #   container_name: skills4Hire-web2
 
-  web3:
-    <<: *web_base
-    container_name: skills4Hire-web3
+  # web3:
+  #   <<: *web_base
+  #   container_name: skills4Hire-web3
 
-  celery-worker:
-    build: .
-    container_name: celery-worker
-    working_dir: /app/backend/backend
-    command: ["uv", "run", "celery", "-A", "config", "worker", "--loglevel=info"]
-    env_file:
-      - .env
-    restart: "unless-stopped"
+  # celery-worker:
+  #   build: .
+  #   container_name: celery-worker
+  #   working_dir: /app/backend/backend
+  #   command: ["uv", "run", "celery", "-A", "config", "worker", "--loglevel=info"]
+  #   env_file:
+  #     - .env
+  #   restart: "unless-stopped"
 
-  celery-beat:
-    build: .
-    container_name: celery-beat
-    restart: "unless-stopped"
-    working_dir: /app/backend/backend
-    env_file:
-      - .env
-    command: ["uv", "run", "celery", "-A", "config", "beat", "--loglevel=info"]
+  # celery-beat:
+  #   build: .
+  #   container_name: celery-beat
+  #   restart: "unless-stopped"
+  #   working_dir: /app/backend/backend
+  #   env_file:
+  #     - .env
+  #   command: ["uv", "run", "celery", "-A", "config", "beat", "--loglevel=info"]
 
   nginx:
     build:
