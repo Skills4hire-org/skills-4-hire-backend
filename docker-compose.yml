@@ -13,6 +13,7 @@ services:
     env_file:
       - .env
     command: ["uv", "run", "backend/manage.py", "migrate", "--noinput"]
+    mem_limit: 200m
 
   collect_static:
     build: .
@@ -24,6 +25,7 @@ services:
     env_file:
       - .env
     command: ["uv", "run", "backend/manage.py", "collectstatic", "--noinput"]
+    mem_limit: 200m
 
   web1: &web_base
     container_name: skills4Hire-web1
@@ -91,9 +93,10 @@ services:
       - static_volume:/vol/static
     depends_on:
       - web1
-      - web2
-      - web3
+      # - web2
+      # - web3
     restart: unless-stopped
+    mem_limit: 50m
 
   certbot:
     image: certbot/certbot
