@@ -85,7 +85,7 @@ class ProfileSearchView(viewsets.ModelViewSet):
 
             queryset = queryset.filter(search_q).distinct()
 
-            # Order by relevance (featured/top-rated first) then by creation date
+            # Order by creation date
             queryset = queryset.order_by('-created_at')
         else:
             # Default ordering when no search query
