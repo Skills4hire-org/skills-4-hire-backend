@@ -302,9 +302,10 @@ class ProviderProfilePublicSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProviderModel
         fields = [
-            "provider_id", "user", "professional_title",
-            "avg_rating", "total_reviews", 
-            "overview", "headline"
+            "provider_id", "professional_title",
+            "avg_rating", "total_reviews", "min_charge", 
+            "max_charge", 
+            "overview", "headline", "user",
         ]
     
     def get_user(self, obj: ProviderModel):
