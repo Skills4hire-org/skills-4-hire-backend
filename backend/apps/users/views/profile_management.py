@@ -40,6 +40,12 @@ class ProfileSearchView(viewsets.ModelViewSet):
         "reviews__ratings": ["gte", "lte"]
     }
 
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return ProviderProfilePublicSerializer
+        else:
+            return ProviderProfileDetailSerializer
+
     def get_queryset(self):
         """
         Build search queryset for Provider profiles.
