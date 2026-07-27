@@ -6,6 +6,6 @@ router = DefaultRouter()
 
 router.register("service", ServiceCategoryManagementViewset, basename="service-management")
 
-service_patterns = [
+service_urlpatterns = [
     path("", include(router.urls))
 ]

@@ -22,7 +22,8 @@ def post_save_otp_after_account_registration(sender, instance, created, **kwargs
         return 
     if not created: 
         return
-
+    if instance.is_staff or instance.is_superuser:
+        return 
     logger.info(f"Signal fired for user: {instance.email}")
     try:
         code = create_otp_for_user(instance)
@@ -57,7 +58,8 @@ def auto_create_wallet(sender, instance, created, **kwargs):
 def create_referral_code(sender, instance, created, **kwargs):
     if not created:
         return 
-    
+    if instance.is_staff or instance.is_superuser:
+        return 
     code = generate_code(instance)
     logger.info(f"code generated: {code[:3]}...")
     try:
