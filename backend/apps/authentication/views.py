@@ -123,7 +123,7 @@ class ResendOtpViewSet(viewsets.ModelViewSet):
         try:
             user = _get_user_by_email(email)
             if user is None:
-                raise NotFound("User not found")
+                return error_response(mesage="User not found", status_code=404)
             
             code = create_otp_for_user(user)
             context = genrate_context_for_resend_otp(
