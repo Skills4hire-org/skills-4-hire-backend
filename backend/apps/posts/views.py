@@ -524,6 +524,8 @@ class FeedListView(ListAPIView):
         "post_content": ["icontains"],
     }
     search_fields = ["post_title", "tags__name"]
+    ordering_fields = ["created_at", "amount"]
+    ordering = ["-created_at"]
 
     def get_queryset(self):
         """
@@ -551,12 +553,15 @@ class FeedListView(ListAPIView):
         if not feed_posts:
             return feed_posts
 
-        post_ids = {item["post"].pk for item in feed_posts} 
-        base_queryset = Post.objects.filter(pk__in=post_ids)
+        items_by_post_id = {item["post"].pk: item for item in feed_posts}
+        base_queryset = Post.objects.filter(pk__in=items_by_post_id.keys())
+        filtered_queryset = self.filter_queryset(base_queryset)
 
-        filtered_queryset_id = set(self.filter_queryset(base_queryset).values_list("pk", flat=True))
-
-        return [item for item in feed_posts if item["post"].pk in filtered_queryset_id]
+        return [
+            items_by_post_id[post_id]
+            for post_id in filtered_queryset.values_list("pk", flat=True)
+            if post_id in items_by_post_id
+        ]
 
     def list(self, request, *args, **kwargs):
 
