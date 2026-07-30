@@ -52,29 +52,31 @@ class BookingViewSet(viewsets.ModelViewSet):
             return PaymentRequestSerializer
         return BookingSerializer
 
-    @action(methods=['patch'], detail=True, url_path='accept_or_reject')
+    @action(methods=['patch'], detail=True, url_path=r"(?P<action>[^/.]+)")
     def accept_or_reject(self, request, *args, **kwargs):
+        valid_action = ("accept", "reject")
+        action = kwargs.get("action")
+        if action not in valid_action:
+            return api_response(
+                data={}, message='Invalid action to the request', status_code=400
+            )
 
         booking = self.get_object()
+        
+        if booking.booking_status == "IN_PROGRESS":
+            return api_response(
+                data=BookingSerializer(booking).data, 
+                message="Booking already approved", status_code=200
+            )
+        
         serializer = self.get_serializer(
-            data=request.data, context={"request": request, "booking": booking})
+            data=request.data, context={"request": request, "booking": booking, "action": action})
         
         serializer.is_valid(raise_exception=True)
 
-        idempotency = serializer.validated_data['idempotency_key']
-        user = request.user
-        status = serializer.validated_data['status']
-        if transaction_ready_exists(user, idempotency=idempotency)[0]:
-            return api_response(
-                data={
-                    'transaction': BookingTransactionSerializer(transaction_ready_exists(user, idempotency)[1]).data,
-                },
-                message="Found duplicate transaction",
-                status_code=status.HTTP_409_CONFLICT,
-            )
         saved_booking = serializer.save()
         try:
-            if status == "ACCEPT": 
+            if action.upper() == "ACCEPT": 
                 broadcast_notification("booking_approved", {"booking": saved_booking})
             else:
                 broadcast_notification("booking_rejected", {'booking': saved_booking})

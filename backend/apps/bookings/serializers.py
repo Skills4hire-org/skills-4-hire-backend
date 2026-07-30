@@ -17,6 +17,8 @@ from apps.wallet.services import WalletService
 from ..wallet.services import get_calculated_transaction
 from ..ratings.services.reviews import ReviewService
 from ..notification.consumers import broadcast_notification
+from .email_data import booking_made_payload, accept_booking_payload, reject_booking_payload
+from ..authentication.helpers import send_email_to_user
 
 from decimal import Decimal
 import logging
@@ -99,9 +101,15 @@ class BookingCreateSerializer(serializers.ModelSerializer):
                 BookingAttachments(booking=booking_instance, **data)
                 for data in attachment
             ])
-
         booking_instance.address = address_obj
         booking_instance.save()
+
+        # broadcast email notification to provider
+        email_data = booking_made_payload(
+            customer=booking_instance.customer, provider=booking_instance.provider.profile.user, 
+            booking=booking_instance)
+        from_email = email_data['from_email']
+        send_email_to_user(context=email_data, from_email=from_email)
 
         return booking_instance
 
@@ -130,24 +138,14 @@ class BookingCreateSerializer(serializers.ModelSerializer):
 class AcceptRejectSerializer(serializers.Serializer):
     choices = ['ACCEPT', 'REJECT']
 
-    status = serializers.ChoiceField(choices=choices, required=True)
-    idempotency_key = serializers.UUIDField(required=True)
-
-    def validate_status(self, value):
-        if value.upper() not in self.choices:
-            raise serializers.ValidationError("Bad Request. status is not in active choices")
-        return value
-
     def create(self, validated_data):
-        choice = validated_data['status']
-        idempotency_key = validated_data['idempotency_key']
-
-        instance = self.context['booking']
+        action: str = self.context['action']
+        instance: Bookings = self.context['booking']
 
         if instance is None:
             raise serializers.ValidationError("Booking not Found")
 
-        if instance.booking_status != Bookings.BookingStatus.FUNDED:
+        if action == self.choices[0] and instance.booking_status != Bookings.BookingStatus.FUNDED:
             raise serializers.ValidationError("You can only update funded booking")
         
         user = self.context['request'].user
@@ -155,22 +153,35 @@ class AcceptRejectSerializer(serializers.Serializer):
         if not instance.is_participants(user):
             raise PermissionDenied()
 
-        if choice == self.choices[0]:
+        if action.upper() == self.choices[0]:
             # accept booking
+            if instance.booking_status == "In_progress":
+                raise serializers.ValidationError("Booking already accepted")
             if user != instance.provider.profile.user:
                 raise PermissionDenied()
             
             booking = BookingService().accept_booking(instance, user)
             if booking.booking_status != Bookings.BookingStatus.IN_PROGRESS:
                 raise serializers.ValidationError("Booking did not update")
-            
-        elif choice == self.choices[1]:
+            email_data = accept_booking_payload(
+                customer=booking.customer, provider=booking.provider.profile.user, 
+                booking=booking
+            )
+            send_email_to_user(context=email_data, from_email=email_data['from_email'])
+
+        elif action.upper() == self.choices[1]:
             # reject/cancel booking
+            if instance.booking_status == "Cancelled":
+                raise serializers.ValidationError("Booking already cancelled")
             booking = BookingService().cancel_booking(
-                booking=instance, user=user, idempotency_key=idempotency_key)
+                booking=instance, user=user)
             
             if booking.booking_status != Bookings.BookingStatus.CANCELLED:
                 raise serializers.ValidationError("Booking cancel not updated")
+            email_data = reject_booking_payload(
+                rejected_by=user, booking=booking
+            )
+            send_email_to_user(context=email_data, from_email=email_data['from_email'])
         else:
             raise serializers.ValidationError("Future update coming")
 

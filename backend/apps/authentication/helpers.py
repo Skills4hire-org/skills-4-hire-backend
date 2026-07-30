@@ -18,7 +18,7 @@ import email_validator
 logger  = logging.getLogger(__name__)
 User = get_user_model()
 
-def send_email_to_user(context: dict):
+def send_email_to_user(context: dict, from_email: str = None):
     """
     Docstring for send_email_to_user
     
@@ -49,9 +49,9 @@ def send_email_to_user(context: dict):
     context.update({"to_email": email, "subject": subject, "template_name": template_name})
     try:
         if settings.DEBUG:
-            send_mail_base(context=context)
+            send_mail_base(context=context, from_email=from_email)
         else:
-            send_email_to_queue.delay(context)
+            send_email_to_queue.delay(context, from_email)
             
         logger.info(f"Email message queened for {email}")
         return {"success": True, "message": "Email sent to queue successfully"}

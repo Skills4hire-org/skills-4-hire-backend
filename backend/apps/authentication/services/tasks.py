@@ -19,7 +19,7 @@ User = get_user_model()
 logger = logging.getLogger(__name__)
 
 @shared_task(autoretry_for=(Exception,), max_retries=3, retry_backoff=3)
-def send_email_to_queue(content: dict):
+def send_email_to_queue(content: dict, from_email: str=None):
     """
     Docstring for send_email_on_queue
     
@@ -28,7 +28,7 @@ def send_email_to_queue(content: dict):
     """
     logger.info(f"queue: {content}")
     try:
-        send_mail_base(context=content)
+        send_mail_base(context=content, from_email=from_email)
     except Exception:
         raise
 

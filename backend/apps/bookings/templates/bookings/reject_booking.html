@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Booking Cancelled</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7f6;
+            font-family: Arial, Helvetica, sans-serif;
+            color: #333333;
+        }
+
+        .email-wrapper {
+            width: 100%;
+            padding: 20px 0;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .header {
+            background-color: #e63946;
+            padding: 22px 30px;
+            text-align: center;
+            color: #ffffff;
+        }
+
+        .header .cancel-icon {
+            width: 44px;
+            height: 44px;
+            line-height: 44px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.2);
+            display: inline-block;
+            font-size: 22px;
+            margin-bottom: 8px;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .content {
+            padding: 30px;
+            line-height: 1.6;
+        }
+
+        .content p {
+            margin: 0 0 16px;
+            font-size: 15px;
+        }
+
+        /* Booking summary card */
+        .booking-card {
+            border: 1px solid #e2e6e4;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+            background-color: #fafbfa;
+        }
+
+        .booking-card h2 {
+            font-size: 17px;
+            margin: 0 0 4px;
+            color: #1a1a1a;
+            text-decoration: line-through;
+            text-decoration-color: #cccccc;
+        }
+
+        .booking-card .category {
+            font-size: 13px;
+            color: #999999;
+            font-weight: 600;
+            margin: 0 0 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            background-color: #fde2e4;
+            color: #e63946;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 12px;
+            margin-bottom: 16px;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eef1ef;
+            font-size: 14px;
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            color: #777777;
+        }
+
+        .detail-value {
+            color: #555555;
+            font-weight: 600;
+            text-align: right;
+        }
+
+        /* Reason box */
+        .reason-box {
+            margin: 20px 0;
+            padding: 14px 16px;
+            background-color: #f7f7f7;
+            border-left: 3px solid #cccccc;
+            font-size: 14px;
+            color: #555555;
+            border-radius: 4px;
+        }
+
+        .reason-box .reason-label {
+            display: block;
+            font-size: 12px;
+            font-weight: 700;
+            color: #999999;
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        /* Refund status */
+        .refund-box {
+            margin: 20px 0;
+            padding: 16px;
+            border-radius: 6px;
+            font-size: 14px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        .refund-box.full {
+            background-color: #e4f4de;
+            color: #14a800;
+        }
+
+        .refund-box.partial {
+            background-color: #fff4e0;
+            color: #b8860b;
+        }
+
+        .refund-box.none {
+            background-color: #fde2e4;
+            color: #e63946;
+        }
+
+        /* CTA button */
+        .cta-wrapper {
+            text-align: center;
+            margin: 28px 0 10px;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background-color: #14a800;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 13px 32px;
+            border-radius: 4px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .note {
+            font-size: 13px;
+            color: #999999;
+            text-align: center;
+            margin-top: 14px;
+        }
+
+        .footer {
+            background-color: #f0f3f2;
+            padding: 18px 30px;
+            text-align: center;
+            font-size: 13px;
+            color: #777777;
+        }
+
+        .footer a {
+            color: #14a800;
+            text-decoration: none;
+        }
+
+        .footer span {
+            color: #14a800;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+
+            <!-- Header -->
+            <div class="header">
+                <div class="cancel-icon">&#10005;</div>
+                <h1>Booking Cancelled</h1>
+            </div>
+
+            <!-- Content -->
+            <div class="content">
+                <p>Hello <strong>{{ recipient_name }}</strong>,</p>
+
+                {% if cancelled_by == "provider" %}
+                <p>
+                    We're sorry to let you know that <strong>{{ other_party_name }}</strong> has cancelled
+                    the following booking on <strong>{{ app_name }}</strong>.
+                </p>
+                {% else %}
+                <p>
+                    <strong>{{ other_party_name }}</strong> has cancelled the following booking on
+                    <strong>{{ app_name }}</strong>. Your calendar has been updated.
+                </p>
+                {% endif %}
+
+                <!-- Booking summary card -->
+                <div class="booking-card">
+                    <span class="status-badge">CANCELLED</span>
+                    <h2>{{ service_name }}</h2>
+                    <p class="category">{{ category }}</p>
+
+                    <div class="detail-row">
+                        <span class="detail-label">Booking ID</span>
+                        <span class="detail-value">{{ booking_id }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Was scheduled for</span>
+                        <span class="detail-value">{{ booking_date }}, {{ booking_time }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Amount</span>
+                        <span class="detail-value">{{ currency }}{{ price }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Cancelled on</span>
+                        <span class="detail-value">{{ cancelled_at }}</span>
+                    </div>
+                </div>
+
+                {% if cancellation_reason %}
+                <div class="reason-box">
+                    <span class="reason-label">Reason given</span>
+                    {{ cancellation_reason }}
+                </div>
+                {% endif %}
+                <!-- CTA -->
+                <div class="cta-wrapper">
+                    {% if cancelled_by == "provider" %}
+                    <a href="{{ rebook_url }}" class="cta-button">Find Another Provider</a>
+                    {% else %}
+                    <a href="{{ dashboard_url }}" class="cta-button">View Your Schedule</a>
+                    {% endif %}
+                </div>
+
+                <p class="note">
+                    Questions about this cancellation? Reach out to support and reference booking ID {{ booking_id }}.
+                </p>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+                © {{ year }} <span>{{ app_name }}</span> — All rights reserved.<br>
+                Need help? <a href="{{ support_url }}">Contact support</a>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

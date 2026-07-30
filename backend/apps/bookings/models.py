@@ -61,9 +61,6 @@ class Bookings(models.Model):
 
     class Meta:
         verbose_name = "Booking"
-        constraints = [
-            models.UniqueConstraint(fields=("provider", "start_date", "end_date"), name="unique_booking_constraint")
-        ]
         indexes = [
             models.Index(fields=("is_active",), name="activ_de_idx"),
         ]

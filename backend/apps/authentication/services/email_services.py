@@ -1,6 +1,7 @@
 from django.template.loader import render_to_string
 from django.conf import settings
 from django.core.mail import send_mail
+from django.utils import timezone
 
 import logging
 
@@ -9,7 +10,7 @@ logger = logging.getLogger(__name__)
 APP_NAME = getattr(settings, "APP_NAME", "Skill4Hire")
 
 
-def send_mail_base(context: dict) :
+def send_mail_base(context: dict, from_email: str = f"Skills4Hire <{settings.DEFAULT_FROM_EMAIL}>") :
     """
     Docstring for send_mail_base
     
@@ -18,7 +19,7 @@ def send_mail_base(context: dict) :
     :return: Description
     :rtype: bool
     """
-    context.update({"app_name": APP_NAME})
+    context.update({"app_name": APP_NAME, "year": str(timezone.now().year)})
     try:
         html_content = render_to_string(context.get("template_name"), context)
         subject = context.get("subject")
@@ -26,7 +27,7 @@ def send_mail_base(context: dict) :
         
         send_mail(
             subject=subject,
-            from_email=f"Skills4Hire <{settings.DEFAULT_FROM_EMAIL}>",
+            from_email=from_email,
             recipient_list=[to_email],
             fail_silently=False,
             message="",
