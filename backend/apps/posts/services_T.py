@@ -32,20 +32,12 @@ def get_post_by_id(post_pk: uuid.UUID):
     return post
 
 
-def get_offers_or_job_post(user,  queryset, include_offers):
-    if queryset is None:
-        return None
-    if include_offers:
-        if user is not None:
-           qs = queryset\
-                .filter(user=user, post_type=Post.PostType.JOB)\
-                .order_by("-created_at", "-updated_at")
-        else:
-            qs = queryset.filter(post_type=Post.PostType.JOB.value)
-        return qs
+def get_offers_or_job_post(queryset):
+    return queryset.filter(post_type=Post.PostType.JOB.value)
+
 
 def list_posts(user, queryset):
-    return queryset.filter(user=user).order_by("-created_at", "-updated_at")
+    return queryset.filter(user=user)
 
 
 def return_paginated_view(self, queryset):

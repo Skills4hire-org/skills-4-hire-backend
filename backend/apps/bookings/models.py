@@ -6,6 +6,7 @@ from django.conf import settings
 
 from ..users.provider_models import ProviderModel
 from ..users.address.models import UserAddress
+from ..users.services.models import Service
 
 import uuid
 from decimal import Decimal
@@ -26,10 +27,13 @@ class Bookings(models.Model):
 
     customer = models.ForeignKey(User, on_delete=models.CASCADE,  related_name="bookings")
     provider = models.ForeignKey(ProviderModel, on_delete=models.CASCADE, related_name="bookings")
+    provider_service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="bookings", null=True, blank=True)
     address = models.ForeignKey(UserAddress, on_delete=models.CASCADE, related_name="booking_address", blank=True,
                                 null=True)
     location = models.CharField(max_length=255, blank=True, null=True)
     is_remote = models.BooleanField(default=False)
+    is_urgent =  models.BooleanField(null=True, blank=True)
+
     cancelled_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="booking_cancelled", null=True, blank=True)
     accepted_by = models.ForeignKey(User, on_delete=models.CASCADE, related_name="booking_accepted", blank=True,null=True)
 
@@ -234,7 +238,7 @@ class BookingTransaction(models.Model):
     type = models.CharField(max_length=20, choices=Type.choices, default=Type.ESCROW_HOLD)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
 
-    idempotency_key = models.CharField(max_length=20, null=False, blank=True)
+    reference = models.CharField(max_length=20, null=False, blank=True)
 
     is_active = models.BooleanField(default=True)
     transaction_date = models.DateField(auto_now_add=True)
@@ -248,6 +252,6 @@ class BookingTransaction(models.Model):
             models.Index(fields=['amount']),
             models.Index(fields=['status']),
             models.Index(fields=['type']),
-            models.Index(fields=['idempotency_key']),
+            models.Index(fields=['reference']),
         ]
 

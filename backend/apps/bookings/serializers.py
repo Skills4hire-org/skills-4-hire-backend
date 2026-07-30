@@ -3,9 +3,8 @@ from django.utils.translation import gettext_lazy as _
 from django.utils import timezone
 
 from rest_framework import serializers
-from rest_framework.exceptions import PermissionDenied, NotFound
+from rest_framework.exceptions import PermissionDenied
 
-from ..core.utils.py import get_or_none
 from ..users.address.models import UserAddress
 from ..users.address.serializers import AddressCreateSerializer, AddressSerializer
 from .models import Bookings, BookingAttachments, PaymentRequestBooking,\
@@ -22,8 +21,8 @@ from ..notification.consumers import broadcast_notification
 from decimal import Decimal
 import logging
 
-from ..users.provider_models import ProviderModel
 from ..users.serializers.profiles import ProviderProfilePublicSerializer
+from ..users.services.serializers import ServiceListSerializer
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +42,15 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         fields = [
             'address', "provider", "price", "notes",
             "descriptions", "start_date", "location",
-            "end_date", "currency", "is_remote",
-            "requirements", 'attachments',
+            "end_date", "currency", "is_remote", "is_urgent",
+            "requirements", 'attachments', "provider_service", 
         ]
 
     def validate(self, attrs):
+        service = attrs['provider_service']
+        if service.profile !=  attrs['provider']:
+            raise serializers.ValidationError("Invalid provider service")
+        
         if attrs.get("start_date") or attrs.get("end_date"):
             if attrs["end_date"] <= attrs["start_date"]:
                 raise serializers.ValidationError("'end_date' cannot be less than 'start_date'")
@@ -71,20 +74,18 @@ class BookingCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         request = self.context['request']
-
         if not is_customer(request):
             raise serializers.ValidationError("User is not a customer")
         
         address = validated_data.pop("address", None)
         attachment = validated_data.pop("attachments", None)
         provider_profile = validated_data.pop('provider')
-        
-        if address is not None:
-            address, created = UserAddress.objects.get_or_create(
-                user_profile=request.user.profile, **address,
-                defaults=address
-            )
 
+        address_obj = None
+        if address is not None:
+            serializer = AddressCreateSerializer(data=address, context={"request": request})
+            serializer.is_valid(raise_exception=True)
+            address_obj = serializer.save()
         try:
             booking_instance = BookingService().create_booking(
                 customer=request.user, provider=provider_profile,
@@ -99,7 +100,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
                 for data in attachment
             ])
 
-        booking_instance.address = address
+        booking_instance.address = address_obj
         booking_instance.save()
 
         return booking_instance
@@ -180,14 +181,16 @@ class BookingSerializer(serializers.ModelSerializer):
     provider = ProviderProfilePublicSerializer(read_only=True)
     attachments = BookingAttachmentSerializer(read_only=True, many=True)
     address = AddressSerializer(read_only=True)
+    provider_service = ServiceListSerializer(read_only=True)
     class Meta:
         model = Bookings
         fields =[
             'booking_id', 'booking_status',
-            'customer', 'provider',
-            'price', "platform_fee", "descriptions",
-            'is_active', 'start_date', 'end_date',
-            'created_at', "attachments", "address"
+            'customer', "provider", "price", "notes",
+            "descriptions", "start_date", "location",
+            "end_date", "currency", "is_remote", "is_urgent",
+            "requirements", 'created_at', "attachments", "address",
+            "provider_service"
         ]
 
 class BookingDetailSerializer(serializers.ModelSerializer):

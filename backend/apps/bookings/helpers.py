@@ -17,7 +17,7 @@ def check_request(request):
     return True
 
 def is_customer(request):
-    return request.user.is_customer
+    return request.user.is_customer or request.user.is_staff
 
 def provider_profile(pk: UUID) -> ProviderModel:
     if pk is None:

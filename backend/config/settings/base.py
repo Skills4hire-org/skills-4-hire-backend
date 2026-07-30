@@ -39,12 +39,6 @@ PAYSTACK_CHANNELS = env("PAYSTACK_CHANNELS").split(",")
 
 GOOGLE_CLIENT_ID = env("GOOGLE_CLIENT_ID")
 
-
-ANYMAIL = {
-    "BREVO_API_KEY": env("BREVO_API_KEY"),
-}
-DEFAULT_FROM_EMAIL = env("FROM_EMAIL")
-
 # User model to user 
 AUTH_USER_MODEL = "authentication.CustomUser"
 
@@ -196,7 +190,17 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'config.wsgi.application'
 
-EMAIL_BACKEND = 'anymail.backends.brevo.EmailBackend'
+
+# Email Configuration
+EMAIL_BACKEND = 'anymail.backends.amazon_ses.EmailBackend'
+DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="skills4hireofficial@gmail.com")
+ANYMAIL = {
+    "AMAZON_SES_CLIENT_PARAMS": {
+        "aws_access_key_id": env("AWS_ACCESS_KEY_ID"),
+        "aws_secret_access_key": env("AWS_SECRET_ACCESS_KEY"),
+        "region_name": env("AWS_SES_REGION_NAME"),
+    }
+}
 
 # Password validation
 # https://docs.djangoproject.com/en/5.2/ref/settings/#auth-password-validators

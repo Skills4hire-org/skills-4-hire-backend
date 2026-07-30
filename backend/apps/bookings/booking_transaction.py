@@ -12,8 +12,6 @@ from ..notification.consumers import broadcast_notification
 logger = logging.getLogger(__name__)
 
 def process_transaction(booking_id: UUID, action, status: bool):
-    
-    idempotency_key = str(uuid4())
 
     if action not in BookingTransaction.Type.values:
         raise ValueError("in valid action object")
@@ -37,7 +35,7 @@ def process_transaction(booking_id: UUID, action, status: bool):
         try:
             booking_transaction = BookingTransaction.objects.create(
                 booking=booking,amount=booking.price, platform_fee=booking.platform_fee,
-                idempotency_key=idempotency_key, sender=booking.customer,
+                reference=str(uuid4()), sender=booking.customer,
                 receiver=booking.provider.profile.user
             )
             if action == BookingTransaction.Type.ESCROW_HOLD:
@@ -77,11 +75,12 @@ def process_transaction(booking_id: UUID, action, status: bool):
                     "sender": sender, "receiver": receiver, "amount": booking_transaction.amount,
                     "is_credit": is_credit, "is_debit": is_debit
                 })
+
+            return booking_transaction
         except Exception as exc:
             logger.exception(f"Failed to process booking transaction: {exc}", exc_info=True)
             raise Exception(exc)
     
-    return booking_transaction
 
 def transaction_ready_exists(user, idempotency):
     existing = BookingTransaction.objects.filter(
