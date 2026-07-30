@@ -34,7 +34,6 @@ def check_docker_update(request):
 def test_email(request):
    
     from django.core.mail import send_mail
-    from django.conf import settings
 
     subject = 'Hello Bro'
     message = 'New Message'
@@ -43,8 +42,8 @@ def test_email(request):
         send_mail(
             subject=subject,
             message=message,
-            from_email="skills4hireofficial@gmail.com",
-            recipient_list=['ogennaisrael@gmail.com'],
+            from_email="no-reply@theskills4hire.com",
+            recipient_list=['ogennaisrael98@gmail.com'],
             fail_silently=False,
         )
     except Exception as e:

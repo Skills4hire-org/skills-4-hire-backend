@@ -10,7 +10,7 @@ urlpatterns = [
     path('aduser-skills4hire/', admin.site.urls),
     path("health/", health, name="health"),
     # path("docker/", check_docker_update, name="docker"),
-    # path("email/", test_email, name='test')
+    path("email/", test_email, name='test'),
     path('banks/', get_banks, name='get_banks'),
 
     path('api/schema/', SpectacularAPIView.as_view(), name='schema'),

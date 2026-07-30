@@ -16,23 +16,16 @@ class AddressService:
 
     @transaction.atomic
     def create_address(self, user_profile, validated_data):
-        if "user_profile_id" in validated_data:
-            validated_data.pop("user_profile_id")
         if not isinstance(user_profile, BaseProfile):
             raise ValueError("Invalid base profile instance")
-
-        postal_code = validated_data.poo("postal_code")
         try:
-            address = UserAddress.objects.get_or_create(
-                user_profile=user_profile,
-                postal_code=postal_code,
+            address, created = UserAddress.objects.get_or_create(
+                user_profile=user_profile, postal_code=validated_data.get("postal_code"), 
                 defaults=validated_data
-                
             )
+            return address
         except Exception as e:
             raise Exception(e)
-
-        return address
 
 
 

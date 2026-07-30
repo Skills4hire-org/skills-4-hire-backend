@@ -10,15 +10,12 @@ UserModel = get_user_model()
 
 
 class AddressCreateSerializer(serializers.ModelSerializer):
-    user_profile_id = serializers.UUIDField(write_only=True, required=False)
     class Meta:
         model = UserAddress
         fields = [
-            "address_id", "user_profile_id",
             "street_address", "apartment",
             "city", "state", "country",
             "postal_code", "is_default"
-
         ]
 
     def validate_postal_code(self, value):
@@ -27,8 +24,6 @@ class AddressCreateSerializer(serializers.ModelSerializer):
         return value
 
     def validate(self, data):
-        user = self.context.get("request").user
-        user_base_profile = user.profile
         for value in data.values():
             if isinstance(value, str):
                 value.strip().title()
@@ -36,21 +31,17 @@ class AddressCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = self.context.get("request").user
-
-        if "user_profile_id" in  validated_data:
-            user_base_profile = UserModel.objects.get(email__iexact=user.email, is_active=True)
-            validated_data.pop("user_profile_id")
-        else:
-            user_base_profile = user.profile
+        user_base_profile = user.profile
 
         try:
             address = AddressService().create_address(
                 user_profile=user_base_profile,
                 validated_data=validated_data
             )
+            return address
         except Exception as e:
             raise serializers.ErrorDetail(string=str(e), code=400)
-        return address
+        
 
     def update(self, instance: UserAddress, validated_data: dict):
         user = self.context.get("request").user

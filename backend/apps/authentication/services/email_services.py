@@ -1,12 +1,8 @@
-import requests
-
 from django.template.loader import render_to_string
 from django.conf import settings
 from django.core.mail import send_mail
 
-
 import logging
-import validators
 
 logger = logging.getLogger(__name__)
 
@@ -30,10 +26,10 @@ def send_mail_base(context: dict) :
         
         send_mail(
             subject=subject,
-            from_email="skills4hireofficial@gmail.com",
+            from_email=f"Skills4Hire <{settings.DEFAULT_FROM_EMAIL}>",
             recipient_list=[to_email],
             fail_silently=False,
-            message='',
+            message="",
             html_message=html_content,
         )
     except KeyError:

@@ -68,7 +68,6 @@ class BookingService:
     def create_booking(customer, provider, **validated_data):
         booking = None
         transaction_status = False
-        idempotency_key = validated_data.pop("idempotency_key")
         with transaction.atomic():
             booking = Bookings.objects.create(customer=customer, provider=provider, 
                                             **validated_data)
@@ -94,7 +93,7 @@ class BookingService:
             if booking:
                 process_transaction(
                     booking_id=booking.pk, action=BookingTransaction.Type.ESCROW_HOLD, 
-                    idempotency_key=idempotency_key, status=transaction_status
+                    status=transaction_status
                 )
             
         return booking

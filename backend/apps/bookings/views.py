@@ -116,22 +116,6 @@ class BookingViewSet(viewsets.ModelViewSet):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
-        idempotency = serializer.validated_data['idempotency_key']
-        user = request.user
-
-        if transaction_ready_exists(user, idempotency=idempotency)[0]:
-    
-            logger.info("Dublicate Booking Transaction Found, returning the initial request")
-
-            return api_response(
-                data={
-                    'transaction': BookingTransactionSerializer(transaction_ready_exists(user, idempotency)[1]).data,
-                },
-                message="Duplicate Booking, returning initial transaction",
-                status_code=status.HTTP_200_OK,
-            )
-        
         created_booking = serializer.save()
         try:
             broadcast_notification("booking_made", {'booking': created_booking})

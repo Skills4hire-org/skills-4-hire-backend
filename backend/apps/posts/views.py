@@ -116,7 +116,8 @@ class PostViewSet(viewsets.ModelViewSet):
 
         if "include_offers" in self.request.query_params:
             include_offers = self.request.query_params['include_offers']
-            updated_qs = get_offers_or_job_post(user, updated_qs, include_offers)
+            if include_offers:
+                updated_qs = get_offers_or_job_post(updated_qs)
 
         if "include_mine" in self.request.query_params:
             include_mine = self.request.query_params['include_mine']
