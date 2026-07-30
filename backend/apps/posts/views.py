@@ -73,7 +73,7 @@ class PostViewSet(viewsets.ModelViewSet):
         "post_content": ["icontains"]
     }
     search_fields = ['post_title', "tags__name"]
-    ordering_fields = ['-created_at', '-updated_at']
+    ordering_fields = ['-created_at']
 
     def get_serializer_class(self):
 
@@ -272,7 +272,6 @@ class PostViewSet(viewsets.ModelViewSet):
         qs = queryset.filter(user__pk=user_id)
         return return_paginated_view(self, qs)
     
-
 class CommentViewSet(viewsets.ModelViewSet):
     pagination_class = CustomPostPagination
 
@@ -497,6 +496,12 @@ class FeedListView(ListAPIView):
     - page: Pagination page number (default 1)
     - limit: Results per page (default 20, max 50)
     - exclude_seen: Whether to skip already-viewed posts (default true)
+    - post_type: Filter by post type (icontains)
+    - user__profile__display_name: Filter by creator display name (icontains)
+    - amount: Filter by amount range (amount_gte, amount_lte)
+    - post_content: Filter by post content (icontains)
+    - search: Free-text search across post_title and tags__name
+    - ordering: Sort filtered results by a given field (overrides recommendation order)
     
     Returns:
     - List of recommended posts ordered by recommendation score
@@ -505,18 +510,21 @@ class FeedListView(ListAPIView):
     Authentication: Required (IsAuthenticated)
     
     Example:
-        GET /api/posts/feed/?category=plumbing&location=Lagos&limit=20
+        GET /api/posts/feed/?category=plumbing&location=Lagos&limit=20&post_type__icontains=job&amount__gte=5000
     """
     CACHE_TTL_SECONDS = 60 * 5
     permission_classes = [permissions.IsAuthenticated]
     serializer_class = FeedPostSerializer
     pagination_class = CustomPostPagination
-    filter_backends = [DjangoFilterBackend]
-    filterset_fields = [
-        "amount", "post_type", "country", "state", "city",
-        "post_title", "tags__name"
-    ]
-    
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
+    filterset_fields = {
+        "post_type": ["icontains"],
+        "user__profile__display_name": ["icontains"],
+        "amount": ["gte", "lte"],
+        "post_content": ["icontains"],
+    }
+    search_fields = ["post_title", "tags__name"]
+
     def get_queryset(self):
         """
         This method is overridden to return an empty QuerySet because we're
@@ -524,21 +532,41 @@ class FeedListView(ListAPIView):
         than using a standard Django QuerySet.
         """
         return Post.objects.none()
-    
+
     @staticmethod
-    def _build_cache_key(user_id: str):
-        key = f"{user_id}"
+    def _build_cache_key(user_id: str, query_string: str):
+        # Query string is included so different filter/search/ordering combos
+        # don't collide on a cached response meant for a different request.
+        key = f"{user_id}:{query_string}"
         return hashlib.sha3_256(key.encode("utf-8")).hexdigest()
 
+    def _apply_filters(self, request, feed_posts):
+        """
+        Runs the declared filter_backends (DjangoFilterBackend, SearchFilter,
+        OrderingFilter) against the recommended posts. Since feed_posts is a
+        scored list rather than a queryset, we build a queryset from the
+        candidate IDs, filter that, then use the result to trim/reorder the
+        original scored list.
+        """
+        if not feed_posts:
+            return feed_posts
+
+        post_ids = {item["post"].pk for item in feed_posts} 
+        base_queryset = Post.objects.filter(pk__in=post_ids)
+
+        filtered_queryset_id = set(self.filter_queryset(base_queryset).values_list("pk", flat=True))
+
+        return [item for item in feed_posts if item["post"].pk in filtered_queryset_id]
+
     def list(self, request, *args, **kwargs):
- 
+
         try:
             category = request.query_params.get('category', None)
             location = request.query_params.get('location', None)
             exclude_seen = request.query_params.get('exclude_seen', False)
             include_offers = request.query_params.get('include_offers', False)
 
-            cache_key = self._build_cache_key(request.user.pk)
+            cache_key = self._build_cache_key(request.user.pk, request.query_params.urlencode())
             try:
                 cached_response = cache.get(cache_key)
             except Exception as error:
@@ -562,6 +590,8 @@ class FeedListView(ListAPIView):
                     category=category, location=location,
                     exclude_seen=exclude_seen, include_offers=include_offers,
                 )
+
+            feed_posts = self._apply_filters(request, feed_posts)
 
             # self._record_feed_impressions(request.user, feed_posts)
             page = self.paginate_queryset(feed_posts)
@@ -595,8 +625,7 @@ class FeedListView(ListAPIView):
                 message='Failed to generate feed',
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-
-    
+        
     def _record_feed_impressions(self, user, feed_posts: list):
         """
         Record 'view' interactions for posts shown in the feed.

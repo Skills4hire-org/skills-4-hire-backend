@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>New Booking Request</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #f4f7f6;
+            font-family: Arial, Helvetica, sans-serif;
+            color: #333333;
+        }
+
+        .email-wrapper {
+            width: 100%;
+            padding: 20px 0;
+        }
+
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background-color: #ffffff;
+            border-radius: 6px;
+            overflow: hidden;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+        }
+
+        .header {
+            background-color: #14a800;
+            padding: 22px 30px;
+            text-align: center;
+            color: #ffffff;
+        }
+
+        .header h1 {
+            margin: 0;
+            font-size: 20px;
+        }
+
+        .content {
+            padding: 30px;
+            line-height: 1.6;
+        }
+
+        .content p {
+            margin: 0 0 16px;
+            font-size: 15px;
+        }
+
+        /* Client info block */
+        .client-block {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        .avatar {
+            width: 44px;
+            height: 44px;
+            min-width: 44px;
+            border-radius: 50%;
+            background-color: #e4f4de;
+            color: #14a800;
+            font-weight: bold;
+            font-size: 16px;
+            text-align: center;
+            line-height: 44px;
+        }
+
+        .client-name {
+            font-size: 15px;
+            font-weight: 600;
+            color: #222222;
+            margin: 0;
+        }
+
+        .client-sub {
+            font-size: 13px;
+            color: #777777;
+            margin: 2px 0 0;
+        }
+
+        /* Booking summary card */
+        .booking-card {
+            border: 1px solid #e2e6e4;
+            border-radius: 6px;
+            padding: 20px;
+            margin: 20px 0;
+            background-color: #fafbfa;
+        }
+
+        .booking-card h2 {
+            font-size: 17px;
+            margin: 0 0 4px;
+            color: #1a1a1a;
+        }
+
+        .booking-card .category {
+            font-size: 13px;
+            color: #14a800;
+            font-weight: 600;
+            margin: 0 0 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .detail-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #eef1ef;
+            font-size: 14px;
+        }
+
+        .detail-row:last-child {
+            border-bottom: none;
+        }
+
+        .detail-label {
+            color: #777777;
+        }
+
+        .detail-value {
+            color: #222222;
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .price-value {
+            color: #14a800;
+            font-size: 16px;
+        }
+
+        /* Client message */
+        .client-message {
+            margin: 20px 0;
+            padding: 14px 16px;
+            background-color: #fff9e6;
+            border-left: 3px solid #f0b429;
+            font-size: 14px;
+            color: #555555;
+            border-radius: 4px;
+            font-style: italic;
+        }
+
+        /* CTA button */
+        .cta-wrapper {
+            text-align: center;
+            margin: 28px 0 10px;
+        }
+
+        .cta-button {
+            display: inline-block;
+            background-color: #14a800;
+            color: #ffffff !important;
+            text-decoration: none;
+            padding: 13px 32px;
+            border-radius: 4px;
+            font-size: 15px;
+            font-weight: 600;
+        }
+
+        .note {
+            font-size: 13px;
+            color: #999999;
+            text-align: center;
+            margin-top: 10px;
+        }
+
+        .footer {
+            background-color: #f0f3f2;
+            padding: 18px 30px;
+            text-align: center;
+            font-size: 13px;
+            color: #777777;
+        }
+
+        .footer a {
+            color: #14a800;
+            text-decoration: none;
+        }
+
+        .footer span {
+            color: #14a800;
+            font-weight: 600;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="email-wrapper">
+        <div class="email-container">
+
+            <!-- Header -->
+            <div class="header">
+                <h1>New Booking Request</h1>
+            </div>
+
+            <!-- Content -->
+            <div class="content">
+                <p>Hello <strong>{{ provider_name }}</strong>,</p>
+
+                <p>
+                    You've received a new booking request on <strong>{{ app_name }}</strong>.
+                    Here are the details:
+                </p>
+
+                <!-- Client block -->
+                <div class="client-block">
+                    <div class="avatar">{{ client_initials }}</div>
+                    <div>
+                        <p class="client-name">{{ client_name }}</p>
+                        <p class="client-sub">Booking ID: {{ booking_id }}</p>
+                    </div>
+                </div>
+
+                <!-- Booking summary card -->
+                <div class="booking-card">
+                    <h2>{{ service_name }}</h2>
+                    <p class="category">{{ category }}</p>
+
+                    <div class="detail-row">
+                        <span class="detail-label">Date</span>
+                        <span class="detail-value">{{ booking_date }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Time</span>
+                        <span class="detail-value">{{ booking_time }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Location</span>
+                        <span class="detail-value">{{ service_location }}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span class="detail-label">Amount</span>
+                        <span class="detail-value price-value">{{ currency }}{{ price }}</span>
+                    </div>
+                </div>
+
+                <!-- Client message -->
+                <div class="client-message">
+                    "{{ client_message }}"
+                </div>
+
+                <!-- CTA -->
+                <div class="cta-wrapper">
+                    <a href="{{ booking_url }}" class="cta-button">View &amp; Respond to Booking</a>
+                </div>
+
+                <p class="note">
+                    Please respond within {{ response_window }} to confirm this booking.
+                </p>
+            </div>
+
+            <!-- Footer -->
+            <div class="footer">
+                © {{ year }} <span>{{ app_name }}</span> — All rights reserved.<br>
+                Need help? <a href="{{ support_url }}">Contact support</a>
+            </div>
+
+        </div>
+    </div>
+</body>
+</html>

@@ -99,7 +99,7 @@ class BookingService:
         return booking
 
     @staticmethod
-    def cancel_booking(booking, user, idempotency_key):
+    def cancel_booking(booking, user):
 
         if not isinstance(booking, Bookings) or not isinstance(user, User):
             raise ValidationError("Failed: 'booking' and 'user' should be valid instances")
@@ -122,23 +122,21 @@ class BookingService:
                 logger.exception(f"Failed to reverse booking: {e}", exc_info=True)
                 transaction_status = False
             
-        transaction.on_commit( lambda: process_transaction(
+            process_transaction(
                 booking_id=booking.pk, action=BookingTransaction.Type.REFUND,
-                idempotency_key=idempotency_key, status=transaction_status
-                ))
-
-        message = f"Booking cancelled by {user.full_name}."
+                status=transaction_status
+                )
         logger.info(f"Booking {booking.pk} cancelled by user {user.get_username()}.")
+        
+        return booking
 
+        
     @staticmethod
     def accept_booking(booking, user):
         if not isinstance(booking, Bookings) and  not isinstance(user, User):
             raise ValidationError("Failed: 'booking' and 'user' should ba valid instances")
-
         with transaction.atomic():
             booking.accept_booking(user=user)
-
-        booking_message = f"Booking {booking.pk}: Accepted {booking.provider.profile.user.username}."
         return booking
 
     @staticmethod
