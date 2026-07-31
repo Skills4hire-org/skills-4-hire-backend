@@ -42,6 +42,7 @@ from .services.recommendation_service import RecommendationService
 from apps.bookings.permissions import  IsCustomer
 from ..core.exceptions import api_response, error_response
 from ..core.utils.py import get_or_none
+from ..admin.open_applications.serializers import ApplicationListSerializer, OpenApplications
 
 import uuid
 import hashlib
@@ -595,9 +596,8 @@ class FeedListView(ListAPIView):
                     category=category, location=location,
                     exclude_seen=exclude_seen, include_offers=include_offers,
                 )
-
             feed_posts = self._apply_filters(request, feed_posts)
-
+            
             # self._record_feed_impressions(request.user, feed_posts)
             page = self.paginate_queryset(feed_posts)
             serialized_posts = []
@@ -773,3 +773,17 @@ class PostInteractionViewSet(viewsets.ViewSet):
             
         except Exception as e:
             logger.error(f"Error updating engagement count for post {post.post_id}: {e}")
+
+class ExternalJobApplication(viewsets.ModelViewSet):
+    http_method_names = ['get']
+    serializer_class = ApplicationListSerializer
+    queryset = OpenApplications.objects.select_related("category").all()
+    filter_backends = [DjangoFilterBackend, filters.OrderingFilter]
+    pagination_class = CustomPostPagination
+    filterset_fields = {
+        "title": ['icontains', 'iexact'],
+        "description": ["icontains"],
+        "location": ['icontains']
+    }
+    ordering_fields = ['-created_at']
+    ordering = ['-created_at']
