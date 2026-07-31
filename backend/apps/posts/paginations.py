@@ -2,7 +2,7 @@ from rest_framework.pagination import PageNumberPagination
 from rest_framework.response import Response
 
 class CustomPostPagination(PageNumberPagination):
-    page_size = 20
+    page_size = 50
     ordering = ["-created_at"]
 
     def get_paginated_response(self, data):
