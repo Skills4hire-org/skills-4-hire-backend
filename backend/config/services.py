@@ -43,7 +43,7 @@ def test_email(request):
             subject=subject,
             message=message,
             from_email="no-reply@theskills4hire.com",
-            recipient_list=['ogennaisrael98@gmail.com'],
+            recipient_list=['ogennaisrael@gmail.com'],
             fail_silently=False,
         )
     except Exception as e:

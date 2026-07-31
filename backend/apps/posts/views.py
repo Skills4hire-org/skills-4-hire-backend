@@ -518,7 +518,7 @@ class FeedListView(ListAPIView):
     pagination_class = CustomPostPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = {
-        "post_type": ["icontains"],
+        "post_type": ["iexact", "icontains"],
         "user__profile__display_name": ["icontains"],
         "amount": ["gte", "lte"],
         "post_content": ["icontains"],
