@@ -9,7 +9,8 @@ SUPPORT_URL= f"https://skills-4-hire-frobtendwebsite-ld8136i90-finelifeapps-proj
 from_email = f"Skills4Hire <skills4hire@{settings.DOMAIN}"
 
 def booking_made_payload(customer: UserModel, provider: UserModel, booking: Bookings):
-    service = booking.provider_service.first()
+    booking_service = booking.provider_service.first()
+    service = booking_service.services.first()
     return {
         "from_email": from_email,
         "email": provider.email,
@@ -18,8 +19,8 @@ def booking_made_payload(customer: UserModel, provider: UserModel, booking: Book
         "client_name": customer.full_name,
         "client_initials": f"{customer.first_name[0]}{customer.last_name[0]}".upper(),
         "booking_id": str(booking.booking_id),
-        "service_name": str(service.name) or None,
-        "category": str(service.category.name) if service.category else None,
+        "service_name": str(service.name) if service else  None,
+        "category": str(service.category.name) if service else None,
         "booking_date": booking.created_at,
         "booking_time": date_filter(booking.created_at, "F j, Y"),
         "service_location": booking.location,

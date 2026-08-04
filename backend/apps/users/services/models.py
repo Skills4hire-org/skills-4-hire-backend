@@ -23,6 +23,33 @@ class ServiceCategory(models.Model):
     def save(self, *args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
+
+
+class MainService(models.Model):
+    main_service_id = models.UUIDField(
+        primary_key=True, default=uuid.uuid4, 
+        editable=False, unique=True, db_index=True
+    )
+
+    category = models.ForeignKey(
+        ServiceCategory, on_delete=models.SET_NULL, null=True, related_name="main_services", blank=True
+    )
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+    def clean(self):
+        if self.name:
+            self.name = self.name.strip().title()
+        super().clean()
+    
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)       
+
         
 class Service(models.Model):
     service_id = models.UUIDField(
@@ -30,16 +57,14 @@ class Service(models.Model):
         default=uuid.uuid4,
         editable=False,
     )
-    category = models.ForeignKey(
-        ServiceCategory, on_delete=models.SET_NULL, null=True, related_name="services", blank=True
+    services = models.ManyToManyField(
+        MainService, related_name="services", blank=True,
     )
     profile = models.ForeignKey(
         ProviderModel,
         related_name="services",
         on_delete=models.CASCADE,
     )
-    name = models.CharField(max_length=255)
-    description = models.TextField(null=True, blank=True)
     charge = models.DecimalField(decimal_places=2, max_digits=8, null=True, blank=True)
     years_of_experience = models.IntegerField(default=0, null=True, blank=True)
     is_default = models.BooleanField(default=False)
@@ -59,8 +84,6 @@ class Service(models.Model):
         ]
 
     def clean(self):
-        if self.name:
-            self.name = self.name.strip().title()
         super().clean()
     
     def save(self, *args, **kwargs):
@@ -68,8 +91,7 @@ class Service(models.Model):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.name} ({self.service_id})"
-
+        return f"Service {self.service_id}"
 
 class ServiceAttachment(models.Model):
     image_id = models.UUIDField(
