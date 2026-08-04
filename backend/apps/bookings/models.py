@@ -27,7 +27,7 @@ class Bookings(models.Model):
 
     customer = models.ForeignKey(User, on_delete=models.CASCADE,  related_name="bookings")
     provider = models.ForeignKey(ProviderModel, on_delete=models.CASCADE, related_name="bookings")
-    provider_service = models.ForeignKey(Service, on_delete=models.CASCADE, related_name="bookings", null=True, blank=True)
+    provider_service = models.ManyToManyField(Service, related_name="bookings", blank=True)
     address = models.ForeignKey(UserAddress, on_delete=models.CASCADE, related_name="booking_address", blank=True,
                                 null=True)
     location = models.CharField(max_length=255, blank=True, null=True)
