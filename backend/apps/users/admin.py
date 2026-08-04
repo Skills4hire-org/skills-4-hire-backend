@@ -64,12 +64,11 @@ class ServiceCategoryAdmin(admin.ModelAdmin):
 
 @admin.register(Service)
 class ServiceAdmin(admin.ModelAdmin):
-    list_display = ["profile__profile__display_name", "name",
+    list_display = ["profile__profile__display_name",
                     "charge", "is_default",
-                    "is_active", "created_at", "category__name"]
+                    "is_active", "created_at",]
     
     list_filter = ['is_active']
-    search_fields =  ['name']
     list_per_page = 50
 
 @admin.register(BaseProfile)

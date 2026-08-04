@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Service, ServiceAttachment, ServiceCategory
+from .models import Service, ServiceAttachment, ServiceCategory, MainService
 from ...core.utils.py import generate_thumbnails
 
 
@@ -25,22 +25,17 @@ class ServiceAttachmentSerializer(serializers.ModelSerializer):
 
 class ServiceCreateSerializer(serializers.ModelSerializer):
     attachments = ServiceAttachmentSerializer(many=True, required=False)
-    category_id = serializers.PrimaryKeyRelatedField(
-        queryset=ServiceCategory.objects.all(), required=False
+    services = serializers.PrimaryKeyRelatedField(
+        queryset=MainService.objects.all(), required=False, many=True
     )
     
     class Meta:
         model = Service
         fields = [
-            "category_id", "attachments",
-            "name",  "years_of_experience",
-            "description", "charge", "is_default",
+            "services", "attachments",
+            "years_of_experience",
+            "charge", "is_default",
         ]
-
-    def validate_name(self, value: str) -> str:
-        if not value or not value.strip():
-            raise serializers.ValidationError("name must not be empty.")
-        return value.strip().title()  # Normalize to title case for consistency
 
     def validate_charge(self, value: float):
         if value < 0:
@@ -49,24 +44,22 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data: dict) -> Service:
         attachments_data = validated_data.pop("attachments", [])
-        category = validated_data.pop("category_id", None)
-
-        validated_data["category"] = category
+        services = validated_data.pop('services', [])
         user = self.context['request'].user
         if not user.is_provider:
             raise serializers.ValidationError("user is not a provider")
         profile = user.profile.provider_profile
 
         service = Service.objects.create(profile=profile, **validated_data)
-
+        service.services.set(services)
         if attachments_data:
             ServiceAttachment.objects.bulk_create(
                 [
                     ServiceAttachment(
-                        service=service, 
-                        thumbnail_url=generate_thumbnails(attachment['image_url']) if attachment['type'].lower() == "video" else None,
+                        service=service,
+                        thumbnail_url=generate_thumbnails(attachment.get('image_url', '')) if attachment.get('type', '').lower() == "video" else None,
                         **attachment
-                    ) 
+                    )
                     for attachment in attachments_data]
             )
 
@@ -75,26 +68,24 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
 
     def update(self, instance: Service, validated_data: dict) -> Service:
         attachments_data = validated_data.pop("attachments", None)
-        category = validated_data.pop("category_id", None)
-        if category is not None:
-            validated_data["category"] = category
-
+        services = validated_data.pop("services", [])
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+        instance.services.set(services)
         instance.save()
 
         if attachments_data is not None:
-            #delete all existing attachments in a single query
+            # delete all existing attachments in a single query
             instance.attachments.delete()
 
             # Bulk-insert the fresh set
             ServiceAttachment.objects.bulk_create(
                 [
                     ServiceAttachment(
-                        service=instance, 
-                        thumbnail_url=generate_thumbnails(attachment['image_url']) if attachment['type'].lower() == "video" else None,
+                        service=instance,
+                        thumbnail_url=generate_thumbnails(attachment.get('image_url', '')) if attachment.get('type', '').lower() == "video" else None,
                         **attachment
-                    ) 
+                    )
                     for attachment in attachments_data]
             )
 
@@ -105,20 +96,28 @@ class ServiceCategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = ServiceCategory
         fields = [
-            'name',
+            'name', 
             "service_category_id"
+        ]
+
+class MainServiceSerializer(serializers.ModelSerializer):
+    category = ServiceCategorySerializer(read_only=True)
+    class Meta:
+        model = MainService
+        fields  = [
+            "main_service_id", "name", 
+            "description", "category"
         ]
 
 class ServiceListSerializer(serializers.ModelSerializer):
     attachments = ServiceAttachmentSerializer(many=True, read_only=True)
-    category = ServiceCategorySerializer(read_only=True)
+    services = MainServiceSerializer(read_only=True, many=True)
     
     class Meta:
         model = Service
         fields = [
-            "service_id",
-            "name", "description", "charge",
+            "service_id", "charge",
             "is_default", "years_of_experience",
             "is_active", "created_at", 
-            "attachments", "category"
+            "attachments", "services"
         ]

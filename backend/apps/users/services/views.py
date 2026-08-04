@@ -9,33 +9,31 @@ from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 
-from .models import Service, ServiceCategory
+from .models import Service, MainService
 from .pagination import ServicePagination
 from .permissions import IsOwnerOrReadOnly, IsServiceProvider
-from .serializers import ServiceCreateSerializer, ServiceListSerializer, ServiceCategorySerializer
+from .serializers import ServiceCreateSerializer, ServiceListSerializer, MainServiceSerializer
 from ...posts.services_T import return_paginated_view
 from ...core.exceptions import api_response, error_response
 
 class ServiceCategoryViewSet(viewsets.ModelViewSet):
     http_method_names = ['get']
-    queryset = ServiceCategory.objects.all().only("name", "service_category_id").order_by("name")
-    serializer_class = ServiceCategorySerializer
+    queryset = MainService.objects.all().order_by("category__name")
+    serializer_class = MainServiceSerializer
     pagination_class = None  # Disable pagination for categories
     permission_classes = [IsAuthenticated]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
+    filterset_fields = ["name", "category__name"]
+    search_fields = ["name", "category__name"]
 
+    @method_decorator(cache_page(60 * 60))
+    def list(self, request, *args, **kwargs):
+        return super().list(request, *args, **kwargs)
+    
 class ServiceViewSet(viewsets.ModelViewSet):
-
     http_method_names = ['post', 'get', 'patch', 'delete']
     pagination_class = ServicePagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter]
-
-    search_fields = ["@name", "@category__name"]
-    filterset_fields = {
-        "name": ["icontains"],
-        "is_active": ["exact"],
-        "charge": ["gte", "lte"],
-        "category__name": ["icontains"],
-    }
 
     def get_permissions(self):
         if  self.action in ("create", "auth_user_services"):
@@ -47,7 +45,6 @@ class ServiceViewSet(viewsets.ModelViewSet):
     def get_serializer_class(self):
         if self.action in ("create", "partial_update"):
             return ServiceCreateSerializer
-
         return ServiceListSerializer
     
     @method_decorator(cache_page(60 * 5))
@@ -61,7 +58,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
         """
         return (
             Service.objects.filter(is_active=True)
-            .select_related("profile", "category")
+            .select_related("profile")
             .prefetch_related("attachments")
         )
 

@@ -44,15 +44,16 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         ).filter(role_lower_case__in=ADMIN_ROLES).values_list("user_id", flat=True)
 
         queryset = queryset.exclude(user_id__in=admin_users)
+        if getattr(self, "request", None) is None:
+            return queryset
         return self.filter_queryset(queryset)
+
+    serializer_class = UserManagementDetailSerializer
 
     def get_serializer_class(self):
         if self.action == 'list':
             return UserManagementListSerializer
-        elif self.action == 'retrieve':
-            return UserManagementDetailSerializer
-        else:
-            pass
+        return self.serializer_class
     
     @action(methods=['get'], detail=True, url_path='referrals')
     def referrals(self, request):
