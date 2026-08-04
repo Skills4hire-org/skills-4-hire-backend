@@ -6,7 +6,7 @@ from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
 from ..users.address.models import UserAddress
-from ..users.address.serializers import AddressCreateSerializer, AddressSerializer
+from ..users.address.serializers import AddressCreateSerializer, AddressDetailSerializer, AddressSerializer
 from .models import Bookings, BookingAttachments, PaymentRequestBooking,\
 BookingTransaction
 
@@ -24,7 +24,7 @@ from decimal import Decimal
 import logging
 
 from ..users.serializers.profiles import ProviderProfilePublicSerializer
-from ..users.services.serializers import ServiceListSerializer
+from ..users.services.serializers import ServiceListSerializer, Service
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,10 @@ class BookingAttachmentSerializer(serializers.ModelSerializer):
 class BookingCreateSerializer(serializers.ModelSerializer):
     address = AddressCreateSerializer(required=False)
     attachments = BookingAttachmentSerializer(many=True, required=False)
-
+    provider_service = serializers.PrimaryKeyRelatedField(
+        queryset=Service.objects.filter(is_active=True),
+        many=True, 
+    )
     class Meta:
         model = Bookings
         fields = [
@@ -49,10 +52,6 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
-        service = attrs['provider_service']
-        if service.profile !=  attrs['provider']:
-            raise serializers.ValidationError("Invalid provider service")
-        
         if attrs.get("start_date") or attrs.get("end_date"):
             if attrs["end_date"] <= attrs["start_date"]:
                 raise serializers.ValidationError("'end_date' cannot be less than 'start_date'")
@@ -82,6 +81,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         address = validated_data.pop("address", None)
         attachment = validated_data.pop("attachments", None)
         provider_profile = validated_data.pop('provider')
+        provider_service = validated_data.pop("provider_service")
 
         address_obj = None
         if address is not None:
@@ -93,6 +93,10 @@ class BookingCreateSerializer(serializers.ModelSerializer):
                 customer=request.user, provider=provider_profile,
                 **validated_data
             )
+
+            if provider_service:
+                booking_instance.provider_service.set(provider_service)
+
         except Exception as exc:
             raise serializers.ValidationError(str(exc))
 
@@ -117,6 +121,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
     def update(self, instance: Bookings, validated_data):
         address = validated_data.pop("address", None)
         attachments = validated_data.pop("attachments", None)
+        provider_service = validated_data.pop("provider_service")
         user = self.context['request'].user
         
         if address:
@@ -131,7 +136,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
                 BookingAttachments(booking=instance, **data)
                 for data in attachments
             ])
-
+        instance.provider_service.set(provider_service)
         updated_instance = super().update(instance, validated_data)
         return updated_instance
 
@@ -192,7 +197,7 @@ class BookingSerializer(serializers.ModelSerializer):
     provider = ProviderProfilePublicSerializer(read_only=True)
     attachments = BookingAttachmentSerializer(read_only=True, many=True)
     address = AddressSerializer(read_only=True)
-    provider_service = ServiceListSerializer(read_only=True)
+    provider_service = ServiceListSerializer(read_only=True, many=True)
     class Meta:
         model = Bookings
         fields =[
@@ -205,14 +210,14 @@ class BookingSerializer(serializers.ModelSerializer):
         ]
 
 class BookingDetailSerializer(serializers.ModelSerializer):
-
     customer = UserReadSerializer(read_only=True)
     provider = ProviderProfilePublicSerializer(read_only=True)
     cancelled_by = UserReadSerializer(read_only=True)
     accepted_by = UserReadSerializer(read_only=True)
     attachments = BookingAttachmentSerializer(read_only=True, many=True)
-    address = AddressSerializer(read_only=True, many=True)
+    address = AddressDetailSerializer(read_only=True)
     provider_pay = serializers.SerializerMethodField()
+    provider_service = ServiceListSerializer(read_only=True, many=True)
 
     class Meta:
         model = Bookings
@@ -223,7 +228,8 @@ class BookingDetailSerializer(serializers.ModelSerializer):
             'price', "platform_fee", "provider_pay", 'notes', 'requirements',
             'is_active', 'start_date', 'end_date',
             'created_at', 'cancelled_at', 'accepted_at',
-            'descriptions', 'currency', "attachments", "address"
+            'descriptions', 'currency', "attachments", "address",
+            "provider_service"
         ]
 
     def get_provider_pay(self, obj):
