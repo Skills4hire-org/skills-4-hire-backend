@@ -5,6 +5,9 @@ from ...core.utils.py import get_or_none
 from ..serializers.profiles import ProviderProfilePublicSerializer
 
 import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 class FavouriteAddSerializer(serializers.ModelSerializer):
 
@@ -39,7 +42,8 @@ class FavouriteAddSerializer(serializers.ModelSerializer):
             favourite.providers.add(provider)
 
         except Exception as exc:
-            raise serializers.ValidationError(str(exc))
+            logger.exception("Failed to add favourite for user %s", current_user)
+            raise serializers.ValidationError("Failed to add favourite")
         
         return validated_data
 
@@ -48,7 +52,8 @@ class FavouriteAddSerializer(serializers.ModelSerializer):
             provider = validated_data['provider']
             instance.providers.remove(provider)
         except Exception as exc:
-            raise serializers.ValidationError(str(exc))
+            logger.exception("Failed to remove favourite for user %s", current_user)
+            raise serializers.ValidationError("Failed to remove favourite")
         return instance
     
 

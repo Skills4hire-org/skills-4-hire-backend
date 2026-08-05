@@ -40,7 +40,10 @@ class AddressCreateSerializer(serializers.ModelSerializer):
             )
             return address
         except Exception as e:
-            raise serializers.ErrorDetail(string=str(e), code=400)
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception("Failed to create address for user %s: %s", getattr(user, 'id', None), e)
+            raise serializers.ValidationError("Failed to create address")
         
 
     def update(self, instance: UserAddress, validated_data: dict):

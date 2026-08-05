@@ -20,6 +20,9 @@ class CustomerService:
             setattr(user_base_profile.user, "is_customer", True)
             user_base_profile.user.save(update_fields=["is_customer"])
         except Exception as e:
-            raise ValueError(str(e))
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception("Failed to create customer profile for base profile %s: %s", getattr(user_base_profile, 'id', None), e)
+            raise ValueError("Failed to create customer profile")
         return customer_profile
 

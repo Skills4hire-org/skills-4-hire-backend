@@ -331,8 +331,8 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
             conversation = service.create_conversation(**validated_data)
 
         except Exception as e:
-            logger.exception(f"exception: {str(e)}")
-            raise ValidationError(str(e))
+            logger.exception("Exception creating conversation: %s", e)
+            raise ValidationError("Failed to create conversation")
 
         return conversation
 

@@ -52,7 +52,7 @@ def auto_delete_otp(self):
         
         logger.info(f"Automatically deleted OTP codes from the database")    
     except Exception as exc:
-        logger.error("Delete otp task failed: "+ exc)
+        logger.exception("Delete otp task failed: %s", exc)
         raise self.retry(exc=exc, countdown=60 * 5) 
 
 @shared_task(bind=True, max_retries=3)  
@@ -69,6 +69,6 @@ def clean_up_expired_jwt(self):
 
         logger.info(f"Automatically deleted Exired outstanding jwt")    
     except Exception as exc:
-        logger.error("Cleand up jwt task failed")
+        logger.exception("Clean up expired JWT task failed: %s", exc)
         raise self.retry(exc=exc, countdown=60 * 5) 
 

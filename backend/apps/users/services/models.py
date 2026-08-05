@@ -65,6 +65,9 @@ class Service(models.Model):
         related_name="services",
         on_delete=models.CASCADE,
     )
+    name = models.CharField(max_length=255, null=True, blank=True)
+    description = models.TextField(null=True, blank=True)
+    features = models.JSONField(default=dict)
     charge = models.DecimalField(decimal_places=2, max_digits=8, null=True, blank=True)
     years_of_experience = models.IntegerField(default=0, null=True, blank=True)
     is_default = models.BooleanField(default=False)

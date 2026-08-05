@@ -20,5 +20,8 @@ class ProviderProfileServices:
             setattr(user_base_profile.user, "is_provider", True)
             user_base_profile.user.save(update_fields=["is_provider"])
         except Exception as e:
-            raise ValueError(str(e))
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception("Failed to create provider profile for base profile %s: %s", getattr(user_base_profile, 'id', None), e)
+            raise ValueError("Failed to create provider profile")
         return provider_profile

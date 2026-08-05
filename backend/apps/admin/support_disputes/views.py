@@ -12,6 +12,9 @@ from .serializers import (
     SupportListSerializer, AssignAdminSerializer, SupportListConversationSerializer, 
     SupportConversationSerializer, ReplyMessageSerializer, SupportListMesssageSerialzer)
 from ...core.exceptions import api_response, error_response
+import logging
+
+logger = logging.getLogger(__name__)
 
 class SupportViewsets(viewsets.ModelViewSet):
     http_method_names = ['get', "patch"]
@@ -54,10 +57,8 @@ class SupportViewsets(viewsets.ModelViewSet):
                 status_code=200
             )
         except Exception as error:
-            return error_response(
-                message='Internal Server Error',
-                status_code=500, errors=str(error)
-            )
+            logger.exception("Failed to assign support: %s", error)
+            return error_response(message='Internal Server Error', status_code=500)
 
     @action(methods=['patch'], detail=True, url_path=r"(?P<admin_action>[^/.]+)")
     def admin_action(self, request, *args, **kwargs):
@@ -94,10 +95,8 @@ class SupportViewsets(viewsets.ModelViewSet):
                 status_code=200
             )
         except Exception as error:
-            return error_response(
-                message="Internal Server Error",
-                errors=str(error), status_code=500
-            )
+            logger.exception("Error performing admin action on support: %s", error)
+            return error_response(message="Internal Server Error", status_code=500)
 
 class ConversationViewsets(viewsets.ModelViewSet):
     permission_classes = [IsAuthenticated]
@@ -150,10 +149,7 @@ class ConversationViewsets(viewsets.ModelViewSet):
                 status_code=201
             )
         except Exception as error:
-            return error_response(
-                message="Internal Server error",
-                errors=str(error),
-                status_code=500
-            )
+            logger.exception("Failed to reply to support conversation: %s", error)
+            return error_response(message="Internal Server error", status_code=500)
 
             

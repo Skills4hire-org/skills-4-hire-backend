@@ -10,6 +10,10 @@ from rest_framework.exceptions import (
 )
 from rest_framework.response import Response
 from rest_framework.views import exception_handler as drf_exception_handler
+import logging
+import traceback
+
+logger = logging.getLogger(__name__)
 
 
 def api_response(data=None, message="Operation successful", status_code=status.HTTP_200_OK):
@@ -66,14 +70,18 @@ class BusinessLogicError(APIException):
 
 def custom_exception_handler(exc, context):
     response = drf_exception_handler(exc, context)
+    # If DRF could not handle the exception it's an internal server error.
     if response is None:
+        # Log full exception details server-side for review (including traceback)
+        logger.exception("Unhandled exception in request: %s", exc)
+        # Build a sanitized 500 response without exposing internal details
         response = Response(
             {
                 "success": False,
-                "errors": "Internal server error",
-                "message": f"detail: {str(exc)}",
+                "errors": {},
+                "message": "An internal server error occurred.",
                 "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
-                "data": {}
+                "data": {},
             },
             status=status.HTTP_500_INTERNAL_SERVER_ERROR,
         )
@@ -96,11 +104,14 @@ def custom_exception_handler(exc, context):
         errors = {"detail": data.get("detail", "Authentication failed")}
     elif isinstance(exc, APIException):
         detail = data.get("detail", data)
+        # Keep the API exception detail but avoid sending internal tracebacks.
         message = detail if isinstance(detail, str) else str(detail)
         errors = data
     else:
-        message = data.get("detail", "An error occurred") if isinstance(data, dict) else str(data)
-        errors = data
+        # Non-DRF exceptions that reached here are unexpected; log and sanitize.
+        logger.exception("Unexpected exception handled: %s", exc)
+        message = data.get("detail", "An error occurred") if isinstance(data, dict) else "An error occurred"
+        errors = {} if status_code >= 500 else data
 
     # Build the string representation for message
     error_response_str = ""
@@ -115,12 +126,20 @@ def custom_exception_handler(exc, context):
     else:
         error_response_str = str(errors)
 
+    # For server errors do not expose internal error strings to the client.
+    if status_code >= 500:
+        client_message = "An internal server error occurred."
+        client_errors = {}
+    else:
+        client_message = error_response_str.strip() or (message if isinstance(message, str) else "")
+        client_errors = errors
+
     response.data = {
         "success": False,
-        "message": error_response_str.strip() or message if isinstance(message, str) else "",
+        "message": client_message,
         "status_code": status_code,
-        "errors": errors,
-        "extra_message": message
+        "errors": client_errors,
+        "extra_message": message if status_code < 500 else "Server error",
     }
 
     return response

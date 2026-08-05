@@ -75,7 +75,8 @@ def blacklist_outstanding_token(user):
         logger.debug(f"Blacklist {outstanding_tokens.count()} token")
 
     except Exception as exc:
-        raise ValidationError(F"Error blacklisting tokens: {exc}")
+        logger.exception("Error blacklisting tokens for user %s", user)
+        raise ValidationError("Error blacklisting tokens")
 
 def validate_email(email, check_deliverability=False):
     try:

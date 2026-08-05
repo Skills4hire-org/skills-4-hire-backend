@@ -34,7 +34,7 @@ class ReviewService:
             return review_instance
         
         except Exception as e:
-            logger.error(e)
-            raise ValidationError(f"error creating review {e}")
+            logger.exception("Error creating review for provider: %s", getattr(validated_data.get('provider_profile', None), 'id', None))
+            raise ValidationError("Error creating review")
 
 

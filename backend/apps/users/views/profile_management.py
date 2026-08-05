@@ -166,7 +166,10 @@ class ProfileViewSet(viewsets.GenericViewSet):
                 base_profile.save()
                 return api_response(data={}, status_code=status.HTTP_204_NO_CONTENT)
             except Exception as error:
-                return error_response(message="Invalid profile", errors=error, status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.exception("Failed to clear cover photo for profile %s: %s", getattr(base_profile, 'id', None), error)
+                return error_response(message="Invalid profile", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(methods=['get', 'patch'], detail=False, url_path="me")
     def me(self, request, *args, **kwargs):

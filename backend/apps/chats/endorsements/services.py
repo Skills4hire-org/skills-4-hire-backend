@@ -32,7 +32,8 @@ def create_endorsement(**validated_data):
         logger.info(F"Endorsement {validated_data['endorsed_by'].full_name} <-> \
                     {validated_data['provider'].profile.user.full_name}")
     except Exception as exc:
-        raise ValidationError(f"Error endorsing user: {exc}")
+        logger.exception("Error endorsing user: %s", exc)
+        raise ValidationError("Error endorsing user")
 
     return endorsement
 

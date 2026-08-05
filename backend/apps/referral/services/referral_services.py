@@ -18,7 +18,8 @@ class ReferralService:
                 defaults={ "code": code.strip()}
             )
         except Exception as exc:
-            return {"status": False, "message": str(exc)}
+            logger.exception("Failed to create referral code for user %s", user)
+            return {"status": False, "message": "Failed to create referral code"}
         return {"status": True, "instance": code_instance}
     
     def get_referral_code_instance(self, code: str) -> dict:
@@ -49,7 +50,8 @@ class ReferralService:
             return {'status': True, "instance": referral}
         
         except Exception as exc:
-            return {"status": False, "message": str(exc)}
+            logger.exception("Failed to create referral between %s and %s", referrer, referred)
+            return {"status": False, "message": "Failed to create referral"}
 
        
     def attach_referral(self, referred_user, code_str):

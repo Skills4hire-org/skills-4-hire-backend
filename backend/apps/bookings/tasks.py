@@ -20,7 +20,7 @@ def auto_update_trust_score(self):
         for user in providers:
             compute_trust_score(user=user)
     except Exception as e:
-        logger.error(str(e))
+        logger.exception("Error auto updating trust score: %s", e)
         self.retry(exc=e, countdown=60 * 3)
 
 

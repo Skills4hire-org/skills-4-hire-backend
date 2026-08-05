@@ -93,7 +93,7 @@ def compute_trust_score(user: User) -> float:
         )
         
     except Exception as e:
-        logger.error(f"Error computing trust score for user {user.id}: {e}")
+        logger.exception("Error computing trust score for user %s: %s", user.id, e)
         trust_score = 0.0
     
     return trust_score
@@ -128,7 +128,7 @@ def _get_completed_jobs_count(user: User) -> int:
         
         return completed_count
     except Exception as e:
-        logger.warning(f"Error getting completed jobs for user {user.id}: {e}")
+        logger.exception("Error getting completed jobs for user %s: %s", user.id, e)
         return 0
 
 
@@ -160,7 +160,7 @@ def _get_average_rating(user: User) -> float:
         
         return avg_rating
     except Exception as e:
-        logger.warning(f"Error getting average rating for user {user.id}: {e}")
+        logger.exception("Error getting average rating for user %s: %s", user.id, e)
         return None
 
 def _get_endorsements_count(user: User) -> int:
@@ -188,5 +188,5 @@ def _get_endorsements_count(user: User) -> int:
         
         return endorsements_count
     except Exception as e:
-        logger.warning(f"Error getting endorsements for user {user.id}: {e}")
+        logger.exception("Error getting endorsements for user %s: %s", user.id, e)
         return 0

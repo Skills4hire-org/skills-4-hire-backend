@@ -98,7 +98,8 @@ class BookingCreateSerializer(serializers.ModelSerializer):
                 booking_instance.provider_service.set(provider_service)
 
         except Exception as exc:
-            raise serializers.ValidationError(str(exc))
+            logger.exception("Booking creation failed")
+            raise serializers.ValidationError("Booking creation failed")
 
         if attachment is not None:
             BookingAttachments.objects.bulk_create([
