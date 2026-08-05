@@ -38,7 +38,7 @@ def send_provider_endorsement_message(sender, instance, created, **kwargs):
     try:
         send_email_to_user(context)
     except Exception as exc:
-        logger.exception("Error sending endorsement email: %s", exc)
+        logger.error("Error sending endorsement email: %s", exc)
     
 
 

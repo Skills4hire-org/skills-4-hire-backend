@@ -42,7 +42,7 @@ class AddressCreateSerializer(serializers.ModelSerializer):
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
-            logger.exception("Failed to create address for user %s: %s", getattr(user, 'id', None), e)
+            logger.error("Failed to create address for user %s: %s", getattr(user, 'id', None), e)
             raise serializers.ValidationError("Failed to create address")
         
 

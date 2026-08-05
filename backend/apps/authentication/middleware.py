@@ -60,7 +60,7 @@ class RateLimitOtpRequestMiddleware:
             logger.info("Extracted remote address for user")
             return ip_address
         except Exception as exc:
-            logger.exception("error occurred while extractin ip_address %s", exc, exc_info=True)
+            logger.error("error occurred while extractin ip_address %s", exc, exc_info=True)
             raise HttpResponseNotFound(content="Ip_address not found")
     
     def create_cache_keys(self, request):

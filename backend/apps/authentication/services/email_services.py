@@ -34,9 +34,9 @@ def send_mail_base(context: dict, from_email: str = f"Skills4Hire <{settings.DEF
             html_message=html_content,
         )
     except KeyError:
-        logger.exception("Missing keys in email context")
+        logger.error("Missing keys in email context")
         raise 
     except Exception as e:
-        logger.exception("Error preparing email: %s", e)
+        logger.error("Error preparing email: %s", e)
         raise Exception("Error preparing email")
 

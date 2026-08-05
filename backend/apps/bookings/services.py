@@ -56,7 +56,7 @@ class BookingService:
                 transaction_status = True
         except Exception as e:
             transaction_status = False
-            logger.exception("Error processing payment: %s", e)
+            logger.error("Error processing payment: %s", e)
 
         transaction.on_commit(lambda: process_transaction(
                 booking_id=booking.pk, action=BookingTransaction.Type.RELEASE, 
@@ -119,7 +119,7 @@ class BookingService:
                     # create transaction
                     transaction_status = True
             except Exception as e:
-                logger.exception("Failed to reverse booking: %s", e)
+                logger.error("Failed to reverse booking: %s", e)
                 transaction_status = False
             
             process_transaction(

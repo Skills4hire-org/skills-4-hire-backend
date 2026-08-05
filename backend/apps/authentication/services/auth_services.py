@@ -21,7 +21,7 @@ def verify_google_token(token: str) -> dict[str, any]:
         }
 
     except Exception as exc:
-        logger.exception("Google token verification failed")
+        logger.error("Google token verification failed")
         return {
             "status": False,
             "message": "Failed to verify Google token",

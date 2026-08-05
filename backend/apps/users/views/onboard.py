@@ -56,7 +56,7 @@ class OnboardCompleteViewSet(viewsets.GenericViewSet):
                 status_code=status.HTTP_200_OK,
             )
         except Exception as exc:
-            logger.exception("Failed to complete onboarding for user %s", user)
+            logger.error("Failed to complete onboarding for user %s", user)
             return error_response(
                 message="Failed to update profile",
                 status_code=status.HTTP_400_BAD_REQUEST,

@@ -28,7 +28,7 @@ class RegistrationsService(BaseService):
 
         except Exception as exc:
             logger = logging.getLogger(__name__)
-            logger.exception("Registration service error: %s", exc)
+            logger.error("Registration service error: %s", exc)
             raise
         
         return user

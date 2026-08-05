@@ -22,7 +22,7 @@ class CustomerService:
         except Exception as e:
             import logging
             logger = logging.getLogger(__name__)
-            logger.exception("Failed to create customer profile for base profile %s: %s", getattr(user_base_profile, 'id', None), e)
+            logger.error("Failed to create customer profile for base profile %s: %s", getattr(user_base_profile, 'id', None), e)
             raise ValueError("Failed to create customer profile")
         return customer_profile
 

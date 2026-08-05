@@ -44,7 +44,7 @@ def _generate_code():
         new_code = "".join(random.choice(generate_from) for _ in range(max_code))
         return new_code
     except Exception:
-        logger.exception("Exception while generating otp code", exc_info=True)
+        logger.error("Exception while generating otp code", exc_info=True)
         raise Exception()
 
 @retry_on_failure(max_retries)

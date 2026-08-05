@@ -129,7 +129,7 @@ class RegistrationsSerializer(serializers.Serializer):
                 raise serializers.ValidationError(_("your password do not match"))
 
         except (Exception, TypeError) as exc:
-            logger.exception("Error while checking password")
+            logger.error("Error while checking password")
             raise serializers.ValidationError(_("Error while checking password"))
 
         for field in ("first_name", "last_name"):
@@ -153,7 +153,7 @@ class RegistrationsSerializer(serializers.Serializer):
         try:
             self._normalize_and_validate_password(value)
         except Exception as exc:
-            logger.exception("Password validation error: %s", exc)
+            logger.error("Password validation error: %s", exc)
             raise serializers.ValidationError("Error validating password")
         return value
 
@@ -161,7 +161,7 @@ class RegistrationsSerializer(serializers.Serializer):
         try:
             self._normalize_and_validate_password(value)
         except Exception as exc:
-            logger.exception("Confirm password validation error: %s", exc)
+            logger.error("Confirm password validation error: %s", exc)
             raise serializers.ValidationError("Error validating confirm password")
         return value
 
@@ -201,7 +201,7 @@ class RegistrationsSerializer(serializers.Serializer):
                    
             return user
         except Exception as exc :
-            logger.exception("User creation failed: %s", exc)
+            logger.error("User creation failed: %s", exc)
             raise serializers.ValidationError("User creation failed")
 
 class AccountVerificationSerializer(serializers.Serializer):
@@ -405,5 +405,5 @@ class SocialAuthSerializer(serializers.Serializer):
             user.save()
             return response
         except Exception as exc:
-            logger.exception("Social authentication create failed: %s", exc)
+            logger.error("Social authentication create failed: %s", exc)
             raise serializers.ValidationError("Social authentication failed")

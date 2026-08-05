@@ -21,5 +21,5 @@ def create_notification(event: str, message: str, sender, receiver):
             Notification.objects.create(sender=sender, receiver=receiver, event=event, content=message)
             logger.info(f"Notification created for user {receiver.email} with event {event}")
     except Exception as e:
-        logger.exception("Error creating notification: %s", e)
+        logger.error("Error creating notification: %s", e)
         raise Exception(_("Error creating notification service"))

@@ -168,7 +168,7 @@ class ProfileViewSet(viewsets.GenericViewSet):
             except Exception as error:
                 import logging
                 logger = logging.getLogger(__name__)
-                logger.exception("Failed to clear cover photo for profile %s: %s", getattr(base_profile, 'id', None), error)
+                logger.error("Failed to clear cover photo for profile %s: %s", getattr(base_profile, 'id', None), error)
                 return error_response(message="Invalid profile", status_code=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
     @action(methods=['get', 'patch'], detail=False, url_path="me")

@@ -49,7 +49,7 @@ class WalletViewSet(viewsets.GenericViewSet):
             raise ValidationError("User wallet not found!")
         
         except Exception as e:
-            logger.exception("Failed to fetch user wallet for user %s", self.request.user)
+            logger.error("Failed to fetch user wallet for user %s", self.request.user)
             raise ValidationError("Failed to fetch user wallet")
         
 
@@ -222,7 +222,7 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
         try:
             payload = json.loads(request.body)
         except json.JSONDecodeError as exc:
-            logger.exception("Invalid webhook payload")
+            logger.error("Invalid webhook payload")
             return error_response(
                 message="Invalid webhook payload",
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -291,7 +291,7 @@ class WalletTransactionViewSet(viewsets.GenericViewSet):
             webhook_event.save(update_fields=["status", "processed_at"])
 
         except Exception as exc:
-            logger.exception("Paystack webhook: handler failed for %s (%s): %s", event, payment_reference, exc)
+            logger.error("Paystack webhook: handler failed for %s (%s): %s", event, payment_reference, exc)
 
             webhook_event.status = WebhookEvent.Status.FAILED
             webhook_event.error = "Webhook handler failed"

@@ -42,7 +42,7 @@ class FavouriteAddSerializer(serializers.ModelSerializer):
             favourite.providers.add(provider)
 
         except Exception as exc:
-            logger.exception("Failed to add favourite for user %s", current_user)
+            logger.error("Failed to add favourite for user %s", current_user)
             raise serializers.ValidationError("Failed to add favourite")
         
         return validated_data
@@ -52,7 +52,7 @@ class FavouriteAddSerializer(serializers.ModelSerializer):
             provider = validated_data['provider']
             instance.providers.remove(provider)
         except Exception as exc:
-            logger.exception("Failed to remove favourite for user %s", current_user)
+            logger.error("Failed to remove favourite for user %s", current_user)
             raise serializers.ValidationError("Failed to remove favourite")
         return instance
     
