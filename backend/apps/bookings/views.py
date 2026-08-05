@@ -81,7 +81,7 @@ class BookingViewSet(viewsets.ModelViewSet):
             else:
                 broadcast_notification("booking_rejected", {'booking': saved_booking})
         except Exception as exc:
-            logger.exception("Exception while broadcasting message to websocket: %s", exc)
+            logger.error("Exception while broadcasting message to websocket: %s", exc)
 
         output_serializer = BookingSerializer(saved_booking).data
         return api_response(
@@ -122,7 +122,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         try:
             broadcast_notification("booking_made", {'booking': created_booking})
         except Exception as exc:
-            logger.exception("Failed to broadcast message to consumer: %s", exc)
+            logger.error("Failed to broadcast message to consumer: %s", exc)
 
         output_serializer = BookingSerializer(created_booking).data
         return api_response(

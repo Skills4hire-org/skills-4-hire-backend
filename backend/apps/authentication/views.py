@@ -98,7 +98,7 @@ class AccountVerificationViewSet(viewsets.ModelViewSet):
             code_instance = _get_code_instance_or_none(code)
             account_verifed = verify_account(code_instance=code_instance, user=code_instance.user)
         except Exception as e:
-            logger.exception("Account verification failed")
+            logger.error("Account verification failed")
             return error_response(
                 message="Account verification failed",
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -143,7 +143,7 @@ class ResendOtpViewSet(viewsets.ModelViewSet):
             )
         
         except Exception as exc:
-            logger.exception("Error sending OTP")
+            logger.error("Error sending OTP")
             return error_response(
                 message="Error sending OTP",
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -201,7 +201,7 @@ class PasswordResetConfirmViewSet(viewsets.ModelViewSet):
 
             blacklist_outstanding_token(user)
         except Exception as e:
-            logger.exception("Error while updating password")
+            logger.error("Error while updating password")
             return error_response(
                 message="Error while updating password",
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -243,7 +243,7 @@ class LogOutViewSet(viewsets.ModelViewSet):
 
 
         except Exception as exc:
-            logger.exception("Error while validating logout sessions")
+            logger.error("Error while validating logout sessions")
             return error_response(
                 message="Error occurred while validating logout sessions",
                 status_code=status.HTTP_400_BAD_REQUEST,

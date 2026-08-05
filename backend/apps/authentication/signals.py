@@ -31,7 +31,7 @@ def post_save_otp_after_account_registration(sender, instance, created, **kwargs
         send_email_to_user(context)
         logger.info(f"OTP created and email sent to user: {instance.email}")
     except Exception as e:
-        logger.exception("Error in post_save signal for %s: %s", instance.email, e)
+        logger.error("Error in post_save signal for %s: %s", instance.email, e)
 
 
 @receiver(post_save, sender=User)
@@ -69,7 +69,7 @@ def create_referral_code(sender, instance, created, **kwargs):
         if create['status']:
             logger.info("referral code created")
     except Exception as exc:
-        logger.exception("Failed to create referral code for user %s", instance)
+        logger.error("Failed to create referral code for user %s", instance)
         pass
     
 

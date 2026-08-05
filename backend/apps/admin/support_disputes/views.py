@@ -57,7 +57,7 @@ class SupportViewsets(viewsets.ModelViewSet):
                 status_code=200
             )
         except Exception as error:
-            logger.exception("Failed to assign support: %s", error)
+            logger.error("Failed to assign support: %s", error)
             return error_response(message='Internal Server Error', status_code=500)
 
     @action(methods=['patch'], detail=True, url_path=r"(?P<admin_action>[^/.]+)")
@@ -95,7 +95,7 @@ class SupportViewsets(viewsets.ModelViewSet):
                 status_code=200
             )
         except Exception as error:
-            logger.exception("Error performing admin action on support: %s", error)
+            logger.error("Error performing admin action on support: %s", error)
             return error_response(message="Internal Server Error", status_code=500)
 
 class ConversationViewsets(viewsets.ModelViewSet):
@@ -149,7 +149,7 @@ class ConversationViewsets(viewsets.ModelViewSet):
                 status_code=201
             )
         except Exception as error:
-            logger.exception("Failed to reply to support conversation: %s", error)
+            logger.error("Failed to reply to support conversation: %s", error)
             return error_response(message="Internal Server error", status_code=500)
 
             

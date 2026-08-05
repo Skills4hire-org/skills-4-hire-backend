@@ -169,7 +169,7 @@ class PostViewSet(viewsets.ModelViewSet):
             like_post = LikeService()
             new_like = like_post.create_like_post(post, user)
         except Exception as exc:
-            logger.exception("Failed to create a like for post %s", post.pk)
+            logger.error("Failed to create a like for post %s", post.pk)
             sts = False
             msg = "Failed to create like"
             code = 400
@@ -196,7 +196,7 @@ class PostViewSet(viewsets.ModelViewSet):
             like_post = LikeService()
             new_like = like_post.unlike_post(post, request.user)
         except Exception as exc:
-            logger.exception("Failed to unlike post %s", post.pk)
+            logger.error("Failed to unlike post %s", post.pk)
             msg = "Failed to unlike post"
             sts = "failed"
             code = 400
@@ -239,7 +239,7 @@ class PostViewSet(viewsets.ModelViewSet):
                     status_code=status.HTTP_201_CREATED,
                 )
             except Exception as e:
-                logger.exception("Failed to repost post %s", post_instance.pk)
+                logger.error("Failed to repost post %s", post_instance.pk)
                 msg = "Failed to repost post"
                 sts = "failed"
                 code = 400
@@ -259,7 +259,7 @@ class PostViewSet(viewsets.ModelViewSet):
                         "repost_id", "reposted_by", "comment").order_by("-created_at")
             
         except Exception as e:
-            logger.exception("Failed to fetch reposts for post %s", post.pk)
+            logger.error("Failed to fetch reposts for post %s", post.pk)
             return error_response(
                 message="Failed to fetch reposts",
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -331,7 +331,7 @@ class CommentViewSet(viewsets.ModelViewSet):
                 status_code=status.HTTP_201_CREATED,
             )
         except Exception as e:
-            logger.exception("Failed to create comment")
+            logger.error("Failed to create comment")
             return error_response(
                 message="Internal Server Error",
                 status_code=500,
@@ -406,7 +406,7 @@ class CommentViewSet(viewsets.ModelViewSet):
                 )
 
             except Exception as e:
-                logger.exception("Failed to create reply")
+                logger.error("Failed to create reply")
                 return error_response(
                     message="Failed to create reply",
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -467,7 +467,7 @@ class CommentLikeViewSet(viewsets.GenericViewSet):
                 status_code=status.HTTP_200_OK,
             )
         except Exception as exc:
-            logger.exception("Failed to like comment %s", comment.pk)
+            logger.error("Failed to like comment %s", comment.pk)
             return error_response(
                 message="Failed to like comment",
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -483,7 +483,7 @@ class CommentLikeViewSet(viewsets.GenericViewSet):
 
             return Response(status=204)
         except Exception as exc:
-            logger.exception("Failed to unlike comment %s", comment.pk)
+            logger.error("Failed to unlike comment %s", comment.pk)
             return error_response(
                 message="Failed to unlike comment",
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -580,7 +580,7 @@ class FeedListView(ListAPIView):
             try:
                 cached_response = cache.get(cache_key)
             except Exception as error:
-                logger.exception("Feed cache read failed for key %s: %s", cache_key, error)
+                logger.error("Feed cache read failed for key %s: %s", cache_key, error)
                 cached_response = None
 
             if cached_response is not None:
@@ -624,12 +624,12 @@ class FeedListView(ListAPIView):
                 cache.set(cache_key, paginated_response.data, self.CACHE_TTL_SECONDS)
                 logger.info(f"Cached Response for key {cache_key}")
             except Exception as error:
-                logger.exception("Feed cache write failed for key %s: %s", cache_key, error)
+                logger.error("Feed cache write failed for key %s: %s", cache_key, error)
 
             return api_response(data=paginated_response.data)
 
         except Exception as e:
-            logger.exception("Error generating feed for user %s: %s", request.user.id, e)
+            logger.error("Error generating feed for user %s: %s", request.user.id, e)
             return error_response(
                 message='Failed to generate feed',
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -660,7 +660,7 @@ class FeedListView(ListAPIView):
                 
         except Exception as e:
             # Don't fail the feed request if impression tracking fails
-            logger.exception("Failed to record feed impressions for user %s: %s", user.id, e)
+            logger.error("Failed to record feed impressions for user %s: %s", user.id, e)
 
 class PostInteractionViewSet(viewsets.ViewSet):
     """
@@ -749,7 +749,7 @@ class PostInteractionViewSet(viewsets.ViewSet):
                 )
                 
         except Exception as e:
-            logger.exception("Error recording interaction for user %s, post %s: %s", request.user.id, post_id, e)
+            logger.error("Error recording interaction for user %s, post %s: %s", request.user.id, post_id, e)
             return error_response(
                 message='Failed to record interaction',
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -776,7 +776,7 @@ class PostInteractionViewSet(viewsets.ViewSet):
             post.save(update_fields=['engagement_count'])
             
         except Exception as e:
-            logger.exception("Error updating engagement count for post %s: %s", post.post_id, e)
+            logger.error("Error updating engagement count for post %s: %s", post.post_id, e)
 
 class ExternalJobApplication(viewsets.ModelViewSet):
     http_method_names = ['get']

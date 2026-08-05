@@ -91,7 +91,7 @@ class DepositSerializer(serializers.ModelSerializer):
             if not isinstance(value, uuid.UUID):
                 raise serializers.ValidationError("Not a valid uuid instance 'idempotency key'")
         except Exception as e:
-            logger.exception("Error validating idempotency_key")
+            logger.error("Error validating idempotency_key")
             raise serializers.ValidationError("Error validating idempotency_key")
         return value
     
@@ -162,7 +162,7 @@ class RessolveBankSerializer(serializers.ModelSerializer):
             ressolve_service = PaystackService()
             response = ressolve_service.ressolve_bank(account_number, bank_code)
         except PaystackError as exc:
-            logger.exception("Failed to resolve bank account for user %s", user)
+            logger.error("Failed to resolve bank account for user %s", user)
             raise serializers.ValidationError("Failed to resolve bank account")
         
         if response['status']:
@@ -244,7 +244,7 @@ class TransferRecepientSerializer(serializers.ModelSerializer):
             )
 
         except PaystackError as exc:
-            logger.exception("Failed to create transfer recipient for account %s", account_number)
+            logger.error("Failed to create transfer recipient for account %s", account_number)
             raise serializers.ValidationError("Failed to create transfer recipient")
         
         if not create_receipient['status']:
@@ -316,7 +316,7 @@ class WithDrawalSerializer(serializers.ModelSerializer):
                 transaction_instance = super().create(validated_data)
         
         except Exception as exc:
-            logger.exception("Failed to create withdrawal transaction for user %s", user)
+            logger.error("Failed to create withdrawal transaction for user %s", user)
             raise serializers.ValidationError("Failed to create withdrawal transaction")
         
         # process transfer transaction ( transaction_id, recipient_code)

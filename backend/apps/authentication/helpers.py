@@ -56,7 +56,7 @@ def send_email_to_user(context: dict, from_email: str = None):
         logger.info(f"Email message queened for {email}")
         return {"success": True, "message": "Email sent to queue successfully"}
     except Exception as e:
-        logger.exception("Exception while sending email.", exc_info=True)
+        logger.error("Exception while sending email.", exc_info=True)
         raise
 
 def blacklist_outstanding_token(user):
@@ -75,7 +75,7 @@ def blacklist_outstanding_token(user):
         logger.debug(f"Blacklist {outstanding_tokens.count()} token")
 
     except Exception as exc:
-        logger.exception("Error blacklisting tokens for user %s", user)
+        logger.error("Error blacklisting tokens for user %s", user)
         raise ValidationError("Error blacklisting tokens")
 
 def validate_email(email, check_deliverability=False):

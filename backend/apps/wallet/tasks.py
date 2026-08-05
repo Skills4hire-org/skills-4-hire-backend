@@ -54,7 +54,7 @@ def process_deposit(wallet_transaction_id: uuid.UUID) -> dict:
         return initialize_payment
 
     except Exception as exc:
-        logger.exception(
+        logger.error(
             "Unexpected error processing withdrawal %s: %s", wallet_transaction.pk, exc
         )
 
@@ -87,7 +87,7 @@ def verify_deposit_status(self, webhook_data: dict):
             service = PaystackService()
             verify_transaction = service.verify_deposit(payment_reference)
         except Exception as exc:
-            logger.exception("Error verifying payment")
+            logger.error("Error verifying payment")
             # self.request.retry(exc=exc)
             return 
 
@@ -249,7 +249,7 @@ def process_withdrawal_verifications(self, webhook_data):
         return {"status": True, "message": "transaction_processed"}
     
     except Exception as exc:
-        logger.exception("Retrying task due to exception: %s", exc)
+        logger.error("Retrying task due to exception: %s", exc)
         return self.retry(exc=exc, countdown=60 * 3)
 
 

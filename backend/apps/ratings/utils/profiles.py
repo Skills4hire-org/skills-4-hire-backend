@@ -20,7 +20,7 @@ def get_profile_by_id(profile_id: uuid) -> dict:
     #         profile = get_object_or_404(BaseProfile, pk=profile_id.strip())
 
     # except Exception:
-    #     logger.exception("CANT_FETCH_PROFILE_DATA")
+    #     logger.error("CANT_FETCH_PROFILE_DATA")
        
     # return profile
 

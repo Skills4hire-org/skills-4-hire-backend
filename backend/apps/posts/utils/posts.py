@@ -24,7 +24,7 @@ def get_post_by_id(post_id):
             post_instance = get_object_or_404(Post, pk=post_id, is_active=True, is_deleted=False)
 
     except Exception as exc :
-        logger.exception("Error retrieving post with ID %s", post_id)
+        logger.error("Error retrieving post with ID %s", post_id)
         return {"success": False, "msg": "POST_RETRIEVAL_FAILED"}
     
     return {"success": True, "post": post_instance}
@@ -39,7 +39,7 @@ def validate_url(url: str) -> tuple[bool, str]:
             return True, url
         return False, "Not Valid url"
     except requests.RequestException as e:
-        logger.exception("Error validating URL %s: %s", url, e)
+        logger.error("Error validating URL %s: %s", url, e)
         return False, "URL validation failed"
 
 def can_make_post(user: str, post_type: int) -> bool:

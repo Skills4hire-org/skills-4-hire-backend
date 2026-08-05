@@ -73,7 +73,7 @@ def custom_exception_handler(exc, context):
     # If DRF could not handle the exception it's an internal server error.
     if response is None:
         # Log full exception details server-side for review (including traceback)
-        logger.exception("Unhandled exception in request: %s", exc)
+        logger.error("Unhandled exception in request: %s", exc)
         # Build a sanitized 500 response without exposing internal details
         response = Response(
             {
@@ -109,7 +109,7 @@ def custom_exception_handler(exc, context):
         errors = data
     else:
         # Non-DRF exceptions that reached here are unexpected; log and sanitize.
-        logger.exception("Unexpected exception handled: %s", exc)
+        logger.error("Unexpected exception handled: %s", exc)
         message = data.get("detail", "An error occurred") if isinstance(data, dict) else "An error occurred"
         errors = {} if status_code >= 500 else data
 
