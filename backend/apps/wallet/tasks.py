@@ -249,8 +249,7 @@ def process_withdrawal_verifications(self, webhook_data):
         return {"status": True, "message": "transaction_processed"}
     
     except Exception as exc:
-
-        logger.info("retrying tasks on exceptions: "+ str(exc))
+        logger.exception("Retrying task due to exception: %s", exc)
         return self.retry(exc=exc, countdown=60 * 3)
 
 

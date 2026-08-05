@@ -32,6 +32,7 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Service
         fields = [
+            "name", "description", "features",
             "services", "attachments",
             "years_of_experience",
             "charge", "is_default",
@@ -51,7 +52,8 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
         profile = user.profile.provider_profile
 
         service = Service.objects.create(profile=profile, **validated_data)
-        service.services.set(services)
+        if services:
+            service.services.set(services)
         if attachments_data:
             ServiceAttachment.objects.bulk_create(
                 [
@@ -71,9 +73,10 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
         services = validated_data.pop("services", [])
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
-        instance.services.set(services)
-        instance.save()
 
+        if services:
+            instance.services.set(services)
+        instance.save()
         if attachments_data is not None:
             # delete all existing attachments in a single query
             instance.attachments.delete()
@@ -92,7 +95,6 @@ class ServiceCreateSerializer(serializers.ModelSerializer):
         return instance
     
 class ServiceCategorySerializer(serializers.ModelSerializer):
-
     class Meta:
         model = ServiceCategory
         fields = [

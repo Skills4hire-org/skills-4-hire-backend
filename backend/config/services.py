@@ -47,7 +47,10 @@ def test_email(request):
             fail_silently=False,
         )
     except Exception as e:
-        raise ValidationError(f"Error: {e}")
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.exception("Failed to send test email: %s", e)
+        raise ValidationError("Failed to send test email")
 
     return JsonResponse(data={'message':"Sent"})
     

@@ -224,8 +224,9 @@ class OpenSupportRoomView(generics.GenericAPIView):
                 status_code=201
             )
         except Exception as exc:
+            logger.exception("Failed to open support room")
             return error_response(
-                message=str(exc),
+                message="Failed to open support room",
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 

@@ -30,6 +30,6 @@ def provider_profile(pk: UUID) -> ProviderModel:
         logger.exception("Error fetching porvider profile")
         raise 
     except Exception as e:
-        logger.exception(f"Error fetching base Profile: Error: {str(e)}")
+        logger.exception("Error fetching base Profile: %s", e)
         raise ValidationError("Failed to fetch provider profile")
     return provider_profile

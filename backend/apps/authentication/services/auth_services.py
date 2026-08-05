@@ -2,6 +2,9 @@ from django.conf import settings
 
 from google.oauth2 import id_token
 from google.auth.transport import requests
+import logging
+
+logger = logging.getLogger(__name__)
 
 request_instance = requests.Request()
 client_id = getattr(settings, 'GOOGLE_CLIENT_ID')
@@ -18,9 +21,10 @@ def verify_google_token(token: str) -> dict[str, any]:
         }
 
     except Exception as exc:
+        logger.exception("Google token verification failed")
         return {
             "status": False,
-            "message": str(exc)
+            "message": "Failed to verify Google token",
         }
 
 def google_auth(token: str) -> dict[str, any]:

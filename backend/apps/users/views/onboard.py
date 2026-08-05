@@ -5,6 +5,9 @@ from rest_framework.decorators import action
 from apps.core.exceptions import api_response, error_response
 from ..serializers.onboard import OnboardingSerializer
 from ..serializers.profiles import ProviderProfileUpdateCreateSerializer, BaseProfileCreateSerializer
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class OnboardViewSet(viewsets.ModelViewSet):
@@ -53,7 +56,8 @@ class OnboardCompleteViewSet(viewsets.GenericViewSet):
                 status_code=status.HTTP_200_OK,
             )
         except Exception as exc:
+            logger.exception("Failed to complete onboarding for user %s", user)
             return error_response(
-                message=str(exc),
+                message="Failed to update profile",
                 status_code=status.HTTP_400_BAD_REQUEST,
             )

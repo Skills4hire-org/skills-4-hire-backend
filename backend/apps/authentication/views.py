@@ -33,6 +33,9 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from django.conf import settings
 from django.db import transaction
+import logging
+
+logger = logging.getLogger(__name__)
 
 BASE_URL = getattr(settings, "BASE_URL")
 
@@ -95,8 +98,9 @@ class AccountVerificationViewSet(viewsets.ModelViewSet):
             code_instance = _get_code_instance_or_none(code)
             account_verifed = verify_account(code_instance=code_instance, user=code_instance.user)
         except Exception as e:
+            logger.exception("Account verification failed")
             return error_response(
-                message=f"Account verification failed: {e}",
+                message="Account verification failed",
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
         if account_verifed:
@@ -139,8 +143,9 @@ class ResendOtpViewSet(viewsets.ModelViewSet):
             )
         
         except Exception as exc:
+            logger.exception("Error sending OTP")
             return error_response(
-                message=f"Error sending OTP: {exc}",
+                message="Error sending OTP",
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 
@@ -196,8 +201,9 @@ class PasswordResetConfirmViewSet(viewsets.ModelViewSet):
 
             blacklist_outstanding_token(user)
         except Exception as e:
+            logger.exception("Error while updating password")
             return error_response(
-                message=f"Error while updating password: {e}",
+                message="Error while updating password",
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
         
@@ -237,9 +243,9 @@ class LogOutViewSet(viewsets.ModelViewSet):
 
 
         except Exception as exc:
+            logger.exception("Error while validating logout sessions")
             return error_response(
                 message="Error occurred while validating logout sessions",
-                errors={"exceptions": str(exc)},
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
 

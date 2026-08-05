@@ -27,7 +27,8 @@ class RegistrationsService(BaseService):
             user = self.serializer.save()
 
         except Exception as exc:
-            logging.error(f"error occurred: {exc}")
-            raise exc
+            logger = logging.getLogger(__name__)
+            logger.exception("Registration service error: %s", exc)
+            raise
         
         return user

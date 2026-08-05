@@ -4,7 +4,6 @@ from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password as _validate_password
 from django.db import transaction
 from django.utils import  timezone
-from django.db.models import Avg, Count
 from django.db.models import Q
 
 from rest_framework.exceptions import AuthenticationFailed
@@ -19,8 +18,6 @@ from .utils.helpers import (create_otp_for_user)
 from .helpers import send_email_to_user, logger
 from .utils.template_helpers import genrate_context_for_otp
 
-
-from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -125,19 +122,19 @@ class RegistrationsSerializer(serializers.Serializer):
         try:
             password = attrs.get("password")
             confirm_password = attrs.get("confirm_password")
-            if password and confirm_password:
-                if password.strip() != confirm_password.strip():
-                    raise serializers.ValidationError(_("your password do not match"))
-            elif not password or  not confirm_password:
-                raise serializers.ValidationError({"Password": _("Both password fields are required")})
+            if not password or  not confirm_password:
+                            raise serializers.ValidationError({"Password": _("Both password fields are required")})
+            
+            if password.strip() != confirm_password.strip():
+                raise serializers.ValidationError(_("your password do not match"))
+
         except (Exception, TypeError) as exc:
-            raise serializers.ValidationError(_(f"Error while checking password: {exc}"))
+            logger.exception("Error while checking password")
+            raise serializers.ValidationError(_("Error while checking password"))
 
         for field in ("first_name", "last_name"):
             value = attrs.get(field)
             attrs[field] = value.title() if value else None
-
-
         return attrs
 
 
@@ -156,14 +153,16 @@ class RegistrationsSerializer(serializers.Serializer):
         try:
             self._normalize_and_validate_password(value)
         except Exception as exc:
-            raise serializers.ValidationError(f"error occurred:{exc}")
+            logger.exception("Password validation error: %s", exc)
+            raise serializers.ValidationError("Error validating password")
         return value
 
     def validate_confirm_password(self, value):
         try:
             self._normalize_and_validate_password(value)
         except Exception as exc:
-            raise serializers.ValidationError(f"error occurred: {exc}")
+            logger.exception("Confirm password validation error: %s", exc)
+            raise serializers.ValidationError("Error validating confirm password")
         return value
 
 
@@ -202,8 +201,8 @@ class RegistrationsSerializer(serializers.Serializer):
                    
             return user
         except Exception as exc :
-            logging.error(_(f"user creation failed: {exc}"))
-            raise serializers.ValidationError(f"User creation Failed: {exc}")
+            logger.exception("User creation failed: %s", exc)
+            raise serializers.ValidationError("User creation failed")
 
 class AccountVerificationSerializer(serializers.Serializer):
     """
@@ -333,27 +332,6 @@ class CustomLogoutSerializer(serializers.Serializer):
         "bad_token": _("Token is invalid or expired")
     }
 
-    def get_user_from_token(token: str):
-        token = RefreshToken(token=token)
-        return token.get("user_id")
-    
-    def validate(self, attrs):
-        data = super().validate(attrs)
-        request = self.context.get("request")
-        user = request.user 
-        if user is None or "Anonymous": 
-            raise serializers.ValidationError(_("Authentication credentials were not provided"), code="invali_request")
-        token = attrs.get("refresh_token")
-        user_id = self.get_user_from_token(token)
-        if user_id != user.pk:
-            raise serializers.ValidationError(_("Invalid Request. refresh token is Invalid"), code="refresh_token_invalid")
-        with transaction.atomic():
-            outstanding_tokens = OutstandingToken.objects.filter(user=user).all()
-            # black list all outstanding token for this user
-            BlacklistedToken.objects.bulk_create(
-                BlacklistedToken(token=token) for token in outstanding_tokens
-            )
-        return attrs
 
 class UserReadSerializer(serializers.ModelSerializer):
     from apps.users.serializers.profiles import BaseProfileListSerializer
@@ -427,4 +405,5 @@ class SocialAuthSerializer(serializers.Serializer):
             user.save()
             return response
         except Exception as exc:
-            raise serializers.ValidationError(str(exc))
+            logger.exception("Social authentication create failed: %s", exc)
+            raise serializers.ValidationError("Social authentication failed")

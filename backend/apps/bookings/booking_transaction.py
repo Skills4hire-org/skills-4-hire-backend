@@ -78,7 +78,7 @@ def process_transaction(booking_id: UUID, action, status: bool):
 
             return booking_transaction
         except Exception as exc:
-            logger.exception(f"Failed to process booking transaction: {exc}", exc_info=True)
+            logger.exception("Failed to process booking transaction: %s", exc)
             raise Exception(exc)
     
 

@@ -76,8 +76,8 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             return api_response(data=serializer.data)
         
         except Exception as error:
-            logger.error("[admin] Failed fetching referrals: "+ error)
-            return error_response(errors=error, status_code=500)
+            logger.exception("[admin] Failed fetching referrals: %s", error)
+            return error_response(message="Failed to fetch referrals", status_code=500)
     
     @action(methods=["patch", "delete"], detail=True, url_path=r"(?P<admin_action>[^/.]+)")
     def action(self, request, pk=None, admin_action: str = None):
@@ -102,5 +102,5 @@ class UserManagementViewSet(viewsets.ModelViewSet):
                 logger.info(f"[admin]: failed all admin action")
                 return api_response(data={}, message="Invalid Request", status_code=400)
         except Exception as error:
-            logger.error(f"[admin]: Error {admin_action} user acount: Reason: {error}")
-            return error_response(message="Internal Server Error", errors= error, status=500)
+            logger.exception("[admin]: Error %s user account: %s", admin_action, error)
+            return error_response(message="Internal Server Error", status_code=500)

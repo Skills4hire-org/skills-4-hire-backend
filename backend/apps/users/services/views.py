@@ -75,7 +75,10 @@ class ServiceViewSet(viewsets.ModelViewSet):
         try:
             user_profile = request.user.profile.provider_profile
         except Exception as e:
-            return error_response(message=str(e), errors=e)
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception("Failed to fetch authenticated user's services: %s", e)
+            return error_response(message="Failed to fetch authenticated user's services")
         queryset = self.filter_queryset(self.get_queryset()).filter(profile=user_profile)
         if queryset is None:
             return api_response(data={}, message="success")

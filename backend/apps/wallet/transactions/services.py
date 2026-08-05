@@ -18,9 +18,15 @@ class WalletTransactionService:
                     **validated_data
                 )
         except DuplicateTransactionError as e:
-            return {"status": False, "transaction": None, "reason": str(e)}
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception("Duplicate wallet transaction: %s", e)
+            return {"status": False, "transaction": None, "reason": "Duplicate transaction"}
         except Exception as e:
-            return {"status": False, "transaction": None, 'reason': f"{str(e)}"}
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.exception("Error creating wallet transaction: %s", e)
+            return {"status": False, "transaction": None, 'reason': "Wallet transaction failed"}
         
         return {"status": True, "transaction": wallet_transaction}
     

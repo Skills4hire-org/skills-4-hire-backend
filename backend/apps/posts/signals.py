@@ -37,7 +37,7 @@ def update_engagement_on_interaction(sender, created, instance, **kwargs):
             post.save(update_fields=['engagement_count'])
             
     except Exception as e:
-        logger.error(f"Error updating engagement count on interaction: {e}")
+        logger.exception("Error updating engagement count on interaction: %s", e)
 
 
 @receiver(post_delete, sender=UserPostInteraction)
@@ -59,7 +59,7 @@ def update_engagement_on_interaction_delete(sender, instance, **kwargs):
         post.save(update_fields=['engagement_count'])
         
     except Exception as e:
-        logger.error(f"Error updating engagement count on interaction delete: {e}")
+        logger.exception("Error updating engagement count on interaction delete: %s", e)
 
 
 @receiver(post_save, sender=Repost)
@@ -84,7 +84,7 @@ def update_engagement_on_repost(sender, created, instance, **kwargs):
         post.save(update_fields=['engagement_count'])
         
     except Exception as e:
-        logger.error(f"Error updating engagement count on repost: {e}")
+        logger.exception("Error updating engagement count on repost: %s", e)
 
 
 @receiver(post_save, sender=Likes)
@@ -109,7 +109,7 @@ def update_engagement_on_like(sender, created, instance, **kwargs):
         post.save(update_fields=['engagement_count'])
         
     except Exception as e:
-        logger.error(f"Error updating engagement count on like: {e}")
+        logger.exception("Error updating engagement count on like: %s", e)
 
 
 @receiver(post_save, sender=Comment)
@@ -133,7 +133,7 @@ def update_engagement_on_comment(sender, created, instance, **kwargs):
         post.save(update_fields=['engagement_count'])
         
     except Exception as e:
-        logger.error(f"Error updating engagement count on comment: {e}")
+        logger.exception("Error updating engagement count on comment: %s", e)
 
 
 # ========== TRUST SCORE SIGNALS ==========
@@ -169,7 +169,7 @@ def update_trust_score_on_booking_completion(sender, instance, created, **kwargs
             logger.info(f"Updated trust score for user {provider_user.id}: {trust_score:.3f}")
             
     except Exception as e:
-        logger.error(f"Error updating trust score on booking completion: {e}")
+        logger.exception("Error updating trust score on booking completion: %s", e)
 
 from ..chats.endorsements.models import Endorsements
 
@@ -196,7 +196,7 @@ def update_trust_score_on_endorsement(sender, instance, created, **kwargs):
             logger.info(f"Updated trust score for user {provider_user.id}: {trust_score:.3f}")
             
     except Exception as e:
-        logger.error(f"Error updating trust score on endorsement creation: {e}")
+        logger.exception("Error updating trust score on endorsement creation: %s", e)
 
 from ..ratings.models import ProfileReview
 
@@ -215,7 +215,7 @@ def update_trust_score_on_review(sender, instance, created, **kwargs):
             logger.info(f"Updated trust score for user {provider_user.id}: {trust_score:.3f}")
             
     except Exception as e:
-        logger.error(f"Error updating trust score on rating creation: {e}")
+        logger.exception("Error updating trust score on rating creation: %s", e)
                                 
 def update_user_last_active(sender, instance, created = None, **kwargs):
     """
@@ -242,7 +242,7 @@ def update_user_last_active(sender, instance, created = None, **kwargs):
             profile.save(update_fields=['last_active'])
             
     except Exception as e:
-        logger.error(f"Error updating user last_active: {e}")
+        logger.exception("Error updating user last_active: %s", e)
 
 
 post_save.connect(update_user_last_active, sender=Post)

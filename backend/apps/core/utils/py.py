@@ -60,5 +60,5 @@ def generate_thumbnails(url: str, start: int = 3, duration: int = 5, format: str
         return base_url
             
     except Exception as e:
-        logger.error(f"Error generating thumbnail for {url}: {e}")
+        logger.exception("Error generating thumbnail for %s: %s", url, e)
         return None
