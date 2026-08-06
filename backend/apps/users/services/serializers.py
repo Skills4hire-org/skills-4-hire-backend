@@ -121,5 +121,6 @@ class ServiceListSerializer(serializers.ModelSerializer):
             "service_id", "charge",
             "is_default", "years_of_experience",
             "is_active", "created_at", 
-            "attachments", "services"
+            "attachments", "services",
+            "name", "description", "features"
         ]

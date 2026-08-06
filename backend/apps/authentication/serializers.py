@@ -25,26 +25,6 @@ User = get_user_model()
 
 
 class RegistrationsSerializer(serializers.Serializer):
-    """
-    Serializer for handling new user registration.
-
-    This serializer validates user input for creating a new account, 
-    ensures password complexity, and hashes the password before saving 
-    to the database.
-
-    Fields:
-        
-        email (str): A valid email address for account notifications.
-        first_name: First name to fill account credentials
-        last_name: Last name to fill account credentials
-        phone: A unique phone number for account notifications
-        password (str): A write-only field for the account password.
-        password_confirm (str): A write-only field to verify the password.
-
-    Methods:
-        validate: Ensures that password and password_confirm match.
-        create: Handles the actual user creation and password hashing.
-    """
 
     email = serializers.EmailField(max_length=200)
     first_name = serializers.CharField(max_length=200)
@@ -66,37 +46,18 @@ class RegistrationsSerializer(serializers.Serializer):
         return data
 
     def validate_phone(self, value):
-        """
-        This method ensures that the provided email address does not already 
-        exist in the database and complies with company domain restrictions.
-        """
+
         if User.objects.filter(phone=value).exists():
-            raise serializers.ValidationError("Phone already exists", code="phone_exists")
+            raise serializers.ValidationError("Phone already exists")
         return value
     
-    def validate_email(self, value:str):
-        """
-        Check if the email is unique and belongs to an authorized domain.
-
-        This method ensures that the provided email address does not already 
-        exist in the database and complies with company domain restrictions.
-
-        Args:
-            value (str): The email address string provided by the user.
-
-        Returns:
-            str: The validated email address if all checks pass.
-
-        Raises:
-            serializers.ValidationError: If the email is already registered 
-                or uses a forbidden domain.
-        """ 
+    def validate_email(self, value:str): 
         email = value.strip().lower()
         valid_email = validate_email(email)
-        user = User.objects.filter(email=valid_email)
-        if user.exists():
+        user = User.objects.filter(email=valid_email).first()
+        if user:
             if user.is_verified and user.is_active:
-                raise serializers.ValidationError(_("email already exists"), code="email_exists")
+                raise serializers.ValidationError("email already exists and verified, try logging in")
             else:
                 # fallback to resending email when a user account isn't verified yet
                 code = create_otp_for_user(user)
@@ -105,31 +66,15 @@ class RegistrationsSerializer(serializers.Serializer):
         return valid_email
 
     def validate(self, attrs):
-        """
-        Normalize the `first_name` and `last_name` fields in the given attributes
-        dictionary by converting them to title case.
-
-        If a name field is missing, empty, or falsy, it will be set to None.
-        The function mutates and returns the same dictionary.
-
-        Args:
-            attrs (dict): A dictionary that may contain 'first_name' and 'last_name'.
-
-        Returns:
-            dict: The updated attributes dictionary with normalized name fields.
-        """
-    
         try:
             password = attrs.get("password")
             confirm_password = attrs.get("confirm_password")
-            if not password or  not confirm_password:
-                            raise serializers.ValidationError({"Password": _("Both password fields are required")})
             
             if password.strip() != confirm_password.strip():
-                raise serializers.ValidationError(_("your password do not match"))
+                raise serializers.ValidationError("your password do not match")
 
         except (Exception, TypeError) as exc:
-            logger.error("Error while checking password")
+            logger.error("Error while checking password: %s", exc)
             raise serializers.ValidationError(_("Error while checking password"))
 
         for field in ("first_name", "last_name"):
@@ -143,13 +88,6 @@ class RegistrationsSerializer(serializers.Serializer):
         return _validate_password(value.strip())
 
     def validate_password(self, value):
-        """
-        Validate and normalize the user's password.
-
-        Strips leading and trailing whitespace from the password and delegates
-        password strength and rule enforcement to the internal `_validate_password`
-        helper.
-        """
         try:
             self._normalize_and_validate_password(value)
         except Exception as exc:
@@ -167,31 +105,13 @@ class RegistrationsSerializer(serializers.Serializer):
 
 
     def create(self, validated_data):
-        """
-        Create a new user with the validated data.
-
-        This method ensures that the user is created using the `create_user` method,
-        which handles hashing passwords securely. It also includes basic logging and
-        error handling for edge cases.
-
-        Args:
-            validated_data (dict): A dictionary of validated data for creating the user.
-
-        Returns:
-            User: The newly created user object.
-
-        Raises:
-            ValidationError: If the user creation fails due to invalid data.
-        """
 
         try:
             confirm_password = validated_data.pop("confirm_password")
             referral_code = validated_data.pop("referral_code", None)
-            
             with transaction.atomic():
                 user = User.objects.create_user(**validated_data)
-            logging.info(_(f"A new user instance created: {user.full_name}"))
-
+            logging.info(f"A new user instance created: {user.full_name}")
             if referral_code is not None:
                     from ..referral.tasks import process_referral_attchement
 
@@ -217,8 +137,6 @@ class AccountVerificationSerializer(serializers.Serializer):
     code = serializers.CharField(max_length=50, write_only=True, required=True)
         
     def validate_code(self, value):
-        if not isinstance(value, str):
-            raise serializers.ValidationError(_(f"String instance expected, but got {type(value)}"))
         return value.strip()
     
     def validate(self, attrs):
@@ -227,13 +145,13 @@ class AccountVerificationSerializer(serializers.Serializer):
         code_instance = _get_code_instance_or_none(code=code)
        
         if code_instance is None:
-            raise serializers.ValidationError(_("OneTImePassword Not Found"), code="not_found")
+            raise serializers.ValidationError("Invalid OTP")
 
         if code_instance.is_expired():
-            raise serializers.ValidationError(_("Code Already expired"), code="expired")
+            raise serializers.ValidationError("OTP already expired")
         
         if not code_instance.is_active or code_instance.is_used:
-            raise serializers.ValidationError(_('code already expired'), code="invalid_code")
+            raise serializers.ValidationError("Invalid OTP")
         return attrs
 
 class ResendOtpSerializer(serializers.Serializer):
@@ -257,9 +175,9 @@ class PasswordResetConfirmSerializer(serializers.Serializer):
             raise serializers.ValidationError(_("OneTimePassword object not found"))
         
         if code_instance.is_expired():
-            raise serializers.ValidationError(_("code already expired"), code="expired")
+            raise serializers.ValidationError("OTP already expired")
         if not code_instance.is_active or code_instance.is_used:
-            raise serializers.ValidationError(_('code already expired'), code="invalid_code")
+            raise serializers.ValidationError('Invalid OTP')
 
         return code_instance
     
@@ -290,20 +208,18 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     def validate(self, attrs):
         password = attrs.get("password")
         email = attrs["email"]
-        valid_email = validate_email(email=email, check_deliverability=True)
+        valid_email = validate_email(email=email, check_deliverability=True).lower()
 
-        if valid_email is None:
-            raise serializers.ValidationError(_("email returned none when verifying email address"))
         try:
             user = User.objects.get(email=valid_email) 
         except User.DoesNotExist:
-            raise AuthenticationFailed(code="invalid_credentials", detail={"status": "Failed", "message": f"Invalid credentials"})
-        
+            raise AuthenticationFailed("Invalid credentials")
+
         if not self.user_can_authenticate(user):
-            raise AuthenticationFailed(code="invalid_request", detail={"status": "Failed", "detail": _("invalid credentials")})
+            raise AuthenticationFailed("Invalid Credentials")
         
         if not user.check_password(password):
-            raise AuthenticationFailed(code="invalid_credentials", detail={"status": "failed", "detail": _("invalid_credentials")})
+            raise AuthenticationFailed("Invalid credentials")
         
         self.user = user
         data = super().validate(attrs)
@@ -332,7 +248,6 @@ class CustomLogoutSerializer(serializers.Serializer):
         "bad_token": _("Token is invalid or expired")
     }
 
-
 class UserReadSerializer(serializers.ModelSerializer):
     from apps.users.serializers.profiles import BaseProfileListSerializer
     profile = BaseProfileListSerializer(read_only=True)
@@ -344,7 +259,6 @@ class UserReadSerializer(serializers.ModelSerializer):
             "is_provider", "is_customer",
             "is_verified", "profile"
         ]   
-
 
 class CustomRefreshToken(RefreshToken):
     @classmethod

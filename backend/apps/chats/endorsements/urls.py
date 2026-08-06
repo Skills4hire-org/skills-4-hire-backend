@@ -1,12 +1,11 @@
 from rest_framework.routers import DefaultRouter
 
 from django.urls import path, include
-from .views import EndorsementViewSet, EndorsementDetailViewSet
+from .views import EndorsementViewset
 
 router = DefaultRouter()
 
-router.register("endorsement", EndorsementViewSet, basename="endorse")
-router.register("endorsement-detail", EndorsementDetailViewSet, basename="endorse-detail")
+router.register("endorsement", EndorsementViewset, basename="endorse")
 
 endorsement_urlpatterns = [
     path("", include(router.urls))
