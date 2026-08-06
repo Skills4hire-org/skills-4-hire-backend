@@ -40,37 +40,13 @@ logger = logging.getLogger(__name__)
 BASE_URL = getattr(settings, "BASE_URL")
 
 class RegistrationViewSet(viewsets.ModelViewSet):
-    """
-    Handles registration-related HTTP POST requests.
-
-    This view accepts incoming registration data, validates it using a serializer, 
-    and then processes the registration through the associated service class.
-
-    Attributes:
-        http_method_names (list): Restricts the view to only accept POST requests.
-    """
 
     http_method_names = ["post"]
     permission_classes = [permissions.AllowAny]
 
-
     serializer_class = RegistrationsSerializer
 
     def create(self, request, *args, **kwargs):
-        """
-        Handles the POST request to register a new user.
-
-        This method accepts data from the request, validates it using the 
-        serializer, and then uses the registration service to process the registration.
-
-        Args:
-            request (Request): The HTTP request object containing user registration data.
-            *args: Additional positional arguments.
-            **kwargs: Additional keyword arguments.
-
-        Returns:
-            Response: A Response object with a success or error message.
-        """
 
         serializer = self.get_serializer(data=request.data)
 

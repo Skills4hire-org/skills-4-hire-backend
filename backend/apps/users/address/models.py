@@ -30,9 +30,7 @@ class UserAddress(models.Model):
 
     class Meta:
         verbose_name_plural = "User Addresses"
-        constraints = [
-            models.UniqueConstraint(fields=['postal_code', "user_profile"], name='unique_postal_code')
-        ]
+
     def __str__(self):
         return f"UserAddress: {self.user_profile.user.full_name} - {self.postal_code or None}"
 
@@ -43,13 +41,6 @@ class UserAddress(models.Model):
         if not is_valid:
             return False
         return True
-
-    def clean(self):
-        if self.postal_code:
-            if not UserAddress().validate_postal_code(self.postal_code):
-                logger.debug("Postal code not valid")
-                raise ValueError("postal code is invalid")
-        super().clean()
     
     def save(self, *args, **kwargs):
         self.full_clean()

@@ -38,6 +38,7 @@ def error_response(message="Validation failed", errors=None, status_code=status.
         for key, value in errors.items():
             if isinstance(value, (list, tuple)):
                 formatted_message += f"{key}: {', '.join(map(str, value))} "
+                break
             else:
                 formatted_message += f"{key}: {value} "
     elif isinstance(errors, (list, tuple)):
@@ -114,13 +115,15 @@ def custom_exception_handler(exc, context):
         errors = {} if status_code >= 500 else data
 
     # Build the string representation for message
-    error_response_str = ""
+    error_response_str = " "
     if isinstance(errors, dict):
         for key, value in errors.items():
-            if isinstance(value, list):
-                error_response_str += f"{key}: {', '.join(map(str, value))}: "
+            if isinstance(value, (list, tuple)):
+                error_response_str += ", ".join(value)
+                # return only the initial error
+                break
             else: 
-                error_response_str += f"{key}: {value} "
+                error_response_str += f"{value}, "
     elif isinstance(errors, list):
         error_response_str = ", ".join(map(str, errors))
     else:
@@ -131,7 +134,7 @@ def custom_exception_handler(exc, context):
         client_message = "An internal server error occurred."
         client_errors = {}
     else:
-        client_message = error_response_str.strip() or (message if isinstance(message, str) else "")
+        client_message = error_response_str.strip()
         client_errors = errors
 
     response.data = {

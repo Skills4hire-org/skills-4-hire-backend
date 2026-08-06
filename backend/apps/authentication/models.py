@@ -38,7 +38,7 @@ class UserManager(BaseUserManager):
         
         valid_email = self.normalize_email(email)
         if not valid_email:
-            raise ValueError("Email provided is invalid, check nd try again")
+            raise ValueError("Email provided is invalid, check and try again")
         
         user = self.model(email=valid_email, **extra_fields)
 

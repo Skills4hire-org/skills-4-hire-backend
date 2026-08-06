@@ -430,7 +430,6 @@ class RecommendationService:
         
         return boost
     
-    
     def _rank_and_boost(self, scored_posts: list) -> list:
         """
         Sort posts by score and apply active user boost.

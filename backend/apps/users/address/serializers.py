@@ -1,13 +1,8 @@
 from rest_framework import serializers
-from rest_framework.exceptions import PermissionDenied
-
 from .models import UserAddress
-from .services.address_services import AddressService
-# from ..serializers import BaseProfileReadSerializer
 from django.contrib.auth import get_user_model
 
 UserModel = get_user_model()
-
 
 class AddressCreateSerializer(serializers.ModelSerializer):
     class Meta:
@@ -29,34 +24,6 @@ class AddressCreateSerializer(serializers.ModelSerializer):
                 value.strip().title()
         return data
 
-    def create(self, validated_data):
-        user = self.context.get("request").user
-        user_base_profile = user.profile
-
-        try:
-            address = AddressService().create_address(
-                user_profile=user_base_profile,
-                validated_data=validated_data
-            )
-            return address
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.error("Failed to create address for user %s: %s", getattr(user, 'id', None), e)
-            raise serializers.ValidationError("Failed to create address")
-        
-
-    def update(self, instance: UserAddress, validated_data: dict):
-        user = self.context.get("request").user
-
-        if not instance.user_profile.user == user:
-            raise PermissionDenied()
-        validated_data.pop("user_profile_id")
-        for key, value in validated_data.items():
-            if hasattr(instance, key):
-                setattr(instance, key, value)
-        instance.save(update_fields=[validated_data.keys()])
-        return instance
 
 class AddressSerializer(serializers.ModelSerializer):
     user_profile_id = serializers.UUIDField(read_only=True, source="user_profile.pk")

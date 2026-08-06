@@ -69,7 +69,7 @@ class ServiceViewSet(viewsets.ModelViewSet):
         instance.save(update_fields=["deleted_at", "is_active", "updated_at"])
         return api_response(status_code=status.HTTP_204_NO_CONTENT)
 
-    @method_decorator(cache_page(60 * 5))
+
     @action(methods=['get'], detail=False)
     def auth_user_services(self, request, *args, **kwargs):
         try:
