@@ -126,7 +126,7 @@ class PostViewSet(viewsets.ModelViewSet):
                 updated_qs = list_posts(user, updated_qs)
         return updated_qs
 
-    @method_decorator(cache_page(60 * 5))
+    # @method_decorator(cache_page(60 * 5))
     def list(self, request, *args, **kwargs):
         """List posts (cached for a short period)."""
         return super().list(request, *args, **kwargs)
@@ -201,7 +201,7 @@ class PostViewSet(viewsets.ModelViewSet):
             sts = "failed"
             code = 400
         else:
-            msg="Unliked Post: "+ str(post.pk),
+            msg="Unliked Post",
             sts="success",
             code=200
         return api_response(

@@ -69,20 +69,19 @@ class GeneralPostSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         if not user or not user.is_authenticated:
             return False
-        
-        return obj.likes.filter(user=user).exists()
+        return obj.likes.filter(is_active=True, user=user).exists()
     
     def get_is_commented(self, obj):
         user = self.context['request'].user
         if not user:
             return False
-        return obj.comments.filter(user=user).exists()
+        return obj.comments.filter(is_active=True, user=user).exists()
     
     def get_is_reposted(self, obj):
         user = self.context['request'].user
         if not user:
             return False
-        return obj.repost_records.filter(reposted_by=user).exists()
+        return obj.repost_records.filter(is_active=True, reposted_by=user).exists()
 
 class ServicePostSerializer(GeneralPostSerializer):
 

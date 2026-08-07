@@ -370,14 +370,20 @@ class CustomerCreateUpdateSerializer(serializers.ModelSerializer):
         return updated_profile
 
 class CustomerProfileDetailSerializer(serializers.ModelSerializer):
-   
     user = serializers.SerializerMethodField()
+    endorsement_count = serializers.SerializerMethodField()
     class Meta:
         model = CustomerModel
         fields = [
             "customer_id", 'website',
             "user", "industry_name",
+            "endorsement_count"
         ]
+
+    def get_endorsement_count(self, obj):
+        endorsement: int = obj.profile.user.endorsed_by.filter(is_active=True).count()
+        return endorsement
+    
     def get_user(self, obj):
         from ...authentication.serializers import UserReadSerializer
         user = getattr(obj.profile, "user", None)
