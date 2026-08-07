@@ -63,7 +63,9 @@ class PostViewSet(viewsets.ModelViewSet):
     queryset = (
         Post.is_active_objects.filter(is_deleted=False)
         .select_related('user')
-        .prefetch_related('attachments', 'tags', "comments", "repost_records", "likes")
+        .prefetch_related('attachments', 'tags', "comments", 
+                          "repost_records", "likes", "user_interactions"
+        )
     )
     pagination_class = CustomPostPagination
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
@@ -694,7 +696,7 @@ class PostInteractionViewSet(viewsets.ViewSet):
     serializer_class = _drf_serializers.Serializer
     
     @action(detail=True, methods=['post'], url_path='interact')
-    def interact(self, request, post_id=None):
+    def interact(self, request, *args, **kwargs):
         """
         Record a user interaction with a post.
         
@@ -706,16 +708,21 @@ class PostInteractionViewSet(viewsets.ViewSet):
             Response with interaction details
         """
         # Get the post
+        post_id = kwargs.get("pk", None)
+        if post_id is None:
+            return error_response(
+                message="Invalid Post", 
+                status_code=404
+            )
         post = get_object_or_404(Post, post_id=post_id)
         
         # Get interaction type from request
         interaction_type = request.data.get('interaction_type', None)
-        if interaction_type not in [choice[0] for choice in UserPostInteraction.InteractionType.choices]:
+        if interaction_type.lower() not in  UserPostInteraction.InteractionType.values:
             return error_response(
                 message=f'Invalid interaction_type: {interaction_type}',
                 status_code=status.HTTP_400_BAD_REQUEST,
             )
-        
         try:
             with transaction.atomic():
                 # Record the interaction
@@ -726,14 +733,14 @@ class PostInteractionViewSet(viewsets.ViewSet):
                     defaults={'created_at': timezone.now()}
                 )
                 
-                # Handle repost-specific logic
-                if interaction_type == UserPostInteraction.InteractionType.REPOST:
-                    comment = request.data.get('comment', '')
-                    repost, repost_created = Repost.objects.update_or_create(
-                        original_post=post,
-                        reposted_by=request.user,
-                        defaults={'comment': comment}
-                    )
+                # # Handle repost-specific logic
+                # if interaction_type == UserPostInteraction.InteractionType.REPOST:
+                #     comment = request.data.get('comment', '')
+                #     repost, repost_created = Repost.objects.update_or_create(
+                #         original_post=post,
+                #         reposted_by=request.user,
+                #         defaults={'comment': comment}
+                #     )
                 
                 # Update post engagement count
                 self._update_engagement_count(post)
