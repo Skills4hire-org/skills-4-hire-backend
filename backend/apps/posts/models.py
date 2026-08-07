@@ -320,10 +320,10 @@ class UserPostInteraction(models.Model):
     - 'repost': User has reposted the post
     """
     class InteractionType(models.TextChoices):
-        VIEW = 'view', 'View'
-        LIKE = 'like', 'Like'
-        COMMENT = 'comment', 'Comment'
-        REPOST = 'repost', 'Repost'
+        VIEW = 'view'
+        LIKE = 'like'
+        COMMENT = 'comment'
+        REPOST = 'repost'
     
     interaction_id = models.UUIDField(
         max_length=20,

@@ -56,12 +56,17 @@ class ServiceViewSet(viewsets.ModelViewSet):
         """
         Return only non-deleted services, with optimised joins.
         """
-        return (
+        queryset = (
             Service.objects.filter(is_active=True)
             .select_related("profile")
             .prefetch_related("attachments")
         )
+        other = self.request.query_params.get("other", None)
+        if other is not None:
+            queryset = queryset.filter(profile__pk=other)
 
+        return queryset
+    
     def destroy(self, request, *args, **kwargs) -> Response:
         instance: Service = self.get_object()  # also runs object-level permission check
         instance.deleted_at = timezone.now()
