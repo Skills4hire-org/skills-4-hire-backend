@@ -10,7 +10,7 @@ class AddressCreateSerializer(serializers.ModelSerializer):
         fields = [
             "street_address", "apartment",
             "city", "state", "country",
-            "postal_code", "is_default"
+            "postal_code",
         ]
 
     def validate_postal_code(self, value):
@@ -33,7 +33,7 @@ class AddressSerializer(serializers.ModelSerializer):
             "address_id", "user_profile_id",
             "street_address", "apartment",
             "city", "state", "country",
-            "postal_code", "is_default"
+            "postal_code",
         ]
 
 class AddressDetailSerializer(serializers.ModelSerializer):
@@ -43,7 +43,7 @@ class AddressDetailSerializer(serializers.ModelSerializer):
             "address_id", 'created_at',
             "street_address", "apartment",
             "city", "state", "country",
-            "postal_code", "is_default"
+            "postal_code",
         ]
         
         
