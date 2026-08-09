@@ -6,7 +6,7 @@ from .models import Bookings
 
 UserModel = get_user_model()
 SUPPORT_URL= f"https://skills-4-hire-frobtendwebsite-ld8136i90-finelifeapps-projects.vercel.app/#contact"
-from_email = f"Skills4Hire <skills4hire@{settings.DOMAIN}"
+from_email = f'skills4hire@{settings.DOMAIN}'
 
 def booking_made_payload(customer: UserModel, provider: UserModel, booking: Bookings):
     booking_service = booking.provider_service.first()

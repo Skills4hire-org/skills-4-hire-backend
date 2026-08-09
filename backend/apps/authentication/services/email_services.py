@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 APP_NAME = getattr(settings, "APP_NAME", "Skill4Hire")
 
 
-def send_mail_base(context: dict, from_email: str = f"Skills4Hire <{settings.DEFAULT_FROM_EMAIL}>") :
+def send_mail_base(context: dict, from_email: str = settings.DEFAULT_FROM_EMAIL) :
     """
     Docstring for send_mail_base
     
