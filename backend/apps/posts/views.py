@@ -250,7 +250,7 @@ class PostViewSet(viewsets.ModelViewSet):
                 status_code=code,
             )
         
-    @method_decorator(cache_page(timeout=60 * 5))
+    # @method_decorator(cache_page(timeout=60 * 5))
     @action(methods=['get'], url_path="reposts", detail=True)
     def get_reposts(self, request, *args, **kwargs):
         post = self.get_object()
@@ -343,7 +343,6 @@ class CommentViewSet(viewsets.ModelViewSet):
     def update(self, request, *args, **kwargs):
         partial = kwargs.pop("partial", False)
         _, instance = self.get_object()
-
         if not instance.can_edit(request.user):
             raise PermissionDenied()
 
@@ -379,7 +378,7 @@ class CommentViewSet(viewsets.ModelViewSet):
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
     
-    @method_decorator(cache_page(60))
+    # @method_decorator(cache_page(60))
     def retrieve(self, request, *args, **kwargs):
         _, comment = self.get_object()
         serializer = self.get_serializer(comment)
