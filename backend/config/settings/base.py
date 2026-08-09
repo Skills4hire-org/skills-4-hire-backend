@@ -192,14 +192,10 @@ WSGI_APPLICATION = 'config.wsgi.application'
 
 
 # Email Configuration
-EMAIL_BACKEND = 'anymail.backends.amazon_ses.EmailBackend'
+EMAIL_BACKEND = 'anymail.backends.brevo.EmailBackend'
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL", default="skills4hireofficial@gmail.com")
 ANYMAIL = {
-    "AMAZON_SES_CLIENT_PARAMS": {
-        "aws_access_key_id": env("AWS_ACCESS_KEY_ID"),
-        "aws_secret_access_key": env("AWS_SECRET_ACCESS_KEY"),
-        "region_name": env("AWS_SES_REGION_NAME"),
-    }
+    "BREVO_API_KEY": env("BREVO_API_KEY")
 }
 
 # Password validation
