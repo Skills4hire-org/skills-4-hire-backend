@@ -171,19 +171,14 @@ class PostViewSet(viewsets.ModelViewSet):
             like_post = LikeService()
             new_like = like_post.create_like_post(post, user)
         except Exception as exc:
-            logger.error("Failed to create a like for post %s", post.pk)
-            sts = False
-            msg = "Failed to create like"
-            code = 400
-        else:
-            sts = "success"
-            msg = f"liked post: {post.pk}"
-            code=201
-
+            logger.error("Failed to create a like for post %s: %s", post.pk, str(exc))
+            return error_response(
+                errors=str(exc)
+            )
         return api_response(
-            data={"detail": msg},
+            data={"detail": "Liked Post"},
             message="Post like action completed",
-            status_code=code,
+            status_code=201,
         )
 
     @action(methods=["delete"], detail=True, url_path="unlike")
@@ -198,20 +193,15 @@ class PostViewSet(viewsets.ModelViewSet):
             like_post = LikeService()
             new_like = like_post.unlike_post(post, request.user)
         except Exception as exc:
-            logger.error("Failed to unlike post %s", post.pk)
-            msg = "Failed to unlike post"
-            sts = "failed"
-            code = 400
-        else:
-            msg="Unliked Post",
-            sts="success",
-            code=200
+            logger.error("Failed to unlike post %s: %s", post.pk, str(exc))
+            return error_response(
+                errors=str(exc)
+            )
         return api_response(
-            data={"msg": msg},
-            message=msg,
-            status_code=code,
+            data={"detail": "Unliked Post"},
+            message="Unliked Post",
+            status_code=200,
         )
-
 
     @action(methods=["post", "delete"], detail=True, url_path="repost")
     def repost_post(self, request, *args, **kwargs):
@@ -219,7 +209,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if request.method == "DELETE":
             repost = get_or_none(Repost, original_post=post_instance, reposted_by=request.user, is_active=True)
             if repost is None: 
-                return api_response({}, message="Invalid Request", status=404)
+                return error_response(errors="Repost not Found", status=404)
             
             # set is_active = False
             repost.is_active = False
@@ -240,16 +230,11 @@ class PostViewSet(viewsets.ModelViewSet):
                     message="Post reposted successfully",
                     status_code=status.HTTP_201_CREATED,
                 )
-            except Exception as e:
+            except Exception as exc:
                 logger.error("Failed to repost post %s", post_instance.pk)
-                msg = "Failed to repost post"
-                sts = "failed"
-                code = 400
-            return error_response(
-                message=msg,
-                status_code=code,
-            )
-        
+                return error_response(
+                    errors=str(exc), status_code=500
+                )
     # @method_decorator(cache_page(timeout=60 * 5))
     @action(methods=['get'], url_path="reposts", detail=True)
     def get_reposts(self, request, *args, **kwargs):
@@ -284,7 +269,6 @@ class CommentViewSet(viewsets.ModelViewSet):
             return CommentCreateSerializer
         else:
             return CommentListSerializer
-
     permissions = [IsOwnerOrReadOnly]
 
     def get_queryset(self):
