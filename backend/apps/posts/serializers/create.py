@@ -10,7 +10,7 @@ from ..models import Post, PostAttachment, Comment, Repost
 from rest_framework import serializers
 from rest_framework.exceptions import PermissionDenied
 
-from django.utils import timezone
+from django.db import transaction
 from django.utils.translation import gettext_lazy as _
 
 from ...core.utils.py import generate_thumbnails
@@ -228,30 +228,28 @@ class RepostSerializer(serializers.ModelSerializer):
         user = self.context['request'].user
         post = self.context['post'] 
 
-        if Repost.objects.filter(reposted_by=user, original_post=post).exists():
-            repost = Repost.objects.get(reposted_by=user, original_post=post)
-            if repost.is_active:
-                raise serializers.ValidationError("You already reposted this post")
-            else:
-                repost.is_active = True
-            repost.save(update_fields=['is_active', 'updated_at'])
+        if Repost.objects.filter(reposted_by=user, original_post=post, is_active=True).exists():
+            raise PermissionDenied(_("You already reposted this post"))
+        
+        validated_data.update({
+            "reposted_by": user,
+            "original_post": post,
+        })
 
-        else:
-            validated_data.update({
-                "reposted_by": user,
-                "original_post": post,
-            })
-            repost = super().create(validated_data)
-
-        if not post.is_reposted:
-            post.is_reposted = True
+        repost = None
         try: 
-            Post.objects.create(
-                user=user, post_content=validated_data.get('comment', None), 
-                post_type=post.post_type
-            )
-            post.save()
+            with transaction.atomic():
+                repost = super().create(validated_data)
+                
+                if not post.is_reposted:
+                    post.is_reposted = True
+                Post.objects.create(
+                    user=user, post_content=validated_data.get('comment', None), 
+                    post_type=post.post_type
+                )
+                post.save()
+            return repost
         except Exception as e:
             raise serializers.ValidationError(e)
-        return repost
+        
 
