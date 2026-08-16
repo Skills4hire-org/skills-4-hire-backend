@@ -17,13 +17,13 @@ class UserAddress(models.Model):
     ) 
     user_profile = models.ForeignKey("users.BaseProfile", on_delete=models.CASCADE, related_name="addresses")
 
-    street_address = models.CharField(max_length=255)
-    apartment = models.CharField(max_length=100, blank=True)
+    street_address = models.CharField(max_length=255, null=True)
+    apartment = models.CharField(max_length=100, blank=True, null=True)
 
-    city = models.CharField(max_length=100)
-    state = models.CharField(max_length=100)
+    city = models.CharField(max_length=100, blank=True, null=True)
+    state = models.CharField(max_length=100, null=True, blank=True)
     postal_code = models.CharField(max_length=20, null=True, blank=True)
-    country = models.CharField(max_length=100)
+    country = models.CharField(max_length=100, null=True, blank=True)
     # is_default = models.BooleanField(default=False)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

@@ -400,25 +400,25 @@ class NegotiationViewSet(viewsets.ModelViewSet):
     def counter(self, request, *args, **kwargs):
         return self.update_status(request, status_act='counter', *args, **kwargs)
 
-    @action(methods=["get"], url_path='messages', detail=True)
-    def negotiation_history(self, request, *args, **kwargs):
-        negotiation = self.get_object()
-        if not negotiation.is_participants():
-            raise PermissionDenied()
-        history = negotiation.histories.all()[:20]
-        result = return_paginated_view(self, history)
-        if isinstance(result, Response):
-            return result
-        if isinstance(result, dict) and ("next" in result or "previous" in result):
-            return api_response(
-                data=result,
-                message="Negotiation history retrieved successfully",
-                status_code=status.HTTP_200_OK,
-            )
-        serializer = self.get_serializer(history, many=True)
-        return api_response(
-            data=serializer.data,
-            message="Negotiation history retrieved successfully",
-            status_code=status.HTTP_200_OK,
-        )
+    # @action(methods=["get"], url_path='messages', detail=True)
+    # def negotiation_history(self, request, *args, **kwargs):
+    #     negotiation = self.get_object()
+    #     if not negotiation.is_participants():
+    #         raise PermissionDenied()
+    #     history = negotiation.histories.all()[:20]
+    #     result = return_paginated_view(self, history)
+    #     if isinstance(result, Response):
+    #         return result
+    #     if isinstance(result, dict) and ("next" in result or "previous" in result):
+    #         return api_response(
+    #             data=result,
+    #             message="Negotiation history retrieved successfully",
+    #             status_code=status.HTTP_200_OK,
+    #         )
+    #     serializer = self.get_serializer(history, many=True)
+    #     return api_response(
+    #         data=serializer.data,
+    #         message="Negotiation history retrieved successfully",
+    #         status_code=status.HTTP_200_OK,
+    #     )
 

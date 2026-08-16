@@ -127,7 +127,7 @@ class MessageCreateSerializer(serializers.ModelSerializer):
         Automatically sets sender as current user.
         """
         conversation = self.context.get('conversation')
-        user = self.context.get('request').user
+        user = self.context['request'].user
 
         if not conversation:
             raise serializers.ValidationError('Conversation not found.')
@@ -152,7 +152,7 @@ class MessageCreateSerializer(serializers.ModelSerializer):
 
     def update(self, instance: Message, validated_data: dict):
 
-        user = self.context.get("request").user
+        user = self.context['request'].user
 
         message_content = validated_data["content"]
 
@@ -291,7 +291,7 @@ class ConversationCreateSerializer(serializers.ModelSerializer):
         - User cannot create conversation with themselves
         - Check for existing conversation
         """
-        user = self.context.get("request").user
+        user = self.context["request"].user
         participant_two = data.get('participant_two_id')
 
         # Check for self-conversation
@@ -366,7 +366,7 @@ class NegotiationCreateSerializer(serializers.ModelSerializer):
         return  value.strip()
 
     def validate(self, data):
-        user = self.context.get("request").user
+        user = self.context['request'].user
 
         if "conversation_id" in data:
             conversation_id = data["conversation_id"]
@@ -400,11 +400,11 @@ class NegotiationCreateSerializer(serializers.ModelSerializer):
     def validate_price(self, value):
         is_valid, message = validate_negotiation_price(value)
         if not is_valid:
-            raise serializers.ValidationError(message)
+            raise serializers.ValidationError("Price is invalid")
         return value
 
     def create(self, validated_data):
-        user = self.context.get("request").user
+        user = self.context['request'].user
 
         if not "conversation_id" in validated_data and not "job_post_id" in validated_data:
             raise serializers.ValidationError("Both conversation and job_post cannot be empty at the same time: There must be something to negotiate about")
@@ -433,7 +433,7 @@ class NegotiationCreateSerializer(serializers.ModelSerializer):
     def update(self, instance: Negotiations, validated_data):
         logger.debug(f"instance: {instance}, validated_data: {validated_data}")
         action = validated_data["status"]
-        user = self.context.get("request").user
+        user = self.context['request'].user
 
         if instance.status == Negotiations.Status.ACCEPTED:
             raise serializers.ValidationError("Negotiation already accepted and closed")
