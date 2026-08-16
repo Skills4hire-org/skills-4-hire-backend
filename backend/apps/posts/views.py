@@ -209,7 +209,7 @@ class PostViewSet(viewsets.ModelViewSet):
         if request.method == "DELETE":
             repost = get_or_none(Repost, original_post=post_instance, reposted_by=request.user, is_active=True)
             if repost is None: 
-                return error_response(errors="Repost not Found", status=404)
+                return error_response(errors="Repost not Found", status_code=404)
             
             # set is_active = False
             repost.is_active = False
@@ -254,7 +254,7 @@ class PostViewSet(viewsets.ModelViewSet):
         return  return_paginated_view(self, reposts)
 
     @action(methods=['get'], detail=False, url_path="user/(?P<user_id>[^/.]+)/posts")
-    def user_posts(self, request, user_id: uuid.UUID = None):
+    def user_posts(self, request, user_id):
         queryset = self.filter_queryset(self.get_queryset())
         if user_id is None:
             return Post.objects.none()
