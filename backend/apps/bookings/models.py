@@ -41,10 +41,10 @@ class Bookings(models.Model):
     price = models.DecimalField(max_digits=10, decimal_places=2, null=False, blank=True)
     platform_fee = models.DecimalField(max_digits=10, decimal_places=2, default=0)
 
-    notes = models.TextField(blank=True)
-    descriptions = models.TextField()
+    notes = models.TextField(blank=True, null=True)
+    descriptions = models.TextField(blank=True, null=True)
 
-    requirements = models.TextField(blank=True)
+    requirements = models.TextField(blank=True, null=True)
 
     is_active = models.BooleanField(default=True, db_index=True)
 
