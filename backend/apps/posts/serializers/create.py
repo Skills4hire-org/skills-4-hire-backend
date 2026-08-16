@@ -218,7 +218,6 @@ class RepostSerializer(serializers.ModelSerializer):
         ]
 
     def validated_comment(self, value):
-
         if value and not isinstance(value, str) or len(value) < 1:
             raise serializers.ValidationError(_("Add a meaningful comment"))
         return  value.strip()
@@ -244,12 +243,12 @@ class RepostSerializer(serializers.ModelSerializer):
                 if not post.is_reposted:
                     post.is_reposted = True
                 Post.objects.create(
-                    user=user, post_content=validated_data.get('comment', None), 
+                    user=user, post_content=validated_data['comment'] if validated_data.get("comment") else "", 
                     post_type=post.post_type
                 )
                 post.save()
             return repost
-        except Exception as e:
-            raise serializers.ValidationError(e)
+        except Exception as error:
+            raise error
         
 
