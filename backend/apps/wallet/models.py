@@ -44,14 +44,15 @@ class Wallet(models.Model):
 
     @property
     def locked_wallet(self):
+        from decimal import Decimal
         "return the total amount for this locked wallet"
         locked_amounts = self.locked_balance.filter(is_released=False).aggregate(
             locked_total=models.Sum('amount')
         )
 
         if locked_amounts['locked_total'] is None:
-            return "0.00"
-        return str(locked_amounts['locked_total'])
+            return Decimal("0")
+        return locked_amounts['locked_total']
 
 class LockedWallet(models.Model):
     locked_id = models.UUIDField(
