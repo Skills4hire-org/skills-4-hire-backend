@@ -25,10 +25,7 @@ class WalletTransactionSummarySerializer(serializers.ModelSerializer):
         ]
 
 class WalletDetailSerializer(serializers.ModelSerializer):
-    available_balance = serializers.DecimalField(
-        source="balance", read_only=True,
-        max_digits=8, decimal_places=2)
-    
+    available_balance = serializers.SerializerMethodField()
     overall_balance = serializers.SerializerMethodField()
 
     overall_locked_balance = serializers.SerializerMethodField()
@@ -47,6 +44,9 @@ class WalletDetailSerializer(serializers.ModelSerializer):
             'overall_locked_balance', "transactions"
         ]
 
+    def get_available_balance(self, obj):
+        return obj.balance
+    
     def get_transactions(self, obj):
 
         active_transactions = obj.wallet_transactions.filter(is_active=True).only(
@@ -67,7 +67,7 @@ class WalletDetailSerializer(serializers.ModelSerializer):
         ).data
 
     def get_overall_balance(self, obj):
-        return str(obj.get_total_balance)
+        return obj.get_total_balance
     
     def get_overall_locked_balance(self, obj):
         return obj.locked_wallet
