@@ -23,11 +23,9 @@ class MessagePagination(CursorPagination):
 
     def get_paginated_response(self, data):
         return Response(OrderedDict([
-            ('pagination', OrderedDict([
-                ('next', self.get_next_link()),
-                ('previous', self.get_previous_link()),
-                ('page_size', self.page_size),
-            ])),
+            ('next', self.get_next_link()),
+            ('previous', self.get_previous_link()),
+            ('page_size', self.page_size),
             ('results', data)
         ]))
 
@@ -47,13 +45,7 @@ class ConversationPagination(PageNumberPagination):
 
     def get_paginated_response(self, data):
         return Response(OrderedDict([
-            ('pagination', OrderedDict([
-                ('count', self.page.paginator.count),
-                ('next', self.get_next_link()),
-                ('previous', self.get_previous_link()),
-                ('page_size', self.page_size),
-                ('total_pages', self.page.paginator.num_pages),
-                ('current_page', self.page.number),
-            ])),
+            ('next', self.get_next_link()),
+            ('previous', self.get_previous_link()),
             ('results', data)
         ]))
