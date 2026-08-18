@@ -75,15 +75,15 @@ class MessageListSerializer(serializers.ModelSerializer):
     Used for paginated message lists to reduce response size.
     Includes essential information without nested user objects.
     """
-    is_participant_one = serializers.SerializerMethodField()
-    is_participant_two = serializers.SerializerMethodField()
+    sender = serializers.SerializerMethodField()
+    is_sender = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
         fields = [
             'message_id',
-            "is_participant_one",
-            "is_participant_two",
+            "sender",
+            "is_sender",
             "is_edited",
             'content',
             'is_read',
@@ -91,13 +91,12 @@ class MessageListSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
-    def get_is_participant_one(self, obj):
-        sender = obj.sender
-        return sender == obj.conversation.participant_one
+    def get_sender(self, obj):
+        return UserReadSerializer(obj.sender).data
     
-    def get_is_participant_two(self, obj):
-        sender = obj.sender
-        return sender == obj.conversation.participant_two
+    def get_is_sender(self, obj):
+        user = self.context['request'].user
+        return obj.sender == user
 
 class MessageCreateSerializer(serializers.ModelSerializer):
     """
@@ -219,8 +218,6 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
         model = Conversation
         fields = [
             'conversation_id',
-            'participant_one',
-            'participant_two',
             'message_count',
             'messages',
             'created_at',
