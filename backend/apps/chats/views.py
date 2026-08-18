@@ -89,6 +89,10 @@ class ConversationViewSet(
         """
         if self.action == 'create':
             return ConversationCreateSerializer
+        if self.action == "retrieve_conversation" and self.request.method == "GET":
+            return MessageListSerializer
+        if self.action == "retrieve_conversation" and self.request.method == "POST":
+            return MessageCreateSerializer
         return ConversationSerializer
 
     def get_queryset(self):
@@ -174,14 +178,10 @@ class ConversationViewSet(
             # mark all message as read
             mark_messages_as_read(conversation, request.user)
 
-            serializer = ConversationDetailSerializer(conversation)
-            return api_response(
-                data=serializer.data,
-                message="Conversation details retrieved successfully",
-                status_code=status.HTTP_200_OK,
-            )
+            messages = conversation.messages.filter(is_active=True).order_by("-created_at")
+            return return_paginated_view(self, messages)
         else:
-            serializer = MessageCreateSerializer(
+            serializer = self.get_serializer(
                 data=request.data,
                 context={
                     'request': request,
