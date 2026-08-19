@@ -40,7 +40,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
     attachments = BookingAttachmentSerializer(many=True, required=False)
     provider_service = serializers.PrimaryKeyRelatedField(
         queryset=Service.objects.filter(is_active=True),
-        many=True, 
+        many=True, required=False
     )
     class Meta:
         model = Bookings
@@ -81,7 +81,7 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         address = validated_data.pop("address", None)
         attachment = validated_data.pop("attachments", None)
         provider_profile = validated_data.pop('provider')
-        provider_service = validated_data.pop("provider_service")
+        provider_service = validated_data.pop("provider_service", None)
 
         address_obj = None
         if address is not None:

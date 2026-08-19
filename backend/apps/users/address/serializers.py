@@ -1,3 +1,5 @@
+from typing import Any
+
 from rest_framework import serializers
 from .models import UserAddress
 from django.contrib.auth import get_user_model
@@ -14,7 +16,7 @@ class AddressCreateSerializer(serializers.ModelSerializer):
         ]
 
     def validate_postal_code(self, value):
-        if not UserAddress().validate_postal_code(value.strip()):
+        if value and not UserAddress().validate_postal_code(value):
             raise serializers.ValidationError("postal code is not valid")
         return value
 
@@ -24,6 +26,26 @@ class AddressCreateSerializer(serializers.ModelSerializer):
                 value.strip().title()
         return data
 
+
+    def create(self, validated_data: Any) -> Any:
+        street_address = validated_data.get('street_address')
+        apartment = validated_data.get("apartment")
+        city = validated_data.get("city")
+        state = validated_data.get("state")
+        country = validated_data.get("country")
+        postal_code = validated_data.get("postal_code")
+
+        address, created = UserAddress.objects.update_or_create(
+            user_profile=self.context['request'].user.profile,
+            street_address=street_address,
+            apartment=apartment,
+            city=city,
+            state=state, country=country,
+            postal_code=postal_code,
+            defaults=validated_data
+        )
+
+        return address
 
 class AddressSerializer(serializers.ModelSerializer):
     user_profile_id = serializers.UUIDField(read_only=True, source="user_profile.pk")
