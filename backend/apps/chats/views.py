@@ -9,6 +9,9 @@ Handles all conversation-related operations:
 - Marking messages as read
 """
 
+from collections.abc import Mapping
+from typing import Any
+
 from django.db import transaction
 
 from rest_framework import viewsets, status, generics, filters, mixins, serializers
@@ -79,6 +82,7 @@ class ConversationViewSet(
             return [IsParticipant()]
         return [IsAuthenticated()]
 
+
     def get_serializer_class(self):
         """
         Use appropriate serializer based on action.
@@ -112,7 +116,7 @@ class ConversationViewSet(
         ).select_related(
             'participant_one',
             'participant_two'
-        ).order_by('-updated_at')
+        ).order_by('-created_at')
 
         return queryset
 
@@ -147,15 +151,6 @@ class ConversationViewSet(
             status_code=status.HTTP_201_CREATED,
         )
 
-    def list(self, request, *args, **kwargs):
-        """
-        List all conversations for current user.
-
-        GET /api/conversations/
-
-        Returns: Paginated list of conversations with message counts and unread status
-        """
-        return super().list(request, *args, **kwargs)
 
     @action(methods=["get", "post"], detail=True, url_path="messages")
     def retrieve_conversation(self, request, *args, **kwargs):
