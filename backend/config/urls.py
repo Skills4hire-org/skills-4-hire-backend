@@ -3,6 +3,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.conf import settings
 from .services import health, check_docker_update, test_email, get_banks
+from apps.core.views import BaseSearch
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView
 
 # ADMIN view and health checks
@@ -29,7 +30,8 @@ urlpatterns += [
     path("api/v1/", include("apps.chats.urls")),
     path("api/v1/", include('apps.wallet.urls')),
     path("api/v1/", include("apps.referral.urls")),
-    path("api/admin/", include("apps.admin.urls"))
+    path("api/admin/", include("apps.admin.urls")),
+    path("api/v1/search/", BaseSearch.as_view(), name='search')
     # path("rest/auth/", include("rest_framework.urls"))
 ]
 

@@ -3,7 +3,7 @@ from django.db.models import Q
 from django.utils.decorators import method_decorator
 from django.views.decorators.cache import cache_page
 
-from rest_framework import viewsets, status, permissions
+from rest_framework import viewsets, status, permissions, filters
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from django_filters.rest_framework import DjangoFilterBackend
@@ -31,14 +31,15 @@ class ProfileSearchView(viewsets.ModelViewSet):
     pagination_class = ProfilePagination
     http_method_names = ['get']
     permission_classes = [permissions.IsAuthenticated]
-    serializer_class = ProviderProfilePublicSerializer
-    filter_backends = [DjangoFilterBackend]
+    filter_backends = [DjangoFilterBackend, filters.SearchFilter]
     filterset_fields = {
         "professional_title": ['icontains'],
         "min_charge": ['gte', 'lte'],
         "max_charge": ['gte'],
         "reviews__ratings": ["gte", "lte"]
     }
+
+    search_fields  = ["professional_title", "profile__display_name"]
 
     def get_serializer_class(self):
         if self.action == 'list':
@@ -93,7 +94,7 @@ class ProfileSearchView(viewsets.ModelViewSet):
 
         return queryset
 
-    @method_decorator(cache_page(60 * 5))
+    # @method_decorator(cache_page(60 * 5))
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
 

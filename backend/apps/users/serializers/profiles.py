@@ -231,13 +231,13 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
                 Q(comment__user=obj.profile.user)
             ).select_related("post", "comment").order_by("-created_at")[:2]
 
-            return PostAttachmentSerializer(media, many=True).data
+            return PostAttachmentSerializer(media, many=True, context=self.context).data
 
 
         def get_user(self, obj: ProviderModel):
             from ...authentication.serializers import UserReadSerializer
             user = obj.profile.user
-            return UserReadSerializer(user).data
+            return UserReadSerializer(user, context=self.context).data
 
         def get_completed_bookings(self, obj: ProviderModel):
             from ...bookings.models import Bookings
@@ -264,26 +264,26 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
         def get_gallary(self, obj):
             base_profile = obj.profile
             images = base_profile.work_images.all()[:10]
-            return WorkImagesSerializer(images, many=True).data
+            return WorkImagesSerializer(images, many=True, context=self.context).data
 
         def get_services(self, obj):
             from ..services.serializers import ServiceListSerializer
             primary_service = obj.services.filter(is_active=True).order_by("-created_at")[:4]
-            serializer = ServiceListSerializer(primary_service, many=True)
+            serializer = ServiceListSerializer(primary_service, many=True, context=self.context)
             return serializer.data
         
         def get_comments(self, obj):
             from ...posts.serializers.read import CommentListSerializer
             user = obj.profile.user
             user_comments = user.comments.filter(is_active=True, is_deleted=False).order_by("-created_at")[:3]
-            serializer = CommentListSerializer(user_comments, context={"request": self.context['request']}, many=True)
+            serializer = CommentListSerializer(user_comments, context=self.context, many=True)
             return serializer.data
 
         def get_posts(self, obj):
             from ...posts.serializers.read import PostDetailSerializer
             user = obj.profile.user
             user_posts = user.posts.filter(is_active=True, is_deleted=False).order_by("-created_at")[:3]
-            serializer = PostDetailSerializer(user_posts, context={'request': self.context['request']}, many=True)
+            serializer = PostDetailSerializer(user_posts, context=self.context, many=True)
             return serializer.data
 
         def get_endorsement_count(self, obj):
@@ -311,7 +311,7 @@ class ProviderProfilePublicSerializer(serializers.ModelSerializer):
     def get_user(self, obj: ProviderModel):
         from ...authentication.serializers import UserReadSerializer
         user = obj.profile.user
-        return UserReadSerializer(user).data
+        return UserReadSerializer(user, context=self.context).data
 
     def get_avg_rating(self, obj: ProviderModel):
         
