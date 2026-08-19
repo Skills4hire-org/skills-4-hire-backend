@@ -48,7 +48,7 @@ class GeneralPostSerializer(serializers.ModelSerializer):
     def get_attachments(self, obj):
         if obj.attachments.exists():
             attachments = obj.attachments.all()
-            return PostAttachmentSerializer(attachments, many=True).data
+            return PostAttachmentSerializer(attachments, many=True, context=self.context).data
         return None
     
     def get_reposts_count(self, obj):
