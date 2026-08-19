@@ -10,7 +10,9 @@ from_email = f'skills4hire@{settings.DOMAIN}'
 
 def booking_made_payload(customer: UserModel, provider: UserModel, booking: Bookings):
     booking_service = booking.provider_service.first()
-    service = booking_service.services.first()
+    service = None
+    if booking_service:
+        service = booking_service.services.first()
     return {
         "from_email": from_email,
         "email": provider.email,

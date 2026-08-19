@@ -88,7 +88,6 @@ class BookingService:
 
             
             transaction_status = True  # Mark as successful only if everything succeeds
-            
 
             if booking:
                 process_transaction(

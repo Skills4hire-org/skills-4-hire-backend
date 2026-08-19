@@ -7,9 +7,8 @@ from ..exceptions import DuplicateTransactionError
 
 class WalletTransactionService:
     def create_wallet_transaction(self, amount, user, wallet, **validated_data):
-        from ..state import WalletService
         try:
-            if WalletTransaction.objects.filter(idempotency_key=validated_data['idempotency_key']).first():
+            if WalletTransaction.objects.filter(reference_key=validated_data['reference']).first():
                 raise DuplicateTransactionError()
 
             with transaction.atomic():

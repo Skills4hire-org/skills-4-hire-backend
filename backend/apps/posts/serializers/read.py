@@ -21,7 +21,7 @@ class GeneralPostSerializer(serializers.ModelSerializer):
     post_status = serializers.SerializerMethodField()
 
     is_viewed = serializers.SerializerMethodField()
-    views_count = serializers.SerializerMethodField()
+    impression_count = serializers.SerializerMethodField()
 
     class Meta: 
         model = Post
@@ -32,14 +32,14 @@ class GeneralPostSerializer(serializers.ModelSerializer):
             "tags", "attachments",
             "comments_count", "likes_count", "reposts_count",
             "is_liked", "is_commented", "is_reposted", "duration", "post_status",
-            "is_viewed", "views_count"
+            "is_viewed", "impression_count"
         ]
 
     def get_is_viewed(self, obj):
         user = self.context['request'].user
         return obj.user_interactions.filter(user=user).exists()
 
-    def get_views_count(self, obj):
+    def get_impression_count(self, obj):
         interactions = obj.user_interactions.filter(
             interaction_type=UserPostInteraction.InteractionType.VIEW
             ).count()
