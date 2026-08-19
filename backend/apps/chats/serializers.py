@@ -196,7 +196,7 @@ class ConversationSerializer(serializers.ModelSerializer):
     def get_last_message(self, obj):
         """Get last message in conversation."""
         last_message = obj.get_last_message()
-        return MessageListSerializer(last_message).data
+        return MessageListSerializer(last_message, context=self.context).data
 
     def get_unread_count(self, obj):
         """Get unread message count for current user."""
@@ -231,7 +231,7 @@ class ConversationDetailSerializer(serializers.ModelSerializer):
         """Get recent messages."""
         # Get last 20 messages
         messages = obj.messages.filter(is_active=True).order_by("-created_at")
-        return MessageListSerializer(messages, many=True).data
+        return MessageListSerializer(messages, many=True, context=self.context).data
 
 
 # Support Serializers
