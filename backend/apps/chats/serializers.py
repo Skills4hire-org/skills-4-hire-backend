@@ -77,12 +77,14 @@ class MessageListSerializer(serializers.ModelSerializer):
     """
     sender = serializers.SerializerMethodField()
     is_sender = serializers.SerializerMethodField()
+    receiver = serializers.SerializerMethodField()
 
     class Meta:
         model = Message
         fields = [
             'message_id',
             "sender",
+            'receiver',
             "is_sender",
             "is_edited",
             'content',
@@ -91,8 +93,18 @@ class MessageListSerializer(serializers.ModelSerializer):
         ]
         read_only_fields = fields
 
+    def get_receiver(self, obj):
+        user = self.context['request'].user
+        conversation = obj.conversation
+        receiver = None
+        if conversation.participant_two == obj.sender:
+            receiver = conversation.participant_one
+        else:
+            receiver = conversation.participant_two
+        return UserReadSerializer(receiver, context=self.context).data
+        
     def get_sender(self, obj):
-        return UserReadSerializer(obj.sender).data
+        return UserReadSerializer(obj.sender, context=self.context).data
     
     def get_is_sender(self, obj):
         user = self.context['request'].user
@@ -175,6 +187,7 @@ class ConversationSerializer(serializers.ModelSerializer):
     """
 
     participant_two = UserReadSerializer(read_only=True)
+    participant_one = UserReadSerializer(read_only=True)
     message_count = serializers.IntegerField(read_only=True)
     last_message = serializers.SerializerMethodField()
     unread_count = serializers.SerializerMethodField()
