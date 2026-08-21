@@ -7,13 +7,19 @@ from channels.db import database_sync_to_async
 
 
 from ..notification.services import create_notification
-from .models import Message
+from .models import Message, Conversation
 from ..core.utils.py import get_or_none
+from ..authentication.serializers import UserReadSerializer
+from .serializers import MessageListSerializer
 
 from django.utils import timezone
+from django.contrib.auth import get_user_model
 from enum import Enum
+from types import SimpleNamespace
 
 logger = logging.getLogger(__name__)
+UserModel = get_user_model()
+
 
 class Event(str, Enum):
     TYPING = "typing"
@@ -25,9 +31,26 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
     async def connect(self):
         self.room_id = self.scope['url_route']['kwargs']['room_id']
         if not self.room_id:
-            logger.info("Room Id is not present to accept websocker connection")
+            logger.info("Room Id is not present to accept websocket connection")
             await self.close()
             return 
+        conversation = await self.get_conversation(self.room_id)
+        if conversation is None:
+            logger.info(f"Error fetching conversation: {conversation}")
+            await self.send_json(content={"error": False, 'message': "Failed to fetch conversation"})
+            await self.close()
+            return
+
+        self.auth_user = self.scope.get('user')
+        if self.auth_user is None or self.auth_user.is_anonymous:
+            logger.info("User not found")
+            await self.close(code=4003)
+
+        self.is_participant = await database_sync_to_async(conversation.has_participant)(self.auth_user)
+        if not self.is_participant:
+            logger.info("User is not a participant of this conversation")
+            await self.close(code=4003)
+
         self.group_name = f"chat_group_{self.room_id}"
         await self.channel_layer.group_add(self.group_name, self.channel_name)
         await self.accept()
@@ -52,58 +75,69 @@ class ChatConsumer(AsyncJsonWebsocketConsumer):
         await self.send_json(content={"type": "pong"})
 
     async def handle_typing(self, data):
+        user_id = data.get("user_id")
+        user = await self.user(user_id)
+        user_data = await self.serializer_data(UserReadSerializer, user)
         await self.channel_layer.group_send(
             self.group_name,
             {
                 'type': "user_typing",
-                "fullname": data.get("fullname", None),
-                "user_id": data.get("user_id", None),
-                "is_typing": data.get("is_typing", None),
-                "event": "typing"
+                "event": Event.TYPING,
+                "user_data": user_data,
             }
         )
 
     async def user_typing(self, content):
         logger.info("broadcasting user typing")
+
         await self.send_json(content={
             "event": content.get("event"),
-            "user_id": content.get("user_id"),
-            "fullname": content.get("fullname"),
-            "is_typing": content.get("is_typing"),
+            "user_data": content.get("user_data"),
+            "typing": True,
             "server_time": timezone.now().isoformat()
         })
 
     async def handle_chat_message(self, data):
         message_id = data.get("message_id")
+
         message = await self.get_message(message_id)
-        if message is None:
-            logger.info("message is none, closing connection...")
-            await self.close(400)
-            return 
+        message_data = await self.serializer_data(MessageListSerializer, message)
         await self.channel_layer.group_send(
             self.group_name, 
             {
                 'type': "chat_message",
-                "message_id": str(message.pk),
-                "sender_display_name": message.sender.profile.display_name,
-                "conversation_id": id,
-                "message": message.content[:20],
-                'created_at': str(message.created_at)
+                'message': message_data
             }
         )
 
-    async def chat_message(self, event):
+    async def chat_message(self, content):
         logger.info("broadcasting message")
-        await self.send(text_data= json.dumps({
-            "event": "",
-            "message_id": event['message_id'],
-            "sender": event['sender_display_name'],
-            "conversation_id": event['conversation_id'],
-            "message": event['message'],
-            'created_at': event['created_at'],
-            "server_time": timezone.now().isoformat()
-        }))
+        await self.send_json(content={
+            "event": Event.MESSAGE,
+            "message": content.get("message", None),
+            "server_timestamp": timezone.now().isoformat()
+        })
 
+
+    @database_sync_to_async
+    def serializer_data(self, serializer_class, instance):
+        user = self.scope.get("user")
+        request = SimpleNamespace(user=user)
+        serializer = serializer_class(instance, context={'request': request})
+        return serializer.data
+
+    
+    @database_sync_to_async
+    def user(self, user_id):
+        user = UserModel.objects.filter(pk=user_id, is_active=True).first()
+        return user
+
+
+    @database_sync_to_async
+    def get_conversation(self, conversation_id):
+        conversation = get_or_none(Conversation, conversation_id=conversation_id)
+        return conversation
+    
     @database_sync_to_async
     def save_notifications(self, sender_id, receiver_id, event, message):
         return create_notification(event=event, message=message, sender=sender_id, receiver=receiver_id)

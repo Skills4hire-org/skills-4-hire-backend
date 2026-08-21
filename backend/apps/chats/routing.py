@@ -6,9 +6,5 @@ from .consumers import ChatConsumer
 
 
 chats_urlpatterns = [
-    path(
-        "ws/chats/<str:room_id>/",
-        cast(Any, ChatConsumer.as_asgi()),
-        name="chat-websocket",
-    )
+    path("ws/chats/<str:room_id>/", ChatConsumer.as_asgi(), name="chat-websocket")
 ]
