@@ -60,7 +60,7 @@ class ProfileSearchView(viewsets.ModelViewSet):
         queryset = ProviderModel.objects.select_related(
             'profile', 'profile__user'
         ).prefetch_related(
-            'skills', 'skills__skill', 'skills__skill__category'
+            "services"
         ).filter(
             is_active=True,
             profile__is_active=True
@@ -79,11 +79,8 @@ class ProfileSearchView(viewsets.ModelViewSet):
                 Q(professional_title__icontains=query) | \
                 Q(headline__icontains=query) | \
                 Q(description__icontains=query) | \
-                Q(skills__skill__name__icontains=query) | \
-                Q(skills__skill__category__name__icontains=query)| \
-                Q(services__name__icontains=query) |\
-                Q(services__category__name__icontains=query)
-
+                Q(services__name__icontains=query)
+            
             queryset = queryset.filter(search_q).distinct()
 
             # Order by creation date
