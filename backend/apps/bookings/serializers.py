@@ -52,10 +52,12 @@ class BookingCreateSerializer(serializers.ModelSerializer):
         ]
 
     def validate(self, attrs):
-        if attrs.get("start_date") or attrs.get("end_date"):
-            if attrs["end_date"] <= attrs["start_date"]:
+        end = attrs.get("end_date")
+        start = attrs.get("start_date")
+        if end and start:
+            if end <= start:
                 raise serializers.ValidationError("'end_date' cannot be less than 'start_date'")
-            elif attrs["start_date"].date() < timezone.now().date():
+            elif start.date() < timezone.now().date():
                 raise serializers.ValidationError("start date can't be less than today")
 
         return attrs
