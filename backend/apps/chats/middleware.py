@@ -28,7 +28,6 @@ class AuthMiddleware:
         self.inner = inner
 
     async def __call__(self, scope, receive, send) -> Any:
-        print(scope)
         query_string = scope.get("query_string", b"").decode("utf-8")
 
         query_params = parse_qs(query_string)

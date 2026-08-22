@@ -265,10 +265,12 @@ class CommentViewSet(viewsets.ModelViewSet):
     pagination_class = CustomPostPagination
 
     def get_serializer_class(self):
-        if self.action in ('create', 'update', 'partial_update', 'create_replies'):
+        if self.action in ('create', 'update', 'partial_update'):
             return CommentCreateSerializer
-        else:
-            return CommentListSerializer
+        if self.action == "create_replies" and self.request.method in ("POST", "post"):
+            return CommentCreateSerializer
+        return CommentListSerializer
+    
     permissions = [IsOwnerOrReadOnly]
 
     def get_queryset(self):
@@ -276,8 +278,9 @@ class CommentViewSet(viewsets.ModelViewSet):
         post_instance, _ = self.get_object()
         queryset = (
             Comment.active_objects.filter(post=post_instance).
-                    select_related("post", "user", 'parent').prefetch_related('attachments')
-                    )
+                    select_related("post", "user", 'parent').prefetch_related('attachments').order_by("-created_at")
+
+        )
 
         return queryset.annotate(
             total_replies=Count("replies", filter=Q(replies__is_active=True), distinct=True),
@@ -358,7 +361,7 @@ class CommentViewSet(viewsets.ModelViewSet):
             raise PermissionDenied()
         instance.soft_delete()
 
-    @method_decorator(cache_page(60))
+    # @method_decorator(cache_page(60))
     def list(self, request, *args, **kwargs):
         return super().list(request, *args, **kwargs)
     
@@ -376,14 +379,13 @@ class CommentViewSet(viewsets.ModelViewSet):
     def create_replies(self, request, *args, **kwargs):
         user = request.user
         if request.method == "POST":
-            serializer = self.get_serializer(
-                data=request.data, context={"request": request})
-            serializer.is_valid(raise_exception=True)
             post, comment = self.get_object()
-            data = serializer.validated_data
-            service = CommentService()
+            serializer = self.get_serializer(data=request.data, context=
+                                             {"request": request, "post": post, "parent_comment": comment})
+            serializer.is_valid(raise_exception=True)
+        
             try:
-                new_comment = service.add_comment(post=post, parent=comment, user=user, message=data['message'])
+                new_comment = serializer.save()
                 return api_response(
                     data={"details": CommentListSerializer(new_comment, context={'request': request}).data},
                     message="Reply created successfully",

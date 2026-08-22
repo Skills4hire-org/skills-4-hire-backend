@@ -9,7 +9,7 @@
         body {
             margin: 0;
             padding: 0;
-            background-color: #f4f7f6;
+            background-color: #f4f5fa;
             font-family: Arial, Helvetica, sans-serif;
             color: #333333;
         }
@@ -29,10 +29,37 @@
         }
 
         .header {
-            background-color: #14a800;
+            background-color: #4338ca;
             padding: 22px 30px;
             text-align: center;
             color: #ffffff;
+        }
+
+        .header-brand {
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            justify-content: center;
+            text-decoration: none;
+            margin-bottom: 16px;
+        }
+
+        .header-logo-icon {
+            width: 30px;
+            height: 30px;
+            background-color: #ffffff;
+            border-radius: 7px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .header-brand-name {
+            font-size: 16px;
+            color: #ffffff;
+            font-weight: 700;
+            letter-spacing: 0.3px;
         }
 
         .header .check-icon {
@@ -74,8 +101,8 @@
             height: 44px;
             min-width: 44px;
             border-radius: 50%;
-            background-color: #e4f4de;
-            color: #14a800;
+            background-color: #eef2ff;
+            color: #4338ca;
             font-weight: bold;
             font-size: 16px;
             text-align: center;
@@ -97,11 +124,11 @@
 
         /* Booking summary card */
         .booking-card {
-            border: 1px solid #e2e6e4;
+            border: 1px solid #dfe1f5;
             border-radius: 6px;
             padding: 20px;
             margin: 20px 0;
-            background-color: #fafbfa;
+            background-color: #fafafd;
         }
 
         .booking-card h2 {
@@ -112,7 +139,7 @@
 
         .booking-card .category {
             font-size: 13px;
-            color: #14a800;
+            color: #4338ca;
             font-weight: 600;
             margin: 0 0 16px;
             text-transform: uppercase;
@@ -121,8 +148,8 @@
 
         .status-badge {
             display: inline-block;
-            background-color: #e4f4de;
-            color: #14a800;
+            background-color: #eef2ff;
+            color: #4338ca;
             font-size: 12px;
             font-weight: 700;
             padding: 4px 10px;
@@ -134,7 +161,7 @@
             display: flex;
             justify-content: space-between;
             padding: 8px 0;
-            border-bottom: 1px solid #eef1ef;
+            border-bottom: 1px solid #eeeef7;
             font-size: 14px;
         }
 
@@ -153,7 +180,7 @@
         }
 
         .price-value {
-            color: #14a800;
+            color: #4338ca;
             font-size: 16px;
         }
 
@@ -165,11 +192,11 @@
 
         .cta-button {
             display: inline-block;
-            background-color: #14a800;
+            background-color: #4f46e5;
             color: #ffffff !important;
             text-decoration: none;
             padding: 13px 32px;
-            border-radius: 4px;
+            border-radius: 8px;
             font-size: 15px;
             font-weight: 600;
         }
@@ -181,7 +208,7 @@
         }
 
         .cta-secondary a {
-            color: #14a800;
+            color: #4338ca;
             text-decoration: none;
             font-weight: 600;
         }
@@ -194,7 +221,7 @@
         }
 
         .footer {
-            background-color: #f0f3f2;
+            background-color: #f1f1fb;
             padding: 18px 30px;
             text-align: center;
             font-size: 13px;
@@ -202,12 +229,12 @@
         }
 
         .footer a {
-            color: #14a800;
+            color: #4338ca;
             text-decoration: none;
         }
 
         .footer span {
-            color: #14a800;
+            color: #4338ca;
             font-weight: 600;
         }
     </style>
@@ -219,6 +246,12 @@
 
             <!-- Header -->
             <div class="header">
+                <a href="{{ frontend_url }}" class="header-brand" target="_blank">
+                    <span class="header-logo-icon">
+                        <img src="data:image/png;base64,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" width="20" height="22" alt="Skills4Hire" style="display:block; max-width:20px; height:auto;">
+                    </span>
+                    <span class="header-brand-name">Skills4Hire</span>
+                </a>
                 <div class="check-icon">&#10003;</div>
                 <h1>Your Booking is Confirmed</h1>
             </div>

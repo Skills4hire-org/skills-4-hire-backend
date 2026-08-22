@@ -114,6 +114,7 @@ class MainServiceSerializer(serializers.ModelSerializer):
 class ServiceListSerializer(serializers.ModelSerializer):
     attachments = ServiceAttachmentSerializer(many=True, read_only=True)
     services = MainServiceSerializer(read_only=True, many=True)
+    has_endorsed = serializers.SerializerMethodField()
     
     class Meta:
         model = Service
@@ -122,5 +123,9 @@ class ServiceListSerializer(serializers.ModelSerializer):
             "is_default", "years_of_experience",
             "is_active", "created_at", 
             "attachments", "services",
-            "name", "description", "features"
+            "name", "description", "features", "has_endorsed"
         ]
+
+    def get_has_endorsed(self, obj: Service):
+        from ...chats.endorsements.serializers import has_endorsed
+        return has_endorsed(obj.profile, self.context['request'].user)

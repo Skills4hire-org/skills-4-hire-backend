@@ -44,7 +44,7 @@ class PostAttachmentSerializer(serializers.ModelSerializer):
         return  url
     
 
-def create_bulk_post_attachements(instance: Post = None, attachments: list[dict[str, any]] = [], comment: Comment = None):
+def create_bulk_post_attachements(instance: Post | None = None, attachments: list[dict[str, any]] = [], comment: Comment | None = None):
     result = PostAttachment.objects.bulk_create(
                 [
                     PostAttachment(
@@ -187,14 +187,16 @@ class CommentCreateSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         user = self.context['request'].user
-        post = self.context.get("post")
+        post = self.context.get("post", None)
+        parent_comment = self.context.get("parent_comment", None)
 
         attachments = validated_data.pop("attachments", None)
         try:
             comment_instance = CommentService()
-            comment = comment_instance.add_comment(post=post, user=user, message=validated_data['message'])
+            comment = comment_instance.add_comment(post=post, parent=parent_comment, user=user, message=validated_data['message'])
             if attachments:
-              create_bulk_post_attachements(None, attachments, comment)
+                create_bulk_post_attachements(None, attachments, comment)
+
         except Exception as e:
             raise Exception(e)
 

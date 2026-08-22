@@ -140,10 +140,8 @@ class CommentListSerializer(serializers.ModelSerializer):
         ]
 
     def get_attachments(self, obj):
-        if obj.attachments.exists():
-            attachments = obj.attachments.all()
-            return PostAttachmentSerializer(attachments, many=True).data
-        return None
+        attachments = obj.attachments.all()
+        return PostAttachmentSerializer(attachments, many=True).data
 
     def get_is_liked(self, obj):
         user = self.context['request'].user
