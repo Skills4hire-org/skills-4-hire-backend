@@ -85,7 +85,6 @@ class UserManagementViewSet(viewsets.ModelViewSet):
             if admin_action not in VALID_ADMIN_ACTIONS:
                 logger.info("[admin]: Passed invalid action on user account.")
                 return api_response(data={}, message="Invalid Request", status_code=404)
-            print(request.method)
             user = self.get_object()
             if admin_action.lower() == "delete" and request.method == "DELETE":
                 # delete user account permanently/ 

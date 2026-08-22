@@ -13,7 +13,6 @@ from ..customer_models import CustomerModel
 from ..profile_avater.serializers import AvatarDetailSerializer
 from ..provider_models import ProviderModel
 from ..services.models import ServiceCategory
-from ..skills.serializers import ProviderSkillListSerializer
 from ...core.utils.py import generate_thumbnails
 
 UserModel = get_user_model()
@@ -138,15 +137,21 @@ class BaseProfileListSerializer(serializers.ModelSerializer):
     provider_id = serializers.SerializerMethodField()
     customer_id = serializers.SerializerMethodField()
     professional_title = serializers.SerializerMethodField() # add professional title for provider if present
+    has_endorsed = serializers.SerializerMethodField()
 
     class Meta:
         model = BaseProfile
         fields = [
-            "professional_title", "gender", "display_name", "trust_score",
+            "professional_title", "gender", "display_name", "trust_score", "has_endorsed",
             "country", "city", "state", "location", "created_at", "avatar",
             "customer_id", "provider_id", "cover_photo"
         ]
 
+    def get_has_endorsed(self, obj):
+        from ...chats.endorsements.serializers import has_endorsed
+        if obj.user.is_provider:
+            return has_endorsed(obj.provider_profile, self.context['request'].user)
+    
     def get_professional_title(self, obj):
         user = obj.user
         if not user.is_provider:
@@ -204,6 +209,7 @@ class ProviderProfileUpdateCreateSerializer(serializers.ModelSerializer):
 class ProviderProfileDetailSerializer(serializers.ModelSerializer):
         user = serializers.SerializerMethodField(read_only=True)
         endorsement_count = serializers.SerializerMethodField()
+        has_endorsed = serializers.SerializerMethodField()
         posts = serializers.SerializerMethodField()
         comments = serializers.SerializerMethodField()
         services = serializers.SerializerMethodField()
@@ -218,10 +224,15 @@ class ProviderProfileDetailSerializer(serializers.ModelSerializer):
             fields = [
                 "provider_id", "professional_title", "max_charge", "min_charge", 
                 'avg_rating', "total_reviews", "completed_bookings",
-                "headline", "overview", "created_at", "endorsement_count", "user",
+                "headline", "overview", "created_at", "endorsement_count", "has_endorsed", "user",
                 "posts", 'comments', "services", "gallary", "media"
             ]
 
+
+        def get_has_endorsed(self, obj):
+           from ...chats.endorsements.serializers import has_endorsed
+           return has_endorsed(obj, self.context['request'].user)
+        
         def get_media(self, obj: ProviderModel):
             from ...posts.serializers.create import PostAttachmentSerializer, PostAttachment
             from django.db.models import Q
@@ -298,6 +309,7 @@ class ProviderProfilePublicSerializer(serializers.ModelSerializer):
     user = serializers.SerializerMethodField()
     avg_rating = serializers.SerializerMethodField()
     total_reviews = serializers.SerializerMethodField()
+    has_endorsed = serializers.SerializerMethodField()
 
     class Meta:
         model = ProviderModel
@@ -305,8 +317,12 @@ class ProviderProfilePublicSerializer(serializers.ModelSerializer):
             "provider_id", "professional_title",
             "avg_rating", "total_reviews", "min_charge", 
             "max_charge", 
-            "overview", "headline", "user",
+            "overview", "headline","has_endorsed", "user",
         ]
+
+    def get_has_endorsed(self, obj):
+        from ...chats.endorsements.serializers import has_endorsed
+        return has_endorsed(obj, self.context['request'].user)
     
     def get_user(self, obj: ProviderModel):
         from ...authentication.serializers import UserReadSerializer
